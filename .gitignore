@@ -13,3 +13,7 @@ build/
 installers/
 *.log
 .pytest_cache/
+certs/*.pem
+certs/*.key
+!certs/.gitkeep
+
