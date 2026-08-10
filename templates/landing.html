@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>InPmnt — Get paid without the chase</title>
+  <meta name="description" content="InPmnt automatically reminds clients about unpaid invoices so solo trades and freelancers get paid faster." />
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/inpmnt-icon.png') }}" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}" />
+</head>
+<body class="landing">
+  <nav class="landing-nav">
+    <div class="brand">
+      <div class="brand-logo img" aria-hidden="true">
+        <img src="{{ url_for('static', filename='img/inpmnt-icon.png') }}" alt="" />
+      </div>
+      <div class="brand-copy">
+        <div class="brand-mark" style="color:var(--ink)">InPmnt</div>
+        <div class="brand-sub" style="color:var(--muted)">Invoice chase · Payment reminders</div>
+      </div>
+    </div>
+    <div class="nav-actions">
+      <a class="btn secondary sm" href="{{ url_for('main.login') }}">Log in</a>
+      <a class="btn sm" href="{{ url_for('main.login') }}">Start free trial</a>
+    </div>
+  </nav>
+
+  <header class="landing-hero">
+    <div>
+      <div class="brand-mark">InPmnt</div>
+      <h1>Get paid without the chase.</h1>
+      <p class="sub">
+        Paste unpaid invoices, set polite reminder schedules, and stop losing cash to late payers.
+        Built for plumbers, landscapers, photographers, and consultants.
+      </p>
+      <div class="hero-cta">
+        <a class="btn" href="{{ url_for('main.login') }}">Try the demo workspace</a>
+        <a class="btn secondary" href="#pricing">See pricing</a>
+      </div>
+    </div>
+    <div class="hero-visual" aria-hidden="true">
+      <img src="{{ url_for('static', filename='img/inpmnt-icon.png') }}" alt="InPmnt icon" />
+    </div>
+  </header>
+
+  <section class="landing-section" id="features">
+    <h2>Everything you need to collect faster</h2>
+    <p class="sub">A focused tool — not another bloated accounting suite.</p>
+    <div class="feature-grid">
+      <article class="feature">
+        <h3>Smart reminder schedules</h3>
+        <p>Auto-queue friendly nudges before due date, on the day, and after — email or SMS templates you control.</p>
+      </article>
+      <article class="feature">
+        <h3>Aging &amp; overdue dashboard</h3>
+        <p>See open balances, 1–30 / 31–60 / 60+ aging, and which invoices need a final notice today.</p>
+      </article>
+      <article class="feature">
+        <h3>One-tap final notice</h3>
+        <p>Escalate politely when someone’s been quiet too long. Log every send for your records.</p>
+      </article>
+      <article class="feature">
+        <h3>Clients &amp; open balances</h3>
+        <p>Keep contact details, notes, and who still owes you — without leaving the app.</p>
+      </article>
+      <article class="feature">
+        <h3>Payment tracking</h3>
+        <p>Record partial or full payments and watch reminders cancel themselves when you’re paid.</p>
+      </article>
+      <article class="feature">
+        <h3>Pays for itself</h3>
+        <p>Recover one late invoice and the subscription is covered. Built by Robert Foster.</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="landing-section" id="pricing">
+    <h2>Simple pricing</h2>
+    <p class="sub">Start on a 14-day trial. Upgrade when the first recovered invoice proves it.</p>
+    <div class="pricing-grid">
+      <article class="price-card">
+        <h3>Starter</h3>
+        <div class="price">$19<span>/mo</span></div>
+        <ul>
+          <li>Up to 40 open invoices</li>
+          <li>Email reminders</li>
+          <li>Dashboard &amp; aging</li>
+          <li>1 workspace user</li>
+        </ul>
+        <button class="btn secondary" type="button" data-checkout="starter">Subscribe with Stripe</button>
+      </article>
+      <article class="price-card featured">
+        <h3>Pro</h3>
+        <div class="price">$39<span>/mo</span></div>
+        <ul>
+          <li>Unlimited invoices</li>
+          <li>Email + SMS reminders</li>
+          <li>Custom templates</li>
+          <li>Final notice workflows</li>
+        </ul>
+        <button class="btn" type="button" data-checkout="pro">Subscribe with Stripe</button>
+      </article>
+      <article class="price-card">
+        <h3>Annual</h3>
+        <div class="price">$99<span>/yr</span></div>
+        <ul>
+          <li>Starter features</li>
+          <li>2 months free</li>
+          <li>Best for solo operators</li>
+          <li>Cancel anytime</li>
+        </ul>
+        <button class="btn secondary" type="button" data-checkout="annual">Subscribe with Stripe</button>
+      </article>
+    </div>
+    <p class="sub" style="margin-top:18px">
+      {% if stripe_enabled %}
+      Stripe Checkout is live — cards processed securely by Stripe.
+      {% else %}
+      Stripe keys not configured yet — buttons open the demo workspace. Add keys from <code>.env.example</code> to go live.
+      {% endif %}
+      Or <a href="{{ url_for('main.login') }}">start the free trial</a> first.
+    </p>
+  </section>
+
+  <footer class="landing-footer">
+    <p>© 2026 Robert Foster · InPmnt · MIT License</p>
+    <p>Demo login: robert@inpmnt.app / demo1234</p>
+  </footer>
+  <script>
+    document.querySelectorAll("[data-checkout]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const plan = btn.getAttribute("data-checkout");
+        btn.disabled = true;
+        try {
+          const res = await fetch("/api/billing/checkout", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ plan }),
+          });
+          const data = await res.json();
+          if (res.status === 401) {
+            location.href = "{{ url_for('main.login') }}?next=/app#/settings&plan=" + plan;
+            return;
+          }
+          if (data.url) {
+            location.href = data.url;
+            return;
+          }
+          // Stripe not configured — send to demo login
+          location.href = "{{ url_for('main.login') }}";
+        } catch (e) {
+          location.href = "{{ url_for('main.login') }}";
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    });
+  </script>
+</body>
+</html>

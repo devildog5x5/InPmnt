@@ -1,0 +1,13 @@
+---
+description: After build-related fix series, rebuild release zips and hand off download links without waiting to be asked.
+alwaysApply: true
+---
+
+# Auto-build after fix series (InPmnt)
+
+When you finish a **connected set of changes** that fix or materially affect **runtime, billing, packaging, or start scripts**, do **not** end the turn until you have:
+
+1. Smoke-checked the app (`python -c` import / test_client, or `.\start.ps1` briefly).
+2. Rebuilt zips: `powershell -File .\build_release.ps1`
+3. Given **### New build links** (local paths under `installers\` and/or GitHub release URLs if published).
+4. Committed and pushed when the change set is shippable (per release SOP).
