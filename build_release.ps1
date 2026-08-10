@@ -3,16 +3,17 @@ $ErrorActionPreference = "Stop"
 $Root = $PSScriptRoot
 $Out = Join-Path $Root "installers"
 $Stage = Join-Path $Root "build\stage"
-$Version = if ($args[0]) { $args[0] } else { "1.1.4" }
+$Version = if ($args[0]) { $args[0] } else { "1.2.0" }
 
 New-Item -ItemType Directory -Force -Path $Out | Out-Null
 if (Test-Path $Stage) { Remove-Item -Recurse -Force $Stage }
 New-Item -ItemType Directory -Force -Path $Stage | Out-Null
 
 $include = @(
-    "app", "static", "templates", "assets",
+    "app", "static", "templates", "assets", "deploy",
     "requirements.txt", "run.py", "start.ps1",
-    "README.md", "GO_TO_MARKET.md", "LICENSE", ".env.example", ".gitignore"
+    "Dockerfile", "docker-compose.yml", "docker-entrypoint.sh", ".dockerignore",
+    "README.md", "GO_TO_MARKET.md", "LICENSE", ".env.example", ".gitignore", ".gitattributes"
 )
 
 $PortableDir = Join-Path $Stage "InPmnt"

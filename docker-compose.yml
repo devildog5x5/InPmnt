@@ -1,0 +1,36 @@
+# InPmnt on Linux (Docker)
+#   docker compose up -d --build
+#   open http://127.0.0.1:5055
+# Demo: trialuser@inpmnt.app / demo1234
+#
+# Optional Stripe / public URL — create .env then:
+#   docker compose --env-file .env up -d --build
+# Or copy keys into the container after first start:
+#   docker cp .env inpmnt:/app/.env && docker compose restart
+
+services:
+  inpmnt:
+    build: .
+    image: inpmnt:latest
+    container_name: inpmnt
+    restart: unless-stopped
+    ports:
+      - "${INPMNT_PORT:-5055}:5055"
+    environment:
+      PORT: "5055"
+      USE_HTTPS: "0"
+      DATABASE_PATH: /app/data/inpmnt.db
+      BASE_URL: ${BASE_URL:-http://127.0.0.1:5055}
+      WEB_CONCURRENCY: ${WEB_CONCURRENCY:-2}
+      FLASK_SECRET_KEY: ${FLASK_SECRET_KEY:-}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_PRICE_STARTER: ${STRIPE_PRICE_STARTER:-}
+      STRIPE_PRICE_PRO: ${STRIPE_PRICE_PRO:-}
+      STRIPE_PRICE_ANNUAL: ${STRIPE_PRICE_ANNUAL:-}
+    volumes:
+      - inpmnt-data:/app/data
+
+volumes:
+  inpmnt-data:

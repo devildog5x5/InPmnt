@@ -12,11 +12,11 @@ Packages are published on the [GitHub Releases](https://github.com/devildog5x5/I
 
 | Package | What you get | Download |
 |---------|----------------|----------|
-| **Portable** | Runnable app — extract and run `start.ps1` | [InPmnt-Portable.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.1.4/InPmnt-Portable.zip) |
-| **Source** | Source distribution | [InPmnt-Source.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.1.4/InPmnt-Source.zip) |
-| **Icon** | Brand icon assets (blue / teal / violet) | [InPmnt-Icon.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.1.4/InPmnt-Icon.zip) |
+| **Portable** | Runnable app — extract and run `start.ps1` | [InPmnt-Portable.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.2.0/InPmnt-Portable.zip) |
+| **Source** | Source distribution | [InPmnt-Source.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.2.0/InPmnt-Source.zip) |
+| **Icon** | Brand icon assets (blue / teal / violet) | [InPmnt-Icon.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.2.0/InPmnt-Icon.zip) |
 
-- Latest release: [v1.1.4](https://github.com/devildog5x5/InPmnt/releases/tag/v1.1.4)
+- Latest release: [v1.2.0](https://github.com/devildog5x5/InPmnt/releases/tag/v1.2.0)
 - Demo login: `trialuser@inpmnt.app` / `demo1234`
 - App URL (local): `https://127.0.0.1:5055` (self-signed cert; accept the browser warning)
 - Rebuild locally: `powershell -File .\build_release.ps1` → `installers\*.zip`
@@ -79,13 +79,38 @@ BASE_URL=https://127.0.0.1:5055
 
 Production TLS (Let's Encrypt / IIS) is handled by nginx or IIS in front of the app — see [deploy/DEPLOY.md](deploy/DEPLOY.md). Do not use the local `certs/` files on a public server.
 
-## Deploy (Linux VPS or Windows Server)
+## Docker (Linux container)
 
-Full guide (Linux + Windows): **[deploy/DEPLOY.md](https://github.com/devildog5x5/InPmnt/blob/main/deploy/DEPLOY.md)**
+Runs InPmnt with **Gunicorn** on Linux inside Docker — good for a VPS/VM.
 
 ```bash
-# Linux / GoDaddy VPS
+# On a machine with Docker installed:
+git clone https://github.com/devildog5x5/InPmnt.git
+cd InPmnt
+# optional: cp .env.example .env  && edit Stripe keys / BASE_URL
+docker compose up -d --build
+```
+
+Open **http://127.0.0.1:5055** (or `http://VM_IP:5055`).  
+Demo: `trialuser@inpmnt.app` / `demo1234`  
+SQLite persists in the Docker volume `inpmnt-data`. TLS belongs on the host (nginx/Caddy/Traefik) or cloud load balancer — the container serves plain HTTP on port 5055.
+
+```bash
+docker compose logs -f        # logs
+docker compose down           # stop
+docker compose up -d --build  # rebuild after pulls
+```
+
+## Deploy (Linux VPS or Windows Server)
+
+Full guide (Linux + Windows + Docker): **[deploy/DEPLOY.md](https://github.com/devildog5x5/InPmnt/blob/main/deploy/DEPLOY.md)**
+
+```bash
+# Linux / GoDaddy VPS (native)
 sudo bash deploy/setup-vps.sh yourdomain.com
+
+# Or Docker on any Linux VM
+docker compose up -d --build
 ```
 
 ```powershell

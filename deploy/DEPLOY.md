@@ -6,11 +6,54 @@ InPmnt runs on **Linux VPS** or a **Windows server**. Use a real VM / dedicated 
 
 | Platform | Recommended stack |
 |----------|-------------------|
+| **Docker** (any Linux VM) | `docker compose up` → [Docker](#docker-linux-vm) |
 | **Linux** (GoDaddy VPS, Ubuntu, etc.) | Nginx + Gunicorn + systemd → [Linux](#linux-ubuntu--godaddy-vps) |
 | **Windows Server** | Waitress + Windows Service (NSSM) + IIS reverse proxy → [Windows](#windows-server) |
 
-Download zips: [v1.0.0 release](https://github.com/devildog5x5/InPmnt/releases/tag/v1.0.0)  
-(`InPmnt-Portable.zip` works on both platforms.)
+Download zips: [latest release](https://github.com/devildog5x5/InPmnt/releases/latest)  
+(`InPmnt-Portable.zip` works for native Windows/Linux; Docker uses the repo `Dockerfile`.)
+
+---
+
+## Docker (Linux VM)
+
+Easiest way to keep InPmnt “just running” on a VM.
+
+### Prerequisites
+
+- Ubuntu/Debian (or any Linux) with [Docker Engine](https://docs.docker.com/engine/install/) + Compose plugin
+- Open firewall port **5055** (or put nginx/Caddy in front on 80/443)
+
+### Run
+
+```bash
+git clone https://github.com/devildog5x5/InPmnt.git /opt/inpmnt
+cd /opt/inpmnt
+# optional Stripe / public URL:
+#   cp .env.example .env && nano .env
+#   export BASE_URL=https://yourdomain.com
+docker compose up -d --build
+curl -sS http://127.0.0.1:5055/ | head
+```
+
+- App: `http://YOUR_VM_IP:5055`
+- Demo: `trialuser@inpmnt.app` / `demo1234`
+- Data: Docker volume `inpmnt-data` → `/app/data/inpmnt.db` inside the container
+- Restart policy: `unless-stopped` (survives reboot)
+
+### Useful commands
+
+```bash
+docker compose ps
+docker compose logs -f inpmnt
+docker compose pull   # if you later publish an image registry
+docker compose up -d --build
+docker compose down   # stop (volume keeps the DB)
+```
+
+### HTTPS in front of Docker
+
+Terminate TLS on the host (nginx/Caddy) and proxy to `127.0.0.1:5055`. Set `BASE_URL=https://yourdomain.com` in the environment or `.env` used by Compose. Do not use the Windows local `certs/` files inside the container.
 
 ---
 

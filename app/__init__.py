@@ -19,7 +19,8 @@ def create_app() -> Flask:
     import os
 
     app.config["SECRET_KEY"] = os.environ.get("FLASK_SECRET_KEY") or "inpmnt-dev-change-me"
-    app.config["DATABASE"] = str(root / "inpmnt.db")
+    db_env = (os.environ.get("DATABASE_PATH") or "").strip()
+    app.config["DATABASE"] = db_env if db_env else str(root / "inpmnt.db")
 
     init_db(app.config["DATABASE"])
     app.register_blueprint(bp)
