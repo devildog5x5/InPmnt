@@ -181,5 +181,5 @@ Test with `sk_test_` / `pk_test_` and card `4242 4242 4242 4242`, then switch to
 ## Demo login (change after go-live)
 
 - URL: `https://yourdomain.com`
-- Email: `robert@inpmnt.app`
+- Email: `trialuser@inpmnt.app`
 - Password: `demo1234`

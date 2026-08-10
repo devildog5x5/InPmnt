@@ -150,6 +150,28 @@ def _migrate(conn: sqlite3.Connection) -> None:
     if "stripe_subscription_id" not in cols:
         conn.execute("ALTER TABLE settings ADD COLUMN stripe_subscription_id TEXT")
 
+    # Rename legacy demo login robert@ → trialuser@
+    legacy = conn.execute(
+        "SELECT id FROM users WHERE lower(email) = ?",
+        ("robert@inpmnt.app",),
+    ).fetchone()
+    if legacy:
+        taken = conn.execute(
+            "SELECT id FROM users WHERE lower(email) = ?",
+            ("trialuser@inpmnt.app",),
+        ).fetchone()
+        if not taken:
+            conn.execute(
+                "UPDATE users SET email = ?, name = ? WHERE id = ?",
+                ("trialuser@inpmnt.app", "Trial User", legacy["id"]),
+            )
+        settings = conn.execute("SELECT email, owner_name FROM settings WHERE id = 1").fetchone()
+        if settings and (settings["email"] or "").lower() == "robert@inpmnt.app":
+            conn.execute(
+                "UPDATE settings SET email = ?, owner_name = ? WHERE id = 1",
+                ("trialuser@inpmnt.app", "Trial User"),
+            )
+
 
 def _seed(conn: sqlite3.Connection) -> None:
     now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
@@ -161,8 +183,8 @@ def _seed(conn: sqlite3.Connection) -> None:
         VALUES (?, ?, ?, ?)
         """,
         (
-            "robert@inpmnt.app",
-            "Robert Foster",
+            "trialuser@inpmnt.app",
+            "Trial User",
             generate_password_hash("demo1234"),
             now,
         ),
@@ -178,8 +200,8 @@ def _seed(conn: sqlite3.Connection) -> None:
         """,
         (
             "Foster Field Services",
-            "Robert Foster",
-            "robert@inpmnt.app",
+            "Trial User",
+            "trialuser@inpmnt.app",
             "(555) 014-2200",
             "https://inpmnt.app",
             offsets,
@@ -340,7 +362,7 @@ def _seed(conn: sqlite3.Connection) -> None:
         """
         INSERT INTO activity (kind, message, entity_type, entity_id, created_at)
         VALUES
-        ('system', 'InPmnt workspace created for Robert Foster', 'settings', 1, ?),
+        ('system', 'InPmnt workspace created for Trial User', 'settings', 1, ?),
         ('invoice', 'Demo invoices and reminder schedule loaded', 'invoice', NULL, ?)
         """,
         (now, now),

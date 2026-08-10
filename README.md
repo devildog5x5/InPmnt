@@ -12,12 +12,12 @@ Packages are published on the [GitHub Releases](https://github.com/devildog5x5/I
 
 | Package | What you get | Download |
 |---------|----------------|----------|
-| **Portable** | Runnable app — extract and run `start.ps1` | [InPmnt-Portable.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.1.3/InPmnt-Portable.zip) |
-| **Source** | Source distribution | [InPmnt-Source.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.1.3/InPmnt-Source.zip) |
-| **Icon** | Brand icon assets (blue / teal / violet) | [InPmnt-Icon.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.1.3/InPmnt-Icon.zip) |
+| **Portable** | Runnable app — extract and run `start.ps1` | [InPmnt-Portable.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.1.4/InPmnt-Portable.zip) |
+| **Source** | Source distribution | [InPmnt-Source.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.1.4/InPmnt-Source.zip) |
+| **Icon** | Brand icon assets (blue / teal / violet) | [InPmnt-Icon.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.1.4/InPmnt-Icon.zip) |
 
-- Latest release: [v1.1.3](https://github.com/devildog5x5/InPmnt/releases/tag/v1.1.3)
-- Demo login: `robert@inpmnt.app` / `demo1234`
+- Latest release: [v1.1.4](https://github.com/devildog5x5/InPmnt/releases/tag/v1.1.4)
+- Demo login: `trialuser@inpmnt.app` / `demo1234`
 - App URL (local): `https://127.0.0.1:5055` (self-signed cert; accept the browser warning)
 - Rebuild locally: `powershell -File .\build_release.ps1` → `installers\*.zip`
 
