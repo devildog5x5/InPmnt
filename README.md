@@ -12,11 +12,11 @@ Packages are published on the [GitHub Releases](https://github.com/devildog5x5/I
 
 | Package | What you get | Download |
 |---------|----------------|----------|
-| **Portable** | Runnable app — extract and run `start.ps1` | [InPmnt-Portable.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.1.2/InPmnt-Portable.zip) |
-| **Source** | Source distribution | [InPmnt-Source.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.1.2/InPmnt-Source.zip) |
-| **Icon** | Brand icon assets (blue / teal / violet) | [InPmnt-Icon.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.1.2/InPmnt-Icon.zip) |
+| **Portable** | Runnable app — extract and run `start.ps1` | [InPmnt-Portable.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.1.3/InPmnt-Portable.zip) |
+| **Source** | Source distribution | [InPmnt-Source.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.1.3/InPmnt-Source.zip) |
+| **Icon** | Brand icon assets (blue / teal / violet) | [InPmnt-Icon.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.1.3/InPmnt-Icon.zip) |
 
-- Latest release: [v1.1.2](https://github.com/devildog5x5/InPmnt/releases/tag/v1.1.2)
+- Latest release: [v1.1.3](https://github.com/devildog5x5/InPmnt/releases/tag/v1.1.3)
 - Demo login: `robert@inpmnt.app` / `demo1234`
 - App URL (local): `https://127.0.0.1:5055` (self-signed cert; accept the browser warning)
 - Rebuild locally: `powershell -File .\build_release.ps1` → `installers\*.zip`
@@ -39,6 +39,45 @@ pip install -r requirements.txt
 copy .env.example .env
 python run.py
 ```
+
+## Local HTTPS certificate
+
+Default files (created automatically, **not** committed):
+
+| File | Role |
+|------|------|
+| `certs/localhost.pem` | Certificate (PEM) |
+| `certs/localhost-key.pem` | Private key (PEM) |
+
+### Regenerate the self-signed cert
+
+```powershell
+# Option A - helper (overwrites both files)
+.\.venv\Scripts\python.exe -m app.local_ssl --force
+
+# Option B - delete and let the next start recreate them
+Remove-Item .\certs\localhost.pem, .\certs\localhost-key.pem -ErrorAction SilentlyContinue
+```
+
+Then restart: `powershell -File .\start.ps1`
+
+### Replace with your own certificate
+
+1. Convert your cert + key to **PEM** if needed (not PFX/P12 alone).
+2. Either:
+   - Overwrite `certs/localhost.pem` and `certs/localhost-key.pem`, **or**
+   - Point `.env` at custom paths:
+
+```env
+USE_HTTPS=1
+SSL_CERT_FILE=C:\path\to\fullchain.pem
+SSL_KEY_FILE=C:\path\to\privkey.pem
+BASE_URL=https://127.0.0.1:5055
+```
+
+3. Restart the app. Browsers trust public CAs; self-signed and private CAs still show a warning unless you trust them in the OS/browser store.
+
+Production TLS (Let's Encrypt / IIS) is handled by nginx or IIS in front of the app — see [deploy/DEPLOY.md](deploy/DEPLOY.md). Do not use the local `certs/` files on a public server.
 
 ## Deploy (Linux VPS or Windows Server)
 

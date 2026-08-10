@@ -35,6 +35,17 @@ sudo bash /tmp/inpmnt/deploy/setup-vps.sh yourdomain.com
 sudo certbot --nginx -d yourdomain.com -d www.yourdomain.com
 ```
 
+Renew / replace the Let's Encrypt cert later:
+
+```bash
+sudo certbot renew
+# Or re-issue for the same names:
+sudo certbot --nginx -d yourdomain.com -d www.yourdomain.com
+sudo systemctl reload nginx
+```
+
+Do **not** copy the local-dev files from `certs/` onto the VPS. Local replace/regenerate steps are in the root [README](../README.md#local-https-certificate).
+
 5. Add Stripe keys and restart:
 
 ```bash
@@ -110,7 +121,7 @@ nssm start InPmnt
 6. **IIS reverse proxy**
    - Create a site bound to `yourdomain.com` (and `www`).
    - Point the site physical path at `deploy\iis` (contains `web.config` that proxies to `127.0.0.1:5055`), **or** add a URL Rewrite reverse-proxy rule to `http://127.0.0.1:5055/{R:0}`.
-   - Bind an HTTPS certificate (Win-ACME / Let’s Encrypt, or a GoDaddy cert).
+   - Bind an HTTPS certificate (Win-ACME / Let’s Encrypt, or a GoDaddy cert). To **replace** it later: IIS Manager → site → Bindings → https → Edit → select the new cert (or re-run Win-ACME). Do not use the app’s local `certs/` folder for production.
    - Point DNS `A` records at the Windows server’s public IP.
 
 7. Stripe webhook: `https://yourdomain.com/api/billing/webhook`  

@@ -1,19 +1,26 @@
 """Create a local self-signed certificate for HTTPS development."""
 from __future__ import annotations
 
+import argparse
 import ipaddress
+import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 
-def ensure_local_certs(cert_dir: Path | None = None) -> tuple[Path, Path]:
-    """Return (cert_pem, key_pem), generating them if missing."""
+def cert_paths(cert_dir: Path | None = None) -> tuple[Path, Path]:
     root = Path(__file__).resolve().parent.parent
     cert_dir = Path(cert_dir) if cert_dir else root / "certs"
     cert_dir.mkdir(parents=True, exist_ok=True)
-    cert_path = cert_dir / "localhost.pem"
-    key_path = cert_dir / "localhost-key.pem"
-    if cert_path.is_file() and key_path.is_file():
+    return cert_dir / "localhost.pem", cert_dir / "localhost-key.pem"
+
+
+def ensure_local_certs(
+    cert_dir: Path | None = None, *, force: bool = False
+) -> tuple[Path, Path]:
+    """Return (cert_pem, key_pem), generating them if missing (or if force=True)."""
+    cert_path, key_path = cert_paths(cert_dir)
+    if not force and cert_path.is_file() and key_path.is_file():
         return cert_path, key_path
 
     from cryptography import x509
@@ -67,3 +74,25 @@ def ensure_local_certs(cert_dir: Path | None = None) -> tuple[Path, Path]:
     )
     cert_path.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
     return cert_path, key_path
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        description="Generate or replace the local InPmnt HTTPS certificate."
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite certs/localhost.pem and certs/localhost-key.pem",
+    )
+    args = parser.parse_args(argv)
+    cert_path, key_path = ensure_local_certs(force=args.force)
+    action = "Replaced" if args.force else "Ready"
+    print(f"{action}: {cert_path}")
+    print(f"{action}: {key_path}")
+    print("Restart the app (.\\start.ps1) for changes to take effect.")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
