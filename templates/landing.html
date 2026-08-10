@@ -142,7 +142,7 @@
           });
           const data = await res.json();
           if (res.status === 401) {
-            location.href = "{{ url_for('main.login') }}?next=/app#/settings&plan=" + plan;
+            location.href = "{{ url_for('main.login') }}?next=" + encodeURIComponent("/app#/settings");
             return;
           }
           if (data.url) {

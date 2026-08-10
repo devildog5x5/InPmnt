@@ -4,71 +4,109 @@ set -eu
 cd /app
 mkdir -p /app/data
 
+# Named volumes often mount as root — fix ownership before dropping privileges.
+if [ "$(id -u)" = "0" ]; then
+  chown -R inpmnt:inpmnt /app/data /app/.env 2>/dev/null || chown -R inpmnt:inpmnt /app/data
+fi
+
 if [ ! -f /app/.env ]; then
   if [ -f /app/.env.example ]; then
     cp /app/.env.example /app/.env
   else
     touch /app/.env
   fi
-fi
-
-# Force container-friendly defaults (TLS belongs on the host / reverse proxy).
-if ! grep -q '^USE_HTTPS=' /app/.env 2>/dev/null; then
-  echo 'USE_HTTPS=0' >> /app/.env
-else
-  sed -i 's/^USE_HTTPS=.*/USE_HTTPS=0/' /app/.env
-fi
-
-if ! grep -q '^DATABASE_PATH=' /app/.env 2>/dev/null; then
-  echo "DATABASE_PATH=${DATABASE_PATH:-/app/data/inpmnt.db}" >> /app/.env
-fi
-
-# Prefer a real secret from the environment; otherwise generate one into .env.
-if [ -n "${FLASK_SECRET_KEY:-}" ] && [ "${FLASK_SECRET_KEY}" != "change-me-to-a-long-random-string" ]; then
-  if grep -q '^FLASK_SECRET_KEY=' /app/.env 2>/dev/null; then
-    sed -i "s|^FLASK_SECRET_KEY=.*|FLASK_SECRET_KEY=${FLASK_SECRET_KEY}|" /app/.env
-  else
-    echo "FLASK_SECRET_KEY=${FLASK_SECRET_KEY}" >> /app/.env
+  if [ "$(id -u)" = "0" ]; then
+    chown inpmnt:inpmnt /app/.env
   fi
-elif grep -qE '^FLASK_SECRET_KEY=(change-me-to-a-long-random-string)?$' /app/.env 2>/dev/null \
-   || ! grep -q '^FLASK_SECRET_KEY=' /app/.env 2>/dev/null; then
-  SECRET="$(python -c 'import secrets; print(secrets.token_hex(32))')"
-  if grep -q '^FLASK_SECRET_KEY=' /app/.env 2>/dev/null; then
-    sed -i "s|^FLASK_SECRET_KEY=.*|FLASK_SECRET_KEY=${SECRET}|" /app/.env
-  else
-    echo "FLASK_SECRET_KEY=${SECRET}" >> /app/.env
-  fi
-  export FLASK_SECRET_KEY="${SECRET}"
-  echo "Generated FLASK_SECRET_KEY for this container."
 fi
 
-# Sync common Stripe / URL vars from the process environment into .env when set.
-for key in BASE_URL STRIPE_SECRET_KEY STRIPE_PUBLISHABLE_KEY STRIPE_WEBHOOK_SECRET \
-           STRIPE_PRICE_STARTER STRIPE_PRICE_PRO STRIPE_PRICE_ANNUAL DATABASE_PATH; do
-  eval "val=\${$key:-}"
-  if [ -n "$val" ]; then
-    if grep -q "^${key}=" /app/.env 2>/dev/null; then
-      sed -i "s|^${key}=.*|${key}=${val}|" /app/.env
-    else
-      echo "${key}=${val}" >> /app/.env
-    fi
-  fi
-done
+# Merge container env into .env (safe for special characters) + force Docker defaults.
+python - <<'PY'
+import os
+import secrets
+from pathlib import Path
+
+env_path = Path("/app/.env")
+lines = env_path.read_text(encoding="utf-8").splitlines() if env_path.exists() else []
+data: dict[str, str] = {}
+order: list[str] = []
+for line in lines:
+    if not line.strip() or line.lstrip().startswith("#") or "=" not in line:
+        continue
+    k, v = line.split("=", 1)
+    k = k.strip()
+    if k and k not in data:
+        order.append(k)
+    data[k] = v
+
+def set_key(key: str, value: str) -> None:
+    if key not in data:
+        order.append(key)
+    data[key] = value
+
+set_key("USE_HTTPS", "0")
+set_key("DATABASE_PATH", os.environ.get("DATABASE_PATH") or data.get("DATABASE_PATH") or "/app/data/inpmnt.db")
+
+secret = (os.environ.get("FLASK_SECRET_KEY") or data.get("FLASK_SECRET_KEY") or "").strip()
+if not secret or secret == "change-me-to-a-long-random-string":
+    secret = secrets.token_hex(32)
+    print("Generated FLASK_SECRET_KEY for this container.")
+set_key("FLASK_SECRET_KEY", secret)
+
+for key in (
+    "BASE_URL",
+    "STRIPE_SECRET_KEY",
+    "STRIPE_PUBLISHABLE_KEY",
+    "STRIPE_WEBHOOK_SECRET",
+    "STRIPE_PRICE_STARTER",
+    "STRIPE_PRICE_PRO",
+    "STRIPE_PRICE_ANNUAL",
+):
+    val = (os.environ.get(key) or "").strip()
+    if val:
+        set_key(key, val)
+
+out = []
+for key in order:
+    out.append(f"{key}={data[key]}")
+env_path.write_text("\n".join(out) + "\n", encoding="utf-8")
+PY
 
 export DATABASE_PATH="${DATABASE_PATH:-/app/data/inpmnt.db}"
 export USE_HTTPS=0
 export PORT="${PORT:-5055}"
-# Clear empty secret so Flask can load the generated value from .env
-if [ -z "${FLASK_SECRET_KEY:-}" ] || [ "${FLASK_SECRET_KEY}" = "change-me-to-a-long-random-string" ]; then
-  unset FLASK_SECRET_KEY || true
-fi
+# Prefer values from .env over empty Compose placeholders.
+unset FLASK_SECRET_KEY || true
 
 echo "Starting InPmnt (Gunicorn) on 0.0.0.0:${PORT}"
 echo "Demo login: trialuser@inpmnt.app / demo1234"
-exec gunicorn \
-  --bind "0.0.0.0:${PORT}" \
-  --workers "${WEB_CONCURRENCY:-2}" \
-  --timeout 120 \
-  --access-logfile - \
-  --error-logfile - \
-  "run:app"
+
+# SQLite + multi-worker is unsafe; default to 1 unless overridden carefully.
+WORKERS="${WEB_CONCURRENCY:-1}"
+
+run_gunicorn() {
+  exec gunicorn \
+    --bind "0.0.0.0:${PORT}" \
+    --workers "${WORKERS}" \
+    --timeout 120 \
+    --access-logfile - \
+    --error-logfile - \
+    "run:app"
+}
+
+export HOME=/home/inpmnt
+export USER=inpmnt
+
+if [ "$(id -u)" = "0" ]; then
+  chown -R inpmnt:inpmnt /app/data /app/.env /home/inpmnt
+  exec setpriv --reuid=10001 --regid=10001 --clear-groups -- \
+    gunicorn \
+      --bind "0.0.0.0:${PORT}" \
+      --workers "${WORKERS}" \
+      --timeout 120 \
+      --access-logfile - \
+      --error-logfile - \
+      "run:app"
+else
+  run_gunicorn
+fi

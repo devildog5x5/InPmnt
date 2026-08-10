@@ -23,6 +23,16 @@ PLANS = {
 }
 
 
+def _configured(value: str, *, prefix: str = "", min_len: int = 16) -> bool:
+    """True when a value looks like a real Stripe id, not an .env.example stub."""
+    v = (value or "").strip()
+    if not v or "..." in v:
+        return False
+    if prefix and not v.startswith(prefix):
+        return False
+    return len(v) >= min_len
+
+
 @dataclass
 class StripeConfig:
     secret_key: str
@@ -33,7 +43,10 @@ class StripeConfig:
 
     @property
     def enabled(self) -> bool:
-        return bool(self.secret_key) and all(self.prices.values())
+        return (
+            _configured(self.secret_key, prefix="sk_", min_len=20)
+            and all(_configured(pid, prefix="price_", min_len=20) for pid in self.prices.values())
+        )
 
 
 def load_stripe_config() -> StripeConfig:

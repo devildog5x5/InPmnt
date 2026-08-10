@@ -80,10 +80,21 @@ def landing():
     )
 
 
+def _safe_next_url(raw: str | None) -> str | None:
+    """Allow only same-origin relative paths (blocks open redirects)."""
+    if not raw:
+        return None
+    next_url = raw.strip()
+    if next_url.startswith("/") and not next_url.startswith("//"):
+        return next_url
+    return None
+
+
 @bp.route("/login", methods=["GET", "POST"])
 def login():
+    next_url = _safe_next_url(request.args.get("next") or request.form.get("next"))
     if session.get("user_id"):
-        return redirect(url_for("main.app_home"))
+        return redirect(next_url or url_for("main.app_home"))
     error = None
     if request.method == "POST":
         email = (request.form.get("email") or "").strip().lower()
@@ -94,9 +105,9 @@ def login():
             ).fetchone()
             if user and check_password_hash(user["password_hash"], password):
                 session["user_id"] = user["id"]
-                return redirect(url_for("main.app_home"))
+                return redirect(next_url or url_for("main.app_home"))
         error = "Invalid email or password."
-    return render_template("login.html", error=error)
+    return render_template("login.html", error=error, next=next_url or "")
 
 
 @bp.get("/logout")
@@ -1025,14 +1036,12 @@ def stripe_webhook():
 
     import stripe
 
+    if not cfg.webhook_secret or "..." in cfg.webhook_secret or len(cfg.webhook_secret) < 20:
+        return jsonify({"error": "STRIPE_WEBHOOK_SECRET is required"}), 503
+
     stripe.api_key = cfg.secret_key
     try:
-        if cfg.webhook_secret:
-            event = stripe.Webhook.construct_event(payload, sig, cfg.webhook_secret)
-        else:
-            event = stripe.Event.construct_from(
-                __import__("json").loads(payload.decode("utf-8")), stripe.api_key
-            )
+        event = stripe.Webhook.construct_event(payload, sig, cfg.webhook_secret)
     except Exception as exc:  # noqa: BLE001
         return jsonify({"error": str(exc)}), 400
 
