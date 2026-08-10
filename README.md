@@ -78,14 +78,17 @@ Without keys, the app still runs in demo/trial mode.
 
 ## Product
 
+**Official product name: InPmnt** (locked). Tagline only — not the brand: *Get paid without the chase.*
+
 | | |
 |---|---|
-| Brand | InPmnt |
+| Brand | **InPmnt** |
 | Tagline | Get paid without the chase |
 | Author | Robert Foster |
 | License | MIT |
 | Icon | `static/img/inpmnt-icon.png` |
 | UI | Teal + slate system aligned with Coalesce ERP |
+| Repo / releases | https://github.com/devildog5x5/InPmnt |
 
 ## Go to market
 

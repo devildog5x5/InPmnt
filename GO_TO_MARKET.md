@@ -101,8 +101,9 @@ If you hit that, double ad spend and add QuickBooks import as the next feature.
 
 ## Brand kit
 
-- **Name:** InPmnt  
+- **Name (locked):** **InPmnt** — do not rebrand to GetPaid, PayUp, etc.  
 - **Tagline:** Get paid without the chase  
 - **UI colors:** teal `#0d6b66`, slate sidebar `#101920` (aligned with Coalesce ERP)  
 - **Icon:** blue / teal / violet invoice + reminder mark on black (`static/img/inpmnt-icon.png`)  
-- **Fonts:** Source Serif 4 (display), IBM Plex Sans (UI)
+- **Fonts:** Source Serif 4 (display), IBM Plex Sans (UI)  
+- **Repo:** https://github.com/devildog5x5/InPmnt
