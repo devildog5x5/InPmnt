@@ -38,6 +38,14 @@ copy .env.example .env
 python run.py
 ```
 
+## Deploy (GoDaddy VPS)
+
+Step-by-step + one-shot script: **[deploy/DEPLOY.md](https://github.com/devildog5x5/InPmnt/blob/main/deploy/DEPLOY.md)**
+
+```bash
+sudo bash deploy/setup-vps.sh yourdomain.com
+```
+
 ## Stripe billing
 
 InPmnt ships with **Stripe Checkout** (Starter $19 / Pro $39 / Annual $99) and the Customer Portal.
