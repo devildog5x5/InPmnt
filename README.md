@@ -38,12 +38,18 @@ copy .env.example .env
 python run.py
 ```
 
-## Deploy (GoDaddy VPS)
+## Deploy (Linux VPS or Windows Server)
 
-Step-by-step + one-shot script: **[deploy/DEPLOY.md](https://github.com/devildog5x5/InPmnt/blob/main/deploy/DEPLOY.md)**
+Full guide (Linux + Windows): **[deploy/DEPLOY.md](https://github.com/devildog5x5/InPmnt/blob/main/deploy/DEPLOY.md)**
 
 ```bash
+# Linux / GoDaddy VPS
 sudo bash deploy/setup-vps.sh yourdomain.com
+```
+
+```powershell
+# Windows Server (Waitress + IIS)
+powershell -ExecutionPolicy Bypass -File .\deploy\setup-windows.ps1 -Domain yourdomain.com
 ```
 
 ## Stripe billing
