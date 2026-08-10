@@ -11,7 +11,7 @@ if (-not (Test-Path .\.venv\Scripts\python.exe)) {
 
 if (-not (Test-Path .\.env) -and (Test-Path .\.env.example)) {
     Copy-Item .\.env.example .\.env
-    Write-Host "Created .env from .env.example — add Stripe keys when ready."
+    Write-Host "Created .env from .env.example - add Stripe keys when ready."
 }
 
 Write-Host "Starting InPmnt at http://127.0.0.1:5055"
