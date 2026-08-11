@@ -34,15 +34,15 @@ Offer a **14-day trial** (already seeded in the app). Collect card on day 0 or d
 - [x] Working app + demo data
 - [x] Landing page + pricing
 - [x] App icon + MIT license
-- [ ] Deploy to a host (Railway, Render, or a small VPS)
-- [ ] Point a domain (`inpmnt.com` / `.app`)
+- [x] Docker image + Hostinger deploy docs
+- [ ] Deploy to Hostinger VPS + point domain
 
 ### Day 3 — Payments & real sends
 - [x] Stripe Checkout for Starter / Pro / Annual (wired — add keys to `.env`)
 - [x] Stripe Customer Portal + webhook (`/api/billing/webhook`)
-- [ ] SMTP (Resend, Postmark, or SES) for email reminders
+- [x] Email reminders (Resend or SMTP — add keys to `.env`)
 - [ ] Twilio for SMS (Pro plan)
-- [ ] Replace demo password; add signup
+- [x] Signup + workspace isolation; demo login gated behind `SHOW_DEMO_LOGIN`
 
 ### Stripe setup (keys you must paste)
 
