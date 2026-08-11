@@ -10,8 +10,11 @@ from typing import Any, Iterator
 from werkzeug.security import check_password_hash, generate_password_hash
 
 # Seeded demo / default login (portable + Docker fresh DB).
-DEFAULT_ADMIN_PASSWORD = "LIfeMadeUSMCForged100!"
-_LEGACY_DEMO_PASSWORD = "demo1234"
+DEFAULT_ADMIN_PASSWORD = "LifeMadeUSMCForged100!"
+_LEGACY_DEMO_PASSWORDS = (
+    "demo1234",
+    "LIfeMadeUSMCForged100!",  # brief typo from v1.3.1
+)
 
 
 DEFAULT_TEMPLATE_DEFS = [
@@ -383,12 +386,15 @@ def _migrate(conn: sqlite3.Connection) -> None:
                 ("trialuser@inpmnt.app", "Trial User", settings["id"]),
             )
 
-    # One-time bump of legacy demo password → DEFAULT_ADMIN_PASSWORD.
+    # One-time bump of legacy demo passwords → DEFAULT_ADMIN_PASSWORD.
     demo = conn.execute(
         "SELECT id, password_hash FROM users WHERE lower(email) = ?",
         ("trialuser@inpmnt.app",),
     ).fetchone()
-    if demo and check_password_hash(demo["password_hash"], _LEGACY_DEMO_PASSWORD):
+    if demo and any(
+        check_password_hash(demo["password_hash"], legacy)
+        for legacy in _LEGACY_DEMO_PASSWORDS
+    ):
         conn.execute(
             "UPDATE users SET password_hash = ? WHERE id = ?",
             (generate_password_hash(DEFAULT_ADMIN_PASSWORD), demo["id"]),

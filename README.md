@@ -12,12 +12,12 @@ Packages are published on the [GitHub Releases](https://github.com/devildog5x5/I
 
 | Package | What you get | Download |
 |---------|----------------|----------|
-| **Portable** | Runnable app — extract and run `start.ps1` | [InPmnt-Portable.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.3.1/InPmnt-Portable.zip) |
-| **Source** | Source distribution | [InPmnt-Source.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.3.1/InPmnt-Source.zip) |
-| **Icon** | Brand icon assets (blue / teal / violet) | [InPmnt-Icon.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.3.1/InPmnt-Icon.zip) |
+| **Portable** | Runnable app — extract and run `start.ps1` | [InPmnt-Portable.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.3.2/InPmnt-Portable.zip) |
+| **Source** | Source distribution | [InPmnt-Source.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.3.2/InPmnt-Source.zip) |
+| **Icon** | Brand icon assets (blue / teal / violet) | [InPmnt-Icon.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.3.2/InPmnt-Icon.zip) |
 
-- Latest release: [v1.3.1](https://github.com/devildog5x5/InPmnt/releases/tag/v1.3.1)
-- Sign up: `/signup` · Local demo (optional): set `SHOW_DEMO_LOGIN=1` then `trialuser@inpmnt.app` / `LIfeMadeUSMCForged100!`
+- Latest release: [v1.3.2](https://github.com/devildog5x5/InPmnt/releases/tag/v1.3.2)
+- Sign up: `/signup` · Local demo (optional): set `SHOW_DEMO_LOGIN=1` then `trialuser@inpmnt.app` / `LifeMadeUSMCForged100!`
 - App URL (local): `https://127.0.0.1:5055` (self-signed cert; accept the browser warning)
 - Rebuild locally: `powershell -File .\build_release.ps1` → `installers\*.zip`
 
@@ -92,7 +92,7 @@ docker compose up -d --build
 ```
 
 Open **http://127.0.0.1:5055** (or `http://VM_IP:5055`).  
-Demo: `trialuser@inpmnt.app` / `LIfeMadeUSMCForged100!`  
+Demo: `trialuser@inpmnt.app` / `LifeMadeUSMCForged100!`  
 SQLite persists in the Docker volume `inpmnt-data`. TLS belongs on the host (nginx/Caddy/Traefik) or cloud load balancer — the container serves plain HTTP on port 5055.
 
 ```bash

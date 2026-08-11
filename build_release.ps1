@@ -3,7 +3,7 @@ $ErrorActionPreference = "Stop"
 $Root = $PSScriptRoot
 $Out = Join-Path $Root "installers"
 $Stage = Join-Path $Root "build\stage"
-$Version = if ($args[0]) { $args[0] } else { "1.3.1" }
+$Version = if ($args[0]) { $args[0] } else { "1.3.2" }
 
 New-Item -ItemType Directory -Force -Path $Out | Out-Null
 if (Test-Path $Stage) { Remove-Item -Recurse -Force $Stage }
