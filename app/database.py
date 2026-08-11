@@ -10,6 +10,57 @@ from typing import Any, Iterator
 from werkzeug.security import generate_password_hash
 
 
+DEFAULT_TEMPLATE_DEFS = [
+    (
+        "Friendly nudge",
+        "email",
+        "Quick reminder about invoice {{number}}",
+        "Hi {{client_name}},\n\nJust a friendly reminder that invoice {{number}} "
+        "for {{amount_due}} is due on {{due_date}}.\n\n"
+        "You can reply to this email if you have any questions.\n\n"
+        "Thanks,\n{{business_name}}",
+        1,
+    ),
+    (
+        "Due today",
+        "email",
+        "Invoice {{number}} is due today",
+        "Hi {{client_name}},\n\nInvoice {{number}} for {{amount_due}} is due today. "
+        "Please let us know if payment is already on the way.\n\n"
+        "Appreciate you,\n{{business_name}}",
+        0,
+    ),
+    (
+        "Overdue follow-up",
+        "email",
+        "Past due: invoice {{number}}",
+        "Hi {{client_name}},\n\nInvoice {{number}} for {{amount_due}} was due on "
+        "{{due_date}} and remains unpaid.\n\n"
+        "Please arrange payment at your earliest convenience, or reply so we can help.\n\n"
+        "{{business_name}}",
+        0,
+    ),
+    (
+        "SMS short",
+        "sms",
+        None,
+        "Hi {{client_name}} — invoice {{number}} ({{amount_due}}) is {{status}}. "
+        "Reply STOP to opt out. — {{business_name}}",
+        1,
+    ),
+    (
+        "Final notice",
+        "email",
+        "Final notice: invoice {{number}}",
+        "Hi {{client_name}},\n\nThis is a final notice regarding unpaid invoice "
+        "{{number}} ({{amount_due}}), originally due {{due_date}}.\n\n"
+        "Please remit payment promptly to avoid further collection steps.\n\n"
+        "{{business_name}}",
+        0,
+    ),
+]
+
+
 def connect(db_path: str) -> sqlite3.Connection:
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
@@ -50,11 +101,13 @@ def init_db(db_path: str) -> None:
                 email TEXT NOT NULL UNIQUE,
                 name TEXT NOT NULL,
                 password_hash TEXT NOT NULL,
+                workspace_id INTEGER,
                 created_at TEXT NOT NULL
             );
 
             CREATE TABLE IF NOT EXISTS settings (
-                id INTEGER PRIMARY KEY CHECK (id = 1),
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                owner_user_id INTEGER,
                 business_name TEXT NOT NULL,
                 owner_name TEXT NOT NULL,
                 email TEXT NOT NULL,
@@ -72,6 +125,7 @@ def init_db(db_path: str) -> None:
 
             CREATE TABLE IF NOT EXISTS clients (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                workspace_id INTEGER NOT NULL DEFAULT 1,
                 name TEXT NOT NULL,
                 company TEXT,
                 email TEXT,
@@ -82,7 +136,8 @@ def init_db(db_path: str) -> None:
 
             CREATE TABLE IF NOT EXISTS invoices (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                number TEXT NOT NULL UNIQUE,
+                workspace_id INTEGER NOT NULL DEFAULT 1,
+                number TEXT NOT NULL,
                 client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
                 title TEXT NOT NULL,
                 amount REAL NOT NULL,
@@ -93,7 +148,8 @@ def init_db(db_path: str) -> None:
                 status TEXT NOT NULL,
                 notes TEXT,
                 created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
+                updated_at TEXT NOT NULL,
+                UNIQUE (workspace_id, number)
             );
 
             CREATE TABLE IF NOT EXISTS payments (
@@ -108,6 +164,7 @@ def init_db(db_path: str) -> None:
 
             CREATE TABLE IF NOT EXISTS templates (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                workspace_id INTEGER NOT NULL DEFAULT 1,
                 name TEXT NOT NULL,
                 channel TEXT NOT NULL,
                 subject TEXT,
@@ -129,6 +186,7 @@ def init_db(db_path: str) -> None:
 
             CREATE TABLE IF NOT EXISTS activity (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                workspace_id INTEGER NOT NULL DEFAULT 1,
                 kind TEXT NOT NULL,
                 message TEXT NOT NULL,
                 entity_type TEXT,
@@ -138,19 +196,165 @@ def init_db(db_path: str) -> None:
             """
         )
         _migrate(conn)
-        existing = conn.execute("SELECT id FROM settings WHERE id = 1").fetchone()
+        existing = conn.execute("SELECT id FROM settings LIMIT 1").fetchone()
         if not existing:
             _seed(conn)
 
 
-def _migrate(conn: sqlite3.Connection) -> None:
-    cols = {r["name"] for r in conn.execute("PRAGMA table_info(settings)").fetchall()}
-    if "stripe_customer_id" not in cols:
-        conn.execute("ALTER TABLE settings ADD COLUMN stripe_customer_id TEXT")
-    if "stripe_subscription_id" not in cols:
-        conn.execute("ALTER TABLE settings ADD COLUMN stripe_subscription_id TEXT")
+def _table_sql(conn: sqlite3.Connection, name: str) -> str:
+    row = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name=?", (name,)
+    ).fetchone()
+    return row["sql"] or "" if row else ""
 
-    # Rename legacy demo login robert@ → trialuser@
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    # --- settings: drop CHECK(id=1), add owner_user_id ---
+    settings_sql = _table_sql(conn, "settings")
+    settings_cols = {r["name"] for r in conn.execute("PRAGMA table_info(settings)").fetchall()}
+    if settings_cols and (
+        "CHECK (id = 1)" in settings_sql.replace("CHECK(id=1)", "CHECK (id = 1)")
+        or "owner_user_id" not in settings_cols
+    ):
+        conn.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS settings_v2 (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                owner_user_id INTEGER,
+                business_name TEXT NOT NULL,
+                owner_name TEXT NOT NULL,
+                email TEXT NOT NULL,
+                phone TEXT,
+                website TEXT,
+                currency TEXT NOT NULL DEFAULT 'USD',
+                reminder_offsets TEXT NOT NULL,
+                default_channel TEXT NOT NULL DEFAULT 'email',
+                smtp_enabled INTEGER NOT NULL DEFAULT 0,
+                trial_ends_on TEXT,
+                plan TEXT NOT NULL DEFAULT 'trial',
+                stripe_customer_id TEXT,
+                stripe_subscription_id TEXT
+            );
+            """
+        )
+        # Copy if empty target
+        if not conn.execute("SELECT id FROM settings_v2 LIMIT 1").fetchone():
+            for row in conn.execute("SELECT * FROM settings").fetchall():
+                keys = [k for k in row.keys() if k != "owner_user_id"]
+                if "owner_user_id" in settings_cols:
+                    keys = list(row.keys())
+                cols = ", ".join(keys)
+                placeholders = ", ".join(["?"] * len(keys))
+                conn.execute(
+                    f"INSERT INTO settings_v2 ({cols}) VALUES ({placeholders})",
+                    [row[k] for k in keys],
+                )
+                # Ensure owner_user_id column populated later
+        conn.execute("DROP TABLE settings")
+        conn.execute("ALTER TABLE settings_v2 RENAME TO settings")
+        settings_cols = {r["name"] for r in conn.execute("PRAGMA table_info(settings)").fetchall()}
+
+    if "owner_user_id" not in settings_cols and settings_cols:
+        conn.execute("ALTER TABLE settings ADD COLUMN owner_user_id INTEGER")
+
+    # --- users.workspace_id ---
+    user_cols = {r["name"] for r in conn.execute("PRAGMA table_info(users)").fetchall()}
+    if "workspace_id" not in user_cols:
+        conn.execute("ALTER TABLE users ADD COLUMN workspace_id INTEGER")
+
+    # --- stamp workspace_id on data tables ---
+    for table in ("clients", "templates", "activity"):
+        cols = {r["name"] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+        if "workspace_id" not in cols:
+            conn.execute(
+                f"ALTER TABLE {table} ADD COLUMN workspace_id INTEGER NOT NULL DEFAULT 1"
+            )
+        conn.execute(f"UPDATE {table} SET workspace_id = 1 WHERE workspace_id IS NULL")
+
+    inv_sql = _table_sql(conn, "invoices")
+    inv_cols = {r["name"] for r in conn.execute("PRAGMA table_info(invoices)").fetchall()}
+    needs_inv_rebuild = "workspace_id" not in inv_cols or (
+        "UNIQUE" in inv_sql and "workspace_id, number" not in inv_sql.replace(" ", "")
+        and "number TEXT NOT NULL UNIQUE" in inv_sql
+    )
+    if needs_inv_rebuild and inv_cols:
+        conn.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS invoices_v2 (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                workspace_id INTEGER NOT NULL DEFAULT 1,
+                number TEXT NOT NULL,
+                client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+                title TEXT NOT NULL,
+                amount REAL NOT NULL,
+                amount_paid REAL NOT NULL DEFAULT 0,
+                currency TEXT NOT NULL DEFAULT 'USD',
+                issue_date TEXT NOT NULL,
+                due_date TEXT NOT NULL,
+                status TEXT NOT NULL,
+                notes TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                UNIQUE (workspace_id, number)
+            );
+            """
+        )
+        if not conn.execute("SELECT id FROM invoices_v2 LIMIT 1").fetchone():
+            for row in conn.execute("SELECT * FROM invoices").fetchall():
+                wid = row["workspace_id"] if "workspace_id" in row.keys() else 1
+                conn.execute(
+                    """
+                    INSERT INTO invoices_v2 (
+                        id, workspace_id, number, client_id, title, amount, amount_paid,
+                        currency, issue_date, due_date, status, notes, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        row["id"],
+                        wid or 1,
+                        row["number"],
+                        row["client_id"],
+                        row["title"],
+                        row["amount"],
+                        row["amount_paid"],
+                        row["currency"],
+                        row["issue_date"],
+                        row["due_date"],
+                        row["status"],
+                        row["notes"],
+                        row["created_at"],
+                        row["updated_at"],
+                    ),
+                )
+        conn.execute("DROP TABLE invoices")
+        conn.execute("ALTER TABLE invoices_v2 RENAME TO invoices")
+    elif "workspace_id" not in inv_cols:
+        conn.execute(
+            "ALTER TABLE invoices ADD COLUMN workspace_id INTEGER NOT NULL DEFAULT 1"
+        )
+
+    conn.execute("UPDATE invoices SET workspace_id = 1 WHERE workspace_id IS NULL")
+
+    # Link demo / first user to workspace 1
+    ws = conn.execute("SELECT id FROM settings ORDER BY id LIMIT 1").fetchone()
+    if ws:
+        wid = ws["id"]
+        user = conn.execute(
+            "SELECT id FROM users WHERE lower(email)=? OR workspace_id IS NULL ORDER BY id LIMIT 1",
+            ("trialuser@inpmnt.app",),
+        ).fetchone()
+        if not user:
+            user = conn.execute("SELECT id FROM users ORDER BY id LIMIT 1").fetchone()
+        if user:
+            conn.execute(
+                "UPDATE users SET workspace_id = ? WHERE id = ?", (wid, user["id"])
+            )
+            conn.execute(
+                "UPDATE settings SET owner_user_id = COALESCE(owner_user_id, ?) WHERE id = ?",
+                (user["id"], wid),
+            )
+
+    # Legacy robert → trialuser
     legacy = conn.execute(
         "SELECT id FROM users WHERE lower(email) = ?",
         ("robert@inpmnt.app",),
@@ -165,107 +369,90 @@ def _migrate(conn: sqlite3.Connection) -> None:
                 "UPDATE users SET email = ?, name = ? WHERE id = ?",
                 ("trialuser@inpmnt.app", "Trial User", legacy["id"]),
             )
-        settings = conn.execute("SELECT email, owner_name FROM settings WHERE id = 1").fetchone()
-        if settings and (settings["email"] or "").lower() == "robert@inpmnt.app":
+        settings = conn.execute(
+            "SELECT id, email FROM settings WHERE lower(email)=?",
+            ("robert@inpmnt.app",),
+        ).fetchone()
+        if settings:
             conn.execute(
-                "UPDATE settings SET email = ?, owner_name = ? WHERE id = 1",
-                ("trialuser@inpmnt.app", "Trial User"),
+                "UPDATE settings SET email = ?, owner_name = ? WHERE id = ?",
+                ("trialuser@inpmnt.app", "Trial User", settings["id"]),
             )
+
+
+def insert_default_templates(conn: sqlite3.Connection, workspace_id: int) -> None:
+    for name, channel, subject, body, is_default in DEFAULT_TEMPLATE_DEFS:
+        conn.execute(
+            """
+            INSERT INTO templates (workspace_id, name, channel, subject, body, is_default)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (workspace_id, name, channel, subject, body, is_default),
+        )
+
+
+def create_workspace(
+    conn: sqlite3.Connection,
+    *,
+    email: str,
+    name: str,
+    password_hash: str,
+    business_name: str | None = None,
+) -> tuple[int, int]:
+    """Create user + settings workspace + default templates. Returns (user_id, workspace_id)."""
+    now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    today = date.today()
+    offsets = json.dumps([-3, 0, 3, 7, 14])
+    biz = (business_name or f"{name}'s business").strip() or "My business"
+
+    cur = conn.execute(
+        """
+        INSERT INTO settings (
+            business_name, owner_name, email, phone, website, currency,
+            reminder_offsets, default_channel, smtp_enabled, trial_ends_on, plan
+        ) VALUES (?, ?, ?, NULL, NULL, 'USD', ?, 'email', 0, ?, 'trial')
+        """,
+        (biz, name, email, offsets, (today + timedelta(days=14)).isoformat()),
+    )
+    wid = int(cur.lastrowid)
+    ucur = conn.execute(
+        """
+        INSERT INTO users (email, name, password_hash, workspace_id, created_at)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (email, name, password_hash, wid, now),
+    )
+    uid = int(ucur.lastrowid)
+    conn.execute("UPDATE settings SET owner_user_id = ? WHERE id = ?", (uid, wid))
+    insert_default_templates(conn, wid)
+    log_activity(
+        conn,
+        "system",
+        f"Workspace created for {name}",
+        "settings",
+        wid,
+        workspace_id=wid,
+    )
+    return uid, wid
 
 
 def _seed(conn: sqlite3.Connection) -> None:
     now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
     today = date.today()
 
+    uid, wid = create_workspace(
+        conn,
+        email="trialuser@inpmnt.app",
+        name="Trial User",
+        password_hash=generate_password_hash("demo1234"),
+        business_name="Foster Field Services",
+    )
     conn.execute(
         """
-        INSERT INTO users (email, name, password_hash, created_at)
-        VALUES (?, ?, ?, ?)
+        UPDATE settings SET phone=?, website=? WHERE id=?
         """,
-        (
-            "trialuser@inpmnt.app",
-            "Trial User",
-            generate_password_hash("demo1234"),
-            now,
-        ),
+        ("(555) 014-2200", "https://inpmnt.app", wid),
     )
-
-    offsets = json.dumps([-3, 0, 3, 7, 14])
-    conn.execute(
-        """
-        INSERT INTO settings (
-            id, business_name, owner_name, email, phone, website, currency,
-            reminder_offsets, default_channel, smtp_enabled, trial_ends_on, plan
-        ) VALUES (1, ?, ?, ?, ?, ?, 'USD', ?, 'email', 0, ?, 'trial')
-        """,
-        (
-            "Foster Field Services",
-            "Trial User",
-            "trialuser@inpmnt.app",
-            "(555) 014-2200",
-            "https://inpmnt.app",
-            offsets,
-            (today + timedelta(days=14)).isoformat(),
-        ),
-    )
-
-    templates = [
-        (
-            "Friendly nudge",
-            "email",
-            "Quick reminder about invoice {{number}}",
-            "Hi {{client_name}},\n\nJust a friendly reminder that invoice {{number}} "
-            "for {{amount_due}} is due on {{due_date}}.\n\n"
-            "You can reply to this email if you have any questions.\n\n"
-            "Thanks,\n{{business_name}}",
-            1,
-        ),
-        (
-            "Due today",
-            "email",
-            "Invoice {{number}} is due today",
-            "Hi {{client_name}},\n\nInvoice {{number}} for {{amount_due}} is due today. "
-            "Please let us know if payment is already on the way.\n\n"
-            "Appreciate you,\n{{business_name}}",
-            0,
-        ),
-        (
-            "Overdue follow-up",
-            "email",
-            "Past due: invoice {{number}}",
-            "Hi {{client_name}},\n\nInvoice {{number}} for {{amount_due}} was due on "
-            "{{due_date}} and remains unpaid.\n\n"
-            "Please arrange payment at your earliest convenience, or reply so we can help.\n\n"
-            "{{business_name}}",
-            0,
-        ),
-        (
-            "SMS short",
-            "sms",
-            None,
-            "Hi {{client_name}} — invoice {{number}} ({{amount_due}}) is {{status}}. "
-            "Reply STOP to opt out. — {{business_name}}",
-            1,
-        ),
-        (
-            "Final notice",
-            "email",
-            "Final notice: invoice {{number}}",
-            "Hi {{client_name}},\n\nThis is a final notice regarding unpaid invoice "
-            "{{number}} ({{amount_due}}), originally due {{due_date}}.\n\n"
-            "Please remit payment promptly to avoid further collection steps.\n\n"
-            "{{business_name}}",
-            0,
-        ),
-    ]
-    for name, channel, subject, body, is_default in templates:
-        conn.execute(
-            """
-            INSERT INTO templates (name, channel, subject, body, is_default)
-            VALUES (?, ?, ?, ?, ?)
-            """,
-            (name, channel, subject, body, is_default),
-        )
 
     clients = [
         ("Maya Chen", "Chen Landscape Co.", "maya@chenlandscape.com", "(555) 201-8841", "Prefers email"),
@@ -277,10 +464,10 @@ def _seed(conn: sqlite3.Connection) -> None:
     for name, company, email, phone, notes in clients:
         cur = conn.execute(
             """
-            INSERT INTO clients (name, company, email, phone, notes, created_at)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO clients (workspace_id, name, company, email, phone, notes, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            (name, company, email, phone, notes, now),
+            (wid, name, company, email, phone, notes, now),
         )
         client_ids.append(cur.lastrowid)
 
@@ -296,15 +483,17 @@ def _seed(conn: sqlite3.Connection) -> None:
         conn.execute(
             """
             INSERT INTO invoices (
-                number, client_id, title, amount, amount_paid, currency,
+                workspace_id, number, client_id, title, amount, amount_paid, currency,
                 issue_date, due_date, status, notes, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, 'USD', ?, ?, ?, '', ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, 'USD', ?, ?, ?, '', ?, ?)
             """,
-            (number, client_id, title, amount, paid, issue.isoformat(), due.isoformat(), status, now, now),
+            (wid, number, client_id, title, amount, paid, issue.isoformat(), due.isoformat(), status, now, now),
         )
 
-    if invoices[3][4] > 0:
-        inv = conn.execute("SELECT id FROM invoices WHERE number = 'INV-1004'").fetchone()
+    inv = conn.execute(
+        "SELECT id FROM invoices WHERE workspace_id=? AND number='INV-1004'", (wid,)
+    ).fetchone()
+    if inv:
         conn.execute(
             """
             INSERT INTO payments (invoice_id, amount, method, paid_at, note, created_at)
@@ -312,7 +501,10 @@ def _seed(conn: sqlite3.Connection) -> None:
             """,
             (inv["id"], 1500.00, (today - timedelta(days=24)).isoformat(), now),
         )
-        inv2 = conn.execute("SELECT id FROM invoices WHERE number = 'INV-1002'").fetchone()
+    inv2 = conn.execute(
+        "SELECT id FROM invoices WHERE workspace_id=? AND number='INV-1002'", (wid,)
+    ).fetchone()
+    if inv2:
         conn.execute(
             """
             INSERT INTO payments (invoice_id, amount, method, paid_at, note, created_at)
@@ -321,13 +513,13 @@ def _seed(conn: sqlite3.Connection) -> None:
             (inv2["id"], 1000.00, (today - timedelta(days=10)).isoformat(), now),
         )
 
-    # Schedule reminders for open invoices
     open_invoices = conn.execute(
-        "SELECT * FROM invoices WHERE status IN ('sent','partial','overdue')"
+        "SELECT * FROM invoices WHERE workspace_id=? AND status IN ('sent','partial','overdue')",
+        (wid,),
     ).fetchall()
     default_offsets = [-3, 0, 3, 7, 14]
-    for inv in open_invoices:
-        due = date.fromisoformat(inv["due_date"])
+    for inv_row in open_invoices:
+        due = date.fromisoformat(inv_row["due_date"])
         for offset in default_offsets:
             scheduled = due + timedelta(days=offset)
             status = "pending"
@@ -338,8 +530,8 @@ def _seed(conn: sqlite3.Connection) -> None:
             elif scheduled == today:
                 status = "due"
             body = (
-                f"Reminder for {inv['number']}: "
-                f"${inv['amount'] - inv['amount_paid']:,.2f} due {inv['due_date']}."
+                f"Reminder for {inv_row['number']}: "
+                f"${inv_row['amount'] - inv_row['amount_paid']:,.2f} due {inv_row['due_date']}."
             )
             conn.execute(
                 """
@@ -348,24 +540,23 @@ def _seed(conn: sqlite3.Connection) -> None:
                 ) VALUES (?, 'email', ?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    inv["id"],
+                    inv_row["id"],
                     scheduled.isoformat(),
                     status,
-                    f"Reminder: {inv['number']}",
+                    f"Reminder: {inv_row['number']}",
                     body,
                     sent_at,
                     now,
                 ),
             )
 
-    conn.execute(
-        """
-        INSERT INTO activity (kind, message, entity_type, entity_id, created_at)
-        VALUES
-        ('system', 'InPmnt workspace created for Trial User', 'settings', 1, ?),
-        ('invoice', 'Demo invoices and reminder schedule loaded', 'invoice', NULL, ?)
-        """,
-        (now, now),
+    log_activity(
+        conn,
+        "invoice",
+        "Demo invoices and reminder schedule loaded",
+        "invoice",
+        None,
+        workspace_id=wid,
     )
 
 
@@ -375,27 +566,36 @@ def log_activity(
     message: str,
     entity_type: str | None = None,
     entity_id: int | None = None,
+    workspace_id: int | None = None,
 ) -> None:
     now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    wid = workspace_id if workspace_id is not None else 1
     conn.execute(
         """
-        INSERT INTO activity (kind, message, entity_type, entity_id, created_at)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO activity (workspace_id, kind, message, entity_type, entity_id, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
         """,
-        (kind, message, entity_type, entity_id, now),
+        (wid, kind, message, entity_type, entity_id, now),
     )
 
 
-def next_invoice_number(conn: sqlite3.Connection) -> str:
+def next_invoice_number(conn: sqlite3.Connection, workspace_id: int) -> str:
     row = conn.execute(
-        "SELECT number FROM invoices ORDER BY id DESC LIMIT 1"
+        "SELECT number FROM invoices WHERE workspace_id=? ORDER BY id DESC LIMIT 1",
+        (workspace_id,),
     ).fetchone()
     if not row:
         return "INV-1001"
     try:
         n = int(str(row["number"]).split("-")[-1]) + 1
     except ValueError:
-        n = conn.execute("SELECT COUNT(*) AS c FROM invoices").fetchone()["c"] + 1001
+        n = (
+            conn.execute(
+                "SELECT COUNT(*) AS c FROM invoices WHERE workspace_id=?",
+                (workspace_id,),
+            ).fetchone()["c"]
+            + 1001
+        )
     return f"INV-{n}"
 
 

@@ -19,6 +19,26 @@ Download zips: [latest release](https://github.com/devildog5x5/InPmnt/releases/l
 
 Easiest way to keep InPmnt “just running” on a VM.
 
+### Hostinger (recommended)
+
+1. Buy a **VPS** (not shared Web hosting). Prefer the **Ubuntu 24.04 with Docker** template.
+2. Point your domain `A` record to the VPS IP.
+3. SSH in (or use Hostinger Docker Manager → Compose from GitHub):
+
+```bash
+git clone https://github.com/devildog5x5/InPmnt.git /opt/inpmnt
+cd /opt/inpmnt
+cp .env.example .env
+nano .env   # set FLASK_SECRET_KEY, BASE_URL=https://yourdomain.com, Stripe, RESEND_API_KEY or SMTP
+docker compose up -d --build
+```
+
+4. Put HTTPS in front (Hostinger proxy, Caddy, or nginx) → `127.0.0.1:5055`.
+5. Stripe webhook: `https://yourdomain.com/api/billing/webhook`
+6. Backup DB weekly: `bash deploy/backup-db.sh /root/inpmnt-backups`
+
+Do **not** set `SHOW_DEMO_LOGIN=1` on a public Hostinger site.
+
 ### Prerequisites
 
 - Ubuntu/Debian (or any Linux) with [Docker Engine](https://docs.docker.com/engine/install/) + Compose plugin
@@ -37,7 +57,7 @@ curl -sS http://127.0.0.1:5055/ | head
 ```
 
 - App: `http://YOUR_VM_IP:5055`
-- Demo: `trialuser@inpmnt.app` / `demo1234`
+- Sign up at `/signup` (or set `SHOW_DEMO_LOGIN=1` for local trialuser only)
 - Data: Docker volume `inpmnt-data` → `/app/data/inpmnt.db` inside the container
 - Restart policy: `unless-stopped` (survives reboot)
 

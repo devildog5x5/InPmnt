@@ -24,7 +24,7 @@
     </div>
     <div class="nav-actions">
       <a class="btn secondary sm" href="{{ url_for('main.login') }}">Log in</a>
-      <a class="btn sm" href="{{ url_for('main.login') }}">Start free trial</a>
+      <a class="btn sm" href="{{ url_for('main.signup') }}">Start free trial</a>
     </div>
   </nav>
 
@@ -37,7 +37,7 @@
         Built for plumbers, landscapers, photographers, and consultants.
       </p>
       <div class="hero-cta">
-        <a class="btn" href="{{ url_for('main.login') }}">Try the demo workspace</a>
+        <a class="btn" href="{{ url_for('main.signup') }}">Start free trial</a>
         <a class="btn secondary" href="#pricing">See pricing</a>
       </div>
     </div>
@@ -121,13 +121,15 @@
       {% else %}
       Stripe keys not configured yet — buttons open the demo workspace. Add keys from <code>.env.example</code> to go live.
       {% endif %}
-      Or <a href="{{ url_for('main.login') }}">start the free trial</a> first.
+      Or <a href="{{ url_for('main.signup') }}">start the free trial</a> first.
     </p>
   </section>
 
   <footer class="landing-footer">
     <p>© 2026 Robert Foster · InPmnt · MIT License</p>
-    <p>Demo login: trialuser@inpmnt.app / demo1234</p>
+    {% if show_demo_login %}
+    <p>Local demo: trialuser@inpmnt.app / demo1234 (SHOW_DEMO_LOGIN=1)</p>
+    {% endif %}
   </footer>
   <script>
     document.querySelectorAll("[data-checkout]").forEach((btn) => {

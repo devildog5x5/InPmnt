@@ -89,6 +89,7 @@ def checkout_session_payload(
     customer_email: str,
     client_reference_id: str,
     customer_id: str | None = None,
+    workspace_id: int | str | None = None,
 ) -> dict[str, Any]:
     if plan not in PLANS:
         raise ValueError("Unknown plan")
@@ -97,15 +98,19 @@ def checkout_session_payload(
     if not price:
         raise RuntimeError(f"Missing Stripe price for plan '{plan}'")
 
+    meta: dict[str, Any] = {"plan": plan, "user_id": client_reference_id}
+    if workspace_id is not None:
+        meta["workspace_id"] = str(workspace_id)
+
     params: dict[str, Any] = {
         "mode": "subscription",
         "line_items": [{"price": price, "quantity": 1}],
         "success_url": f"{cfg.base_url}/billing/success?session_id={{CHECKOUT_SESSION_ID}}",
         "cancel_url": f"{cfg.base_url}/#pricing",
         "client_reference_id": client_reference_id,
-        "metadata": {"plan": plan, "user_id": client_reference_id},
+        "metadata": meta,
         "allow_promotion_codes": True,
-        "subscription_data": {"metadata": {"plan": plan, "user_id": client_reference_id}},
+        "subscription_data": {"metadata": dict(meta)},
     }
     if customer_id:
         params["customer"] = customer_id

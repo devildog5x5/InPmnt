@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from datetime import date, datetime, timedelta
 from functools import wraps
@@ -17,7 +18,7 @@ from flask import (
     session,
     url_for,
 )
-from werkzeug.security import check_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from .billing import (
     PLANS,
@@ -27,12 +28,21 @@ from .billing import (
     plan_from_price_id,
 )
 from .database import (
+    create_workspace,
     db_session,
     log_activity,
     next_invoice_number,
     refresh_invoice_status,
     row_to_dict,
     rows_to_list,
+)
+from .mail import mail_configured, send_email
+from .workspace import (
+    assert_can_add_open_invoice,
+    effective_plan,
+    get_settings,
+    plan_allows_sms,
+    require_workspace_id,
 )
 
 bp = Blueprint("main", __name__)
@@ -61,7 +71,9 @@ def load_user() -> None:
     if not uid:
         return
     with db_session(db_path()) as conn:
-        row = conn.execute("SELECT id, email, name FROM users WHERE id = ?", (uid,)).fetchone()
+        row = conn.execute(
+            "SELECT id, email, name, workspace_id FROM users WHERE id = ?", (uid,)
+        ).fetchone()
         g.user = row_to_dict(row)
 
 
@@ -77,6 +89,17 @@ def landing():
         stripe_enabled=cfg.enabled,
         publishable_key=cfg.publishable_key,
         plans=PLANS,
+        show_demo_login=_show_demo_login(),
+    )
+
+
+def _show_demo_login() -> bool:
+    import os
+
+    return (os.environ.get("SHOW_DEMO_LOGIN") or "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
     )
 
 
@@ -107,7 +130,51 @@ def login():
                 session["user_id"] = user["id"]
                 return redirect(next_url or url_for("main.app_home"))
         error = "Invalid email or password."
-    return render_template("login.html", error=error, next=next_url or "")
+    return render_template(
+        "login.html",
+        error=error,
+        next=next_url or "",
+        show_demo_login=_show_demo_login(),
+    )
+
+
+@bp.route("/signup", methods=["GET", "POST"])
+def signup():
+    if session.get("user_id"):
+        return redirect(url_for("main.app_home"))
+    error = None
+    if request.method == "POST":
+        email = (request.form.get("email") or "").strip().lower()
+        name = (request.form.get("name") or "").strip()
+        business = (request.form.get("business_name") or "").strip()
+        password = request.form.get("password") or ""
+        if not email or "@" not in email:
+            error = "Enter a valid email."
+        elif len(password) < 8:
+            error = "Password must be at least 8 characters."
+        elif not name:
+            error = "Name is required."
+        else:
+            try:
+                with db_session(db_path()) as conn:
+                    taken = conn.execute(
+                        "SELECT id FROM users WHERE lower(email)=?", (email,)
+                    ).fetchone()
+                    if taken:
+                        error = "That email is already registered. Log in instead."
+                    else:
+                        uid, _wid = create_workspace(
+                            conn,
+                            email=email,
+                            name=name,
+                            password_hash=generate_password_hash(password),
+                            business_name=business or None,
+                        )
+                        session["user_id"] = uid
+                        return redirect(url_for("main.app_home"))
+            except Exception as exc:  # noqa: BLE001
+                error = str(exc)
+    return render_template("signup.html", error=error)
 
 
 @bp.get("/logout")
@@ -143,7 +210,11 @@ def invoice_balance(inv: dict[str, Any]) -> float:
 
 
 def schedule_reminders_for_invoice(conn, invoice_id: int, due_date: str, force: bool = False) -> int:
-    settings = conn.execute("SELECT * FROM settings WHERE id = 1").fetchone()
+    inv0 = conn.execute("SELECT workspace_id FROM invoices WHERE id = ?", (invoice_id,)).fetchone()
+    if not inv0:
+        return 0
+    wid = inv0["workspace_id"]
+    settings = get_settings(conn, wid)
     offsets = json.loads(settings["reminder_offsets"] or "[-3,0,3,7,14]")
     channel = settings["default_channel"] or "email"
     due = date.fromisoformat(due_date)
@@ -166,18 +237,18 @@ def schedule_reminders_for_invoice(conn, invoice_id: int, due_date: str, force: 
     tmpl = conn.execute(
         """
         SELECT * FROM templates
-        WHERE channel = ? AND is_default = 1
+        WHERE workspace_id = ? AND channel = ? AND is_default = 1
         ORDER BY id LIMIT 1
         """,
-        (channel,),
+        (wid, channel),
     ).fetchone()
     inv = conn.execute(
         """
         SELECT i.*, c.name AS client_name, c.email AS client_email, c.phone AS client_phone
         FROM invoices i JOIN clients c ON c.id = i.client_id
-        WHERE i.id = ?
+        WHERE i.id = ? AND i.workspace_id = ?
         """,
-        (invoice_id,),
+        (invoice_id, wid),
     ).fetchone()
     if not inv:
         return 0
@@ -217,16 +288,17 @@ def schedule_reminders_for_invoice(conn, invoice_id: int, due_date: str, force: 
     return created
 
 
-def invoice_detail(conn, invoice_id: int) -> dict[str, Any] | None:
+def invoice_detail(conn, invoice_id: int, workspace_id: int | None = None) -> dict[str, Any] | None:
+    wid = workspace_id if workspace_id is not None else require_workspace_id()
     row = conn.execute(
         """
         SELECT i.*, c.name AS client_name, c.company AS client_company,
                c.email AS client_email, c.phone AS client_phone
         FROM invoices i
         JOIN clients c ON c.id = i.client_id
-        WHERE i.id = ?
+        WHERE i.id = ? AND i.workspace_id = ?
         """,
-        (invoice_id,),
+        (invoice_id, wid),
     ).fetchone()
     if not row:
         return None
@@ -254,7 +326,8 @@ def invoice_detail(conn, invoice_id: int) -> dict[str, Any] | None:
 @login_required
 def api_me():
     with db_session(db_path()) as conn:
-        settings = row_to_dict(conn.execute("SELECT * FROM settings WHERE id = 1").fetchone())
+        wid = require_workspace_id()
+        settings = row_to_dict(get_settings(conn, wid))
     return jsonify({"user": g.user, "settings": settings})
 
 
@@ -262,15 +335,17 @@ def api_me():
 @login_required
 def api_dashboard():
     today = date.today().isoformat()
+    wid = require_workspace_id()
     with db_session(db_path()) as conn:
         open_inv = rows_to_list(
             conn.execute(
                 """
                 SELECT i.*, c.name AS client_name
                 FROM invoices i JOIN clients c ON c.id = i.client_id
-                WHERE i.status IN ('sent','partial','overdue')
+                WHERE i.workspace_id = ? AND i.status IN ('sent','partial','overdue')
                 ORDER BY i.due_date
-                """
+                """,
+                (wid,),
             ).fetchall()
         )
         for inv in open_inv:
@@ -285,10 +360,12 @@ def api_dashboard():
         ]
         paid_30 = conn.execute(
             """
-            SELECT COALESCE(SUM(amount), 0) AS total FROM payments
-            WHERE paid_at >= ?
+            SELECT COALESCE(SUM(p.amount), 0) AS total
+            FROM payments p
+            JOIN invoices i ON i.id = p.invoice_id
+            WHERE i.workspace_id = ? AND p.paid_at >= ?
             """,
-            ((date.today() - timedelta(days=30)).isoformat(),),
+            (wid, (date.today() - timedelta(days=30)).isoformat()),
         ).fetchone()["total"]
 
         aging = {"current": 0.0, "d1_30": 0.0, "d31_60": 0.0, "d60_plus": 0.0}
@@ -312,11 +389,11 @@ def api_dashboard():
                 FROM reminders r
                 JOIN invoices i ON i.id = r.invoice_id
                 JOIN clients c ON c.id = i.client_id
-                WHERE r.status IN ('due','pending') AND r.scheduled_for <= ?
+                WHERE i.workspace_id = ? AND r.status IN ('due','pending') AND r.scheduled_for <= ?
                 ORDER BY r.scheduled_for
                 LIMIT 12
                 """,
-                (today,),
+                (wid, today),
             ).fetchall()
         )
         for r in due_reminders:
@@ -330,16 +407,17 @@ def api_dashboard():
 
         activity = rows_to_list(
             conn.execute(
-                "SELECT * FROM activity ORDER BY id DESC LIMIT 10"
+                "SELECT * FROM activity WHERE workspace_id = ? ORDER BY id DESC LIMIT 10",
+                (wid,),
             ).fetchall()
         )
 
         recovered = conn.execute(
             """
             SELECT COUNT(*) AS c FROM invoices
-            WHERE status = 'paid' AND updated_at >= ?
+            WHERE workspace_id = ? AND status = 'paid' AND updated_at >= ?
             """,
-            ((date.today() - timedelta(days=30)).isoformat(),),
+            (wid, (date.today() - timedelta(days=30)).isoformat()),
         ).fetchone()["c"]
 
     return jsonify(
@@ -367,6 +445,7 @@ def api_dashboard():
 @login_required
 def api_clients():
     q = (request.args.get("q") or "").strip().lower()
+    wid = require_workspace_id()
     with db_session(db_path()) as conn:
         rows = rows_to_list(
             conn.execute(
@@ -377,8 +456,10 @@ def api_clients():
                      FROM invoices i
                     WHERE i.client_id = c.id AND i.status IN ('sent','partial','overdue')) AS open_balance
                 FROM clients c
+                WHERE c.workspace_id = ?
                 ORDER BY c.name
-                """
+                """,
+                (wid,),
             ).fetchall()
         )
     if q:
@@ -399,13 +480,15 @@ def api_create_client():
     if not name:
         return jsonify({"error": "Name is required"}), 400
     now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    wid = require_workspace_id()
     with db_session(db_path()) as conn:
         cur = conn.execute(
             """
-            INSERT INTO clients (name, company, email, phone, notes, created_at)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO clients (workspace_id, name, company, email, phone, notes, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
             (
+                wid,
                 name,
                 (data.get("company") or "").strip() or None,
                 (data.get("email") or "").strip() or None,
@@ -414,8 +497,11 @@ def api_create_client():
                 now,
             ),
         )
-        log_activity(conn, "client", f"Added client {name}", "client", cur.lastrowid)
-        row = conn.execute("SELECT * FROM clients WHERE id = ?", (cur.lastrowid,)).fetchone()
+        log_activity(conn, "client", f"Added client {name}", "client", cur.lastrowid, workspace_id=wid)
+        row = conn.execute(
+            "SELECT * FROM clients WHERE id = ? AND workspace_id = ?",
+            (cur.lastrowid, wid),
+        ).fetchone()
     return jsonify(row_to_dict(row)), 201
 
 
@@ -423,15 +509,19 @@ def api_create_client():
 @login_required
 def api_update_client(client_id: int):
     data = request.get_json(force=True) or {}
+    wid = require_workspace_id()
     with db_session(db_path()) as conn:
-        existing = conn.execute("SELECT * FROM clients WHERE id = ?", (client_id,)).fetchone()
+        existing = conn.execute(
+            "SELECT * FROM clients WHERE id = ? AND workspace_id = ?",
+            (client_id, wid),
+        ).fetchone()
         if not existing:
             return jsonify({"error": "Not found"}), 404
         name = (data.get("name") or existing["name"]).strip()
         conn.execute(
             """
             UPDATE clients SET name=?, company=?, email=?, phone=?, notes=?
-            WHERE id=?
+            WHERE id=? AND workspace_id=?
             """,
             (
                 name,
@@ -440,22 +530,30 @@ def api_update_client(client_id: int):
                 (data.get("phone") if "phone" in data else existing["phone"]),
                 (data.get("notes") if "notes" in data else existing["notes"]),
                 client_id,
+                wid,
             ),
         )
-        log_activity(conn, "client", f"Updated client {name}", "client", client_id)
-        row = conn.execute("SELECT * FROM clients WHERE id = ?", (client_id,)).fetchone()
+        log_activity(conn, "client", f"Updated client {name}", "client", client_id, workspace_id=wid)
+        row = conn.execute(
+            "SELECT * FROM clients WHERE id = ? AND workspace_id = ?",
+            (client_id, wid),
+        ).fetchone()
     return jsonify(row_to_dict(row))
 
 
 @bp.delete("/api/clients/<int:client_id>")
 @login_required
 def api_delete_client(client_id: int):
+    wid = require_workspace_id()
     with db_session(db_path()) as conn:
-        row = conn.execute("SELECT * FROM clients WHERE id = ?", (client_id,)).fetchone()
+        row = conn.execute(
+            "SELECT * FROM clients WHERE id = ? AND workspace_id = ?",
+            (client_id, wid),
+        ).fetchone()
         if not row:
             return jsonify({"error": "Not found"}), 404
-        conn.execute("DELETE FROM clients WHERE id = ?", (client_id,))
-        log_activity(conn, "client", f"Deleted client {row['name']}", "client", client_id)
+        conn.execute("DELETE FROM clients WHERE id = ? AND workspace_id = ?", (client_id, wid))
+        log_activity(conn, "client", f"Deleted client {row['name']}", "client", client_id, workspace_id=wid)
     return jsonify({"ok": True})
 
 
@@ -465,20 +563,22 @@ def api_delete_client(client_id: int):
 @login_required
 def api_invoices():
     status = (request.args.get("status") or "").strip().lower()
+    wid = require_workspace_id()
     with db_session(db_path()) as conn:
-        # refresh overdue flags
         for inv in conn.execute(
-            "SELECT id FROM invoices WHERE status IN ('sent','partial')"
+            "SELECT id FROM invoices WHERE workspace_id=? AND status IN ('sent','partial')",
+            (wid,),
         ).fetchall():
             refresh_invoice_status(conn, inv["id"])
 
         sql = """
             SELECT i.*, c.name AS client_name, c.company AS client_company
             FROM invoices i JOIN clients c ON c.id = i.client_id
+            WHERE i.workspace_id = ?
         """
-        params: list[Any] = []
+        params: list[Any] = [wid]
         if status and status != "all":
-            sql += " WHERE i.status = ?"
+            sql += " AND i.status = ?"
             params.append(status)
         sql += " ORDER BY i.due_date DESC, i.id DESC"
         rows = rows_to_list(conn.execute(sql, params).fetchall())
@@ -490,9 +590,16 @@ def api_invoices():
 @bp.get("/api/invoices/<int:invoice_id>")
 @login_required
 def api_invoice(invoice_id: int):
+    wid = require_workspace_id()
     with db_session(db_path()) as conn:
+        inv = conn.execute(
+            "SELECT id FROM invoices WHERE id=? AND workspace_id=?",
+            (invoice_id, wid),
+        ).fetchone()
+        if not inv:
+            return jsonify({"error": "Not found"}), 404
         refresh_invoice_status(conn, invoice_id)
-        data = invoice_detail(conn, invoice_id)
+        data = invoice_detail(conn, invoice_id, wid)
     if not data:
         return jsonify({"error": "Not found"}), 404
     return jsonify(data)
@@ -517,17 +624,30 @@ def api_create_invoice():
     if status not in ("draft", "sent", "partial", "overdue", "paid"):
         status = "draft"
     now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    wid = require_workspace_id()
 
     with db_session(db_path()) as conn:
-        number = (data.get("number") or "").strip() or next_invoice_number(conn)
+        client = conn.execute(
+            "SELECT id FROM clients WHERE id=? AND workspace_id=?",
+            (int(client_id), wid),
+        ).fetchone()
+        if not client:
+            return jsonify({"error": "Client not found"}), 404
+        settings = get_settings(conn, wid)
+        if status in ("sent", "partial", "overdue"):
+            blocked = assert_can_add_open_invoice(conn, wid, settings)
+            if blocked:
+                return jsonify({"error": blocked}), 403
+        number = (data.get("number") or "").strip() or next_invoice_number(conn, wid)
         cur = conn.execute(
             """
             INSERT INTO invoices (
-                number, client_id, title, amount, amount_paid, currency,
+                workspace_id, number, client_id, title, amount, amount_paid, currency,
                 issue_date, due_date, status, notes, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
+                wid,
                 number,
                 int(client_id),
                 title,
@@ -544,8 +664,10 @@ def api_create_invoice():
         invoice_id = cur.lastrowid
         if status in ("sent", "partial", "overdue"):
             schedule_reminders_for_invoice(conn, invoice_id, due, force=True)
-        log_activity(conn, "invoice", f"Created invoice {number}", "invoice", invoice_id)
-        data_out = invoice_detail(conn, invoice_id)
+        log_activity(
+            conn, "invoice", f"Created invoice {number}", "invoice", invoice_id, workspace_id=wid
+        )
+        data_out = invoice_detail(conn, invoice_id, wid)
     return jsonify(data_out), 201
 
 
@@ -554,8 +676,12 @@ def api_create_invoice():
 def api_update_invoice(invoice_id: int):
     data = request.get_json(force=True) or {}
     now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    wid = require_workspace_id()
     with db_session(db_path()) as conn:
-        existing = conn.execute("SELECT * FROM invoices WHERE id = ?", (invoice_id,)).fetchone()
+        existing = conn.execute(
+            "SELECT * FROM invoices WHERE id=? AND workspace_id=?",
+            (invoice_id, wid),
+        ).fetchone()
         if not existing:
             return jsonify({"error": "Not found"}), 404
         fields = {
@@ -567,11 +693,26 @@ def api_update_invoice(invoice_id: int):
             "client_id": int(data.get("client_id", existing["client_id"])),
             "status": data.get("status", existing["status"]),
         }
+        client = conn.execute(
+            "SELECT id FROM clients WHERE id=? AND workspace_id=?",
+            (fields["client_id"], wid),
+        ).fetchone()
+        if not client:
+            return jsonify({"error": "Client not found"}), 404
+        becoming_open = (
+            fields["status"] in ("sent", "partial", "overdue")
+            and existing["status"] == "draft"
+        )
+        if becoming_open:
+            settings = get_settings(conn, wid)
+            blocked = assert_can_add_open_invoice(conn, wid, settings)
+            if blocked:
+                return jsonify({"error": blocked}), 403
         conn.execute(
             """
             UPDATE invoices
             SET title=?, amount=?, issue_date=?, due_date=?, notes=?, client_id=?, status=?, updated_at=?
-            WHERE id=?
+            WHERE id=? AND workspace_id=?
             """,
             (
                 fields["title"],
@@ -583,15 +724,23 @@ def api_update_invoice(invoice_id: int):
                 fields["status"],
                 now,
                 invoice_id,
+                wid,
             ),
         )
-        if fields["status"] in ("sent", "partial", "overdue") and existing["status"] == "draft":
+        if becoming_open:
             schedule_reminders_for_invoice(conn, invoice_id, fields["due_date"], force=True)
         elif fields["due_date"] != existing["due_date"] and fields["status"] != "draft":
             schedule_reminders_for_invoice(conn, invoice_id, fields["due_date"], force=True)
         refresh_invoice_status(conn, invoice_id)
-        log_activity(conn, "invoice", f"Updated invoice {existing['number']}", "invoice", invoice_id)
-        out = invoice_detail(conn, invoice_id)
+        log_activity(
+            conn,
+            "invoice",
+            f"Updated invoice {existing['number']}",
+            "invoice",
+            invoice_id,
+            workspace_id=wid,
+        )
+        out = invoice_detail(conn, invoice_id, wid)
     return jsonify(out)
 
 
@@ -599,22 +748,38 @@ def api_update_invoice(invoice_id: int):
 @login_required
 def api_send_invoice(invoice_id: int):
     now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    wid = require_workspace_id()
     with db_session(db_path()) as conn:
-        inv = conn.execute("SELECT * FROM invoices WHERE id = ?", (invoice_id,)).fetchone()
+        inv = conn.execute(
+            "SELECT * FROM invoices WHERE id=? AND workspace_id=?",
+            (invoice_id, wid),
+        ).fetchone()
         if not inv:
             return jsonify({"error": "Not found"}), 404
+        if inv["status"] == "draft":
+            settings = get_settings(conn, wid)
+            blocked = assert_can_add_open_invoice(conn, wid, settings)
+            if blocked:
+                return jsonify({"error": blocked}), 403
         status = "paid" if inv["amount_paid"] >= inv["amount"] else (
             "partial" if inv["amount_paid"] > 0 else "sent"
         )
         if inv["due_date"] < date.today().isoformat() and status != "paid":
             status = "overdue" if inv["amount_paid"] == 0 else "partial"
         conn.execute(
-            "UPDATE invoices SET status=?, updated_at=? WHERE id=?",
-            (status, now, invoice_id),
+            "UPDATE invoices SET status=?, updated_at=? WHERE id=? AND workspace_id=?",
+            (status, now, invoice_id, wid),
         )
         schedule_reminders_for_invoice(conn, invoice_id, inv["due_date"], force=True)
-        log_activity(conn, "invoice", f"Marked {inv['number']} as sent — reminders scheduled", "invoice", invoice_id)
-        out = invoice_detail(conn, invoice_id)
+        log_activity(
+            conn,
+            "invoice",
+            f"Marked {inv['number']} as sent — reminders scheduled",
+            "invoice",
+            invoice_id,
+            workspace_id=wid,
+        )
+        out = invoice_detail(conn, invoice_id, wid)
     return jsonify(out)
 
 
@@ -630,9 +795,13 @@ def api_record_payment(invoice_id: int):
         return jsonify({"error": "Amount must be positive"}), 400
     now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
     paid_at = data.get("paid_at") or date.today().isoformat()
+    wid = require_workspace_id()
 
     with db_session(db_path()) as conn:
-        inv = conn.execute("SELECT * FROM invoices WHERE id = ?", (invoice_id,)).fetchone()
+        inv = conn.execute(
+            "SELECT * FROM invoices WHERE id=? AND workspace_id=?",
+            (invoice_id, wid),
+        ).fetchone()
         if not inv:
             return jsonify({"error": "Not found"}), 404
         conn.execute(
@@ -651,12 +820,15 @@ def api_record_payment(invoice_id: int):
         )
         new_paid = round(float(inv["amount_paid"]) + amount, 2)
         conn.execute(
-            "UPDATE invoices SET amount_paid=?, updated_at=? WHERE id=?",
-            (new_paid, now, invoice_id),
+            "UPDATE invoices SET amount_paid=?, updated_at=? WHERE id=? AND workspace_id=?",
+            (new_paid, now, invoice_id, wid),
         )
         refresh_invoice_status(conn, invoice_id)
         # cancel pending reminders if paid
-        refreshed = conn.execute("SELECT * FROM invoices WHERE id = ?", (invoice_id,)).fetchone()
+        refreshed = conn.execute(
+            "SELECT * FROM invoices WHERE id=? AND workspace_id=?",
+            (invoice_id, wid),
+        ).fetchone()
         if refreshed["status"] == "paid":
             conn.execute(
                 "UPDATE reminders SET status='cancelled' WHERE invoice_id=? AND status IN ('pending','due')",
@@ -668,35 +840,75 @@ def api_record_payment(invoice_id: int):
             f"Recorded {money(amount)} on {inv['number']}",
             "invoice",
             invoice_id,
+            workspace_id=wid,
         )
-        out = invoice_detail(conn, invoice_id)
+        out = invoice_detail(conn, invoice_id, wid)
     return jsonify(out)
 
 
 @bp.delete("/api/invoices/<int:invoice_id>")
 @login_required
 def api_delete_invoice(invoice_id: int):
+    wid = require_workspace_id()
     with db_session(db_path()) as conn:
-        inv = conn.execute("SELECT * FROM invoices WHERE id = ?", (invoice_id,)).fetchone()
+        inv = conn.execute(
+            "SELECT * FROM invoices WHERE id=? AND workspace_id=?",
+            (invoice_id, wid),
+        ).fetchone()
         if not inv:
             return jsonify({"error": "Not found"}), 404
-        conn.execute("DELETE FROM invoices WHERE id = ?", (invoice_id,))
-        log_activity(conn, "invoice", f"Deleted invoice {inv['number']}", "invoice", invoice_id)
+        conn.execute("DELETE FROM invoices WHERE id=? AND workspace_id=?", (invoice_id, wid))
+        log_activity(
+            conn,
+            "invoice",
+            f"Deleted invoice {inv['number']}",
+            "invoice",
+            invoice_id,
+            workspace_id=wid,
+        )
     return jsonify({"ok": True})
 
 
 # ---------- Reminders ----------
 
+def _allow_fake_email() -> bool:
+    return (os.environ.get("ALLOW_FAKE_EMAIL") or "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+
+
+def _email_not_configured_response():
+    return (
+        jsonify(
+            {
+                "error": (
+                    "Email is not configured. Set RESEND_API_KEY or "
+                    "SMTP_HOST/SMTP_USER/MAIL_FROM in .env "
+                    "(or ALLOW_FAKE_EMAIL=1 for local testing)."
+                )
+            }
+        ),
+        503,
+    )
+
+
 @bp.get("/api/reminders")
 @login_required
 def api_reminders():
     status = (request.args.get("status") or "queue").strip()
+    wid = require_workspace_id()
     with db_session(db_path()) as conn:
         # promote pending that are due
         today = date.today().isoformat()
         conn.execute(
-            "UPDATE reminders SET status='due' WHERE status='pending' AND scheduled_for <= ?",
-            (today,),
+            """
+            UPDATE reminders SET status='due'
+            WHERE status='pending' AND scheduled_for <= ?
+              AND invoice_id IN (SELECT id FROM invoices WHERE workspace_id=?)
+            """,
+            (today, wid),
         )
         sql = """
             SELECT r.*, i.number AS invoice_number, i.amount, i.amount_paid, i.due_date,
@@ -704,14 +916,16 @@ def api_reminders():
             FROM reminders r
             JOIN invoices i ON i.id = r.invoice_id
             JOIN clients c ON c.id = i.client_id
+            WHERE i.workspace_id = ?
         """
+        params: list[Any] = [wid]
         if status == "queue":
-            sql += " WHERE r.status IN ('due','pending') ORDER BY r.scheduled_for, r.id"
+            sql += " AND r.status IN ('due','pending') ORDER BY r.scheduled_for, r.id"
         elif status == "sent":
-            sql += " WHERE r.status = 'sent' ORDER BY r.sent_at DESC, r.id DESC LIMIT 100"
+            sql += " AND r.status = 'sent' ORDER BY r.sent_at DESC, r.id DESC LIMIT 100"
         else:
             sql += " ORDER BY r.scheduled_for DESC LIMIT 200"
-        rows = rows_to_list(conn.execute(sql).fetchall())
+        rows = rows_to_list(conn.execute(sql, params).fetchall())
         for r in rows:
             r["balance"] = round(r["amount"] - r["amount_paid"], 2)
             if r["status"] in ("due", "pending") and r["scheduled_for"] < today:
@@ -727,36 +941,71 @@ def api_reminders():
 @login_required
 def api_send_reminder(reminder_id: int):
     now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    wid = require_workspace_id()
     with db_session(db_path()) as conn:
         r = conn.execute(
             """
-            SELECT r.*, i.number, c.name AS client_name, c.email, c.phone
+            SELECT r.*, i.number, i.workspace_id, c.name AS client_name, c.email, c.phone
             FROM reminders r
             JOIN invoices i ON i.id = r.invoice_id
             JOIN clients c ON c.id = i.client_id
-            WHERE r.id = ?
+            WHERE r.id = ? AND i.workspace_id = ?
             """,
-            (reminder_id,),
+            (reminder_id, wid),
         ).fetchone()
         if not r:
             return jsonify({"error": "Not found"}), 404
         if r["status"] == "cancelled":
             return jsonify({"error": "Reminder was cancelled"}), 400
 
-        # MVP: log send (email/SMS providers plugged in via settings later)
-        conn.execute(
-            "UPDATE reminders SET status='sent', sent_at=? WHERE id=?",
-            (now, reminder_id),
-        )
-        channel = r["channel"].upper()
-        dest = r["email"] if r["channel"] == "email" else r["phone"]
-        log_activity(
-            conn,
-            "reminder",
-            f"Sent {channel} reminder for {r['number']} to {dest or r['client_name']}",
-            "reminder",
-            reminder_id,
-        )
+        settings = get_settings(conn, wid)
+        channel = (r["channel"] or "email").lower()
+
+        if channel == "sms":
+            if not plan_allows_sms(effective_plan(settings)):
+                return jsonify({"error": "SMS reminders require the Pro plan."}), 403
+            log_activity(
+                conn,
+                "reminder",
+                f"SMS stub (not wired yet) for {r['number']} to {r['phone'] or r['client_name']}",
+                "reminder",
+                reminder_id,
+                workspace_id=wid,
+            )
+            conn.execute(
+                "UPDATE reminders SET status='sent', sent_at=? WHERE id=?",
+                (now, reminder_id),
+            )
+        elif channel == "email":
+            if not mail_configured():
+                if not _allow_fake_email():
+                    return _email_not_configured_response()
+            else:
+                try:
+                    send_email(
+                        to=r["email"] or "",
+                        subject=r["subject"] or "",
+                        body=r["body"] or "",
+                        from_name=settings["business_name"] if settings else None,
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    return jsonify({"error": str(exc)}), 502
+            conn.execute(
+                "UPDATE reminders SET status='sent', sent_at=? WHERE id=?",
+                (now, reminder_id),
+            )
+            dest = r["email"]
+            log_activity(
+                conn,
+                "reminder",
+                f"Sent EMAIL reminder for {r['number']} to {dest or r['client_name']}",
+                "reminder",
+                reminder_id,
+                workspace_id=wid,
+            )
+        else:
+            return jsonify({"error": f"Unknown channel: {channel}"}), 400
+
         row = conn.execute("SELECT * FROM reminders WHERE id = ?", (reminder_id,)).fetchone()
     return jsonify(row_to_dict(row))
 
@@ -767,29 +1016,63 @@ def api_send_due():
     today = date.today().isoformat()
     now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
     sent = 0
+    wid = require_workspace_id()
     with db_session(db_path()) as conn:
+        settings = get_settings(conn, wid)
         rows = conn.execute(
             """
-            SELECT r.id, r.channel, i.number, c.name AS client_name, c.email, c.phone
+            SELECT r.id, r.channel, r.subject, r.body, i.number, c.name AS client_name,
+                   c.email, c.phone
             FROM reminders r
             JOIN invoices i ON i.id = r.invoice_id
             JOIN clients c ON c.id = i.client_id
-            WHERE r.status IN ('due','pending') AND r.scheduled_for <= ?
+            WHERE i.workspace_id = ? AND r.status IN ('due','pending') AND r.scheduled_for <= ?
             """,
-            (today,),
+            (wid, today),
         ).fetchall()
+
+        needs_email = any((r["channel"] or "").lower() == "email" for r in rows)
+        if needs_email and not mail_configured() and not _allow_fake_email():
+            return _email_not_configured_response()
+
         for r in rows:
+            channel = (r["channel"] or "email").lower()
+            if channel == "sms":
+                if not plan_allows_sms(effective_plan(settings)):
+                    continue
+                log_activity(
+                    conn,
+                    "reminder",
+                    f"SMS stub (not wired yet) for {r['number']} to {r['phone'] or r['client_name']}",
+                    "reminder",
+                    r["id"],
+                    workspace_id=wid,
+                )
+            elif channel == "email":
+                if mail_configured():
+                    try:
+                        send_email(
+                            to=r["email"] or "",
+                            subject=r["subject"] or "",
+                            body=r["body"] or "",
+                            from_name=settings["business_name"] if settings else None,
+                        )
+                    except Exception as exc:  # noqa: BLE001
+                        return jsonify({"error": str(exc), "sent": sent}), 502
+                dest = r["email"]
+                log_activity(
+                    conn,
+                    "reminder",
+                    f"Sent EMAIL reminder for {r['number']} to {dest or r['client_name']}",
+                    "reminder",
+                    r["id"],
+                    workspace_id=wid,
+                )
+            else:
+                continue
             conn.execute(
                 "UPDATE reminders SET status='sent', sent_at=? WHERE id=?",
                 (now, r["id"]),
-            )
-            dest = r["email"] if r["channel"] == "email" else r["phone"]
-            log_activity(
-                conn,
-                "reminder",
-                f"Sent {r['channel'].upper()} reminder for {r['number']} to {dest or r['client_name']}",
-                "reminder",
-                r["id"],
             )
             sent += 1
     return jsonify({"sent": sent})
@@ -800,20 +1083,22 @@ def api_send_due():
 def api_final_notice(invoice_id: int):
     now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
     today = date.today().isoformat()
+    wid = require_workspace_id()
     with db_session(db_path()) as conn:
         inv = conn.execute(
             """
             SELECT i.*, c.name AS client_name, c.email AS client_email
             FROM invoices i JOIN clients c ON c.id = i.client_id
-            WHERE i.id = ?
+            WHERE i.id = ? AND i.workspace_id = ?
             """,
-            (invoice_id,),
+            (invoice_id, wid),
         ).fetchone()
         if not inv:
             return jsonify({"error": "Not found"}), 404
-        settings = conn.execute("SELECT * FROM settings WHERE id = 1").fetchone()
+        settings = get_settings(conn, wid)
         tmpl = conn.execute(
-            "SELECT * FROM templates WHERE name = 'Final notice' LIMIT 1"
+            "SELECT * FROM templates WHERE workspace_id=? AND name='Final notice' LIMIT 1",
+            (wid,),
         ).fetchone()
         ctx = {
             "number": inv["number"],
@@ -821,10 +1106,25 @@ def api_final_notice(invoice_id: int):
             "amount_due": money(invoice_balance(dict(inv))),
             "due_date": inv["due_date"],
             "status": inv["status"],
-            "business_name": settings["business_name"],
+            "business_name": settings["business_name"] if settings else "InPmnt",
         }
         subject = render_template_vars(tmpl["subject"] if tmpl else "Final notice", ctx)
         body = render_template_vars(tmpl["body"] if tmpl else "Final notice", ctx)
+
+        if not mail_configured():
+            if not _allow_fake_email():
+                return _email_not_configured_response()
+        else:
+            try:
+                send_email(
+                    to=inv["client_email"] or "",
+                    subject=subject,
+                    body=body,
+                    from_name=settings["business_name"] if settings else None,
+                )
+            except Exception as exc:  # noqa: BLE001
+                return jsonify({"error": str(exc)}), 502
+
         cur = conn.execute(
             """
             INSERT INTO reminders (
@@ -839,6 +1139,7 @@ def api_final_notice(invoice_id: int):
             f"Sent final notice for {inv['number']}",
             "reminder",
             cur.lastrowid,
+            workspace_id=wid,
         )
     return jsonify({"ok": True, "subject": subject})
 
@@ -848,9 +1149,13 @@ def api_final_notice(invoice_id: int):
 @bp.get("/api/templates")
 @login_required
 def api_templates():
+    wid = require_workspace_id()
     with db_session(db_path()) as conn:
         rows = rows_to_list(
-            conn.execute("SELECT * FROM templates ORDER BY channel, name").fetchall()
+            conn.execute(
+                "SELECT * FROM templates WHERE workspace_id=? ORDER BY channel, name",
+                (wid,),
+            ).fetchall()
         )
     return jsonify(rows)
 
@@ -859,14 +1164,18 @@ def api_templates():
 @login_required
 def api_update_template(template_id: int):
     data = request.get_json(force=True) or {}
+    wid = require_workspace_id()
     with db_session(db_path()) as conn:
-        existing = conn.execute("SELECT * FROM templates WHERE id = ?", (template_id,)).fetchone()
+        existing = conn.execute(
+            "SELECT * FROM templates WHERE id=? AND workspace_id=?",
+            (template_id, wid),
+        ).fetchone()
         if not existing:
             return jsonify({"error": "Not found"}), 404
         conn.execute(
             """
             UPDATE templates SET name=?, channel=?, subject=?, body=?, is_default=?
-            WHERE id=?
+            WHERE id=? AND workspace_id=?
             """,
             (
                 data.get("name", existing["name"]),
@@ -875,19 +1184,26 @@ def api_update_template(template_id: int):
                 data.get("body", existing["body"]),
                 1 if data.get("is_default", existing["is_default"]) else 0,
                 template_id,
+                wid,
             ),
         )
-        row = conn.execute("SELECT * FROM templates WHERE id = ?", (template_id,)).fetchone()
+        row = conn.execute(
+            "SELECT * FROM templates WHERE id=? AND workspace_id=?",
+            (template_id, wid),
+        ).fetchone()
     return jsonify(row_to_dict(row))
 
 
 @bp.get("/api/settings")
 @login_required
 def api_get_settings():
+    wid = require_workspace_id()
     with db_session(db_path()) as conn:
-        settings = row_to_dict(conn.execute("SELECT * FROM settings WHERE id = 1").fetchone())
+        settings = row_to_dict(get_settings(conn, wid))
     if settings:
         settings["reminder_offsets"] = json.loads(settings["reminder_offsets"] or "[]")
+        settings["plan"] = settings.get("plan") or "trial"
+        settings["trial_ends_on"] = settings.get("trial_ends_on")
     return jsonify(settings)
 
 
@@ -898,13 +1214,14 @@ def api_put_settings():
     offsets = data.get("reminder_offsets", [-3, 0, 3, 7, 14])
     if isinstance(offsets, str):
         offsets = [int(x.strip()) for x in re.split(r"[,\s]+", offsets) if x.strip()]
+    wid = require_workspace_id()
     with db_session(db_path()) as conn:
         conn.execute(
             """
             UPDATE settings SET
                 business_name=?, owner_name=?, email=?, phone=?, website=?,
                 currency=?, reminder_offsets=?, default_channel=?, smtp_enabled=?
-            WHERE id=1
+            WHERE id=?
             """,
             (
                 data.get("business_name"),
@@ -916,10 +1233,11 @@ def api_put_settings():
                 json.dumps(offsets),
                 data.get("default_channel") or "email",
                 1 if data.get("smtp_enabled") else 0,
+                wid,
             ),
         )
-        log_activity(conn, "settings", "Updated workspace settings", "settings", 1)
-        settings = row_to_dict(conn.execute("SELECT * FROM settings WHERE id = 1").fetchone())
+        log_activity(conn, "settings", "Updated workspace settings", "settings", wid, workspace_id=wid)
+        settings = row_to_dict(get_settings(conn, wid))
     assert settings
     settings["reminder_offsets"] = json.loads(settings["reminder_offsets"] or "[]")
     return jsonify(settings)
@@ -928,9 +1246,13 @@ def api_put_settings():
 @bp.get("/api/activity")
 @login_required
 def api_activity():
+    wid = require_workspace_id()
     with db_session(db_path()) as conn:
         rows = rows_to_list(
-            conn.execute("SELECT * FROM activity ORDER BY id DESC LIMIT 50").fetchall()
+            conn.execute(
+                "SELECT * FROM activity WHERE workspace_id=? ORDER BY id DESC LIMIT 50",
+                (wid,),
+            ).fetchall()
         )
     return jsonify(rows)
 
@@ -941,8 +1263,9 @@ def api_activity():
 @login_required
 def api_billing_status():
     cfg = load_stripe_config()
+    wid = require_workspace_id()
     with db_session(db_path()) as conn:
-        settings = row_to_dict(conn.execute("SELECT * FROM settings WHERE id = 1").fetchone())
+        settings = row_to_dict(get_settings(conn, wid))
     return jsonify(
         {
             "enabled": cfg.enabled,
@@ -974,8 +1297,9 @@ def api_billing_checkout():
             }
         ), 503
 
+    wid = require_workspace_id()
     with db_session(db_path()) as conn:
-        settings = conn.execute("SELECT * FROM settings WHERE id = 1").fetchone()
+        settings = get_settings(conn, wid)
         user = conn.execute("SELECT * FROM users WHERE id = ?", (session["user_id"],)).fetchone()
         try:
             sess = create_checkout_session(
@@ -983,10 +1307,13 @@ def api_billing_checkout():
                 customer_email=user["email"],
                 client_reference_id=str(user["id"]),
                 customer_id=settings["stripe_customer_id"] if settings else None,
+                workspace_id=wid,
             )
         except Exception as exc:  # noqa: BLE001
             return jsonify({"error": str(exc)}), 400
-        log_activity(conn, "billing", f"Started Stripe checkout for {plan}", "settings", 1)
+        log_activity(
+            conn, "billing", f"Started Stripe checkout for {plan}", "settings", wid, workspace_id=wid
+        )
     return jsonify({"url": sess.url, "id": sess.id})
 
 
@@ -996,8 +1323,9 @@ def api_billing_portal():
     cfg = load_stripe_config()
     if not cfg.enabled:
         return jsonify({"error": "Stripe is not configured."}), 503
+    wid = require_workspace_id()
     with db_session(db_path()) as conn:
-        settings = conn.execute("SELECT * FROM settings WHERE id = 1").fetchone()
+        settings = get_settings(conn, wid)
         if not settings or not settings["stripe_customer_id"]:
             return jsonify({"error": "No Stripe customer yet — subscribe first."}), 400
         try:
@@ -1066,6 +1394,27 @@ def stripe_webhook():
     return jsonify({"received": True})
 
 
+def _resolve_settings_id(conn, *, workspace_id=None, user_id=None, customer=None) -> int | None:
+    if workspace_id is not None and str(workspace_id).strip():
+        try:
+            return int(workspace_id)
+        except (TypeError, ValueError):
+            pass
+    if user_id is not None and str(user_id).strip():
+        row = conn.execute(
+            "SELECT workspace_id FROM users WHERE id = ?", (int(user_id),)
+        ).fetchone()
+        if row and row["workspace_id"] is not None:
+            return int(row["workspace_id"])
+    if customer:
+        row = conn.execute(
+            "SELECT id FROM settings WHERE stripe_customer_id = ?", (customer,)
+        ).fetchone()
+        if row:
+            return int(row["id"])
+    return None
+
+
 def _apply_checkout_session(checkout) -> None:
     """checkout may be Stripe object or dict-like."""
     customer = _get(checkout, "customer")
@@ -1079,17 +1428,33 @@ def _apply_checkout_session(checkout) -> None:
         plan = _plan_from_subscription(subscription)
     if not plan:
         plan = "starter"
+    user_id = meta.get("user_id") if isinstance(meta, dict) else None
+    workspace_id = meta.get("workspace_id") if isinstance(meta, dict) else None
+    if not user_id:
+        user_id = _get(checkout, "client_reference_id")
     with db_session(db_path()) as conn:
+        sid = _resolve_settings_id(
+            conn, workspace_id=workspace_id, user_id=user_id, customer=customer
+        )
+        if sid is None:
+            return
         conn.execute(
             """
             UPDATE settings
             SET plan=?, stripe_customer_id=COALESCE(?, stripe_customer_id),
                 stripe_subscription_id=COALESCE(?, stripe_subscription_id)
-            WHERE id=1
+            WHERE id=?
             """,
-            (plan, customer, sub_id),
+            (plan, customer, sub_id, sid),
         )
-        log_activity(conn, "billing", f"Subscribed to {plan} via Stripe", "settings", 1)
+        log_activity(
+            conn,
+            "billing",
+            f"Subscribed to {plan} via Stripe",
+            "settings",
+            sid,
+            workspace_id=sid,
+        )
 
 
 def _apply_subscription(sub) -> None:
@@ -1097,6 +1462,9 @@ def _apply_subscription(sub) -> None:
     sub_id = _get(sub, "id")
     plan = _plan_from_subscription(sub) or "starter"
     status = _get(sub, "status")
+    meta = _get(sub, "metadata") or {}
+    user_id = meta.get("user_id") if isinstance(meta, dict) else None
+    workspace_id = meta.get("workspace_id") if isinstance(meta, dict) else None
     with db_session(db_path()) as conn:
         if status in ("canceled", "unpaid", "incomplete_expired"):
             conn.execute(
@@ -1107,15 +1475,27 @@ def _apply_subscription(sub) -> None:
                 (customer,),
             )
         else:
+            sid = _resolve_settings_id(
+                conn, workspace_id=workspace_id, user_id=user_id, customer=customer
+            )
+            if sid is None:
+                return
             conn.execute(
                 """
                 UPDATE settings
                 SET plan=?, stripe_customer_id=?, stripe_subscription_id=?
-                WHERE id=1
+                WHERE id=?
                 """,
-                (plan, customer, sub_id),
+                (plan, customer, sub_id, sid),
             )
-        log_activity(conn, "billing", f"Subscription updated → {plan} ({status})", "settings", 1)
+        log_activity(
+            conn,
+            "billing",
+            f"Subscription updated → {plan} ({status})",
+            "settings",
+            1,
+            workspace_id=workspace_id or 1,
+        )
 
 
 def _plan_from_subscription(sub) -> str | None:

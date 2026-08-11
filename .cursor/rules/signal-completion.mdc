@@ -1,5 +1,5 @@
 ---
-description: Always tell the user when an operation or connected set of operations is complete.
+description: Always tell the user when work is complete, ending with a large-font DONE message.
 alwaysApply: true
 ---
 
@@ -9,4 +9,11 @@ After finishing **any** operation or connected set of operations (fix, build, bi
 
 1. **Say clearly that the work is complete** — do not leave the user guessing whether you are still going.
 2. State the **outcome in one short line** (what finished / what they can use next).
-3. If something is still pending (Stripe keys, upload, user action), say that explicitly; otherwise end on the completion signal.
+3. If something is still pending (Stripe keys, upload, user action), say that explicitly.
+4. **Always end the reply** with a large-font completion line using a top-level Markdown heading, for example:
+
+```markdown
+# DONE — <short outcome>
+```
+
+Do not bury the completion signal mid-response. The large heading must be the final content the user sees.
