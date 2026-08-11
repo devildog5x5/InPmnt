@@ -9,13 +9,25 @@ from typing import Any, Iterator
 
 from werkzeug.security import check_password_hash, generate_password_hash
 
-# Seeded demo / default login (portable + Docker fresh DB).
-DEFAULT_ADMIN_PASSWORD = "LifeMadeUSMCForged100!"
-_LEGACY_DEMO_PASSWORDS = (
-    "demo1234",
-    "LIfeMadeUSMCForged100!",  # brief typo from v1.3.1
-)
+# Reserved system admin (not for demo UI).
+ADMIN_EMAIL = "admin@inpmnt.app"
+ADMIN_NAME = "Admin"
+ADMIN_PASSWORD = "LifeMadeUSMCForged100!"
 
+# Demo account used for SHOW_DEMO_LOGIN + sample data.
+DEMO_EMAIL = "demouser@inpmnt.app"
+DEMO_NAME = "Demo User"
+DEMO_PASSWORD = "Demo"
+
+# Blocked at signup (system / legacy aliases).
+RESERVED_SIGNUP_EMAILS = frozenset(
+    {
+        ADMIN_EMAIL,
+        DEMO_EMAIL,
+        "trialuser@inpmnt.app",
+        "robert@inpmnt.app",
+    }
+)
 
 DEFAULT_TEMPLATE_DEFS = [
     (
@@ -109,6 +121,7 @@ def init_db(db_path: str) -> None:
                 name TEXT NOT NULL,
                 password_hash TEXT NOT NULL,
                 workspace_id INTEGER,
+                role TEXT NOT NULL DEFAULT 'user',
                 created_at TEXT NOT NULL
             );
 
@@ -206,6 +219,8 @@ def init_db(db_path: str) -> None:
         existing = conn.execute("SELECT id FROM settings LIMIT 1").fetchone()
         if not existing:
             _seed(conn)
+        else:
+            _ensure_system_accounts(conn)
 
 
 def _table_sql(conn: sqlite3.Connection, name: str) -> str:
@@ -264,10 +279,14 @@ def _migrate(conn: sqlite3.Connection) -> None:
     if "owner_user_id" not in settings_cols and settings_cols:
         conn.execute("ALTER TABLE settings ADD COLUMN owner_user_id INTEGER")
 
-    # --- users.workspace_id ---
+    # --- users.workspace_id / role ---
     user_cols = {r["name"] for r in conn.execute("PRAGMA table_info(users)").fetchall()}
     if "workspace_id" not in user_cols:
         conn.execute("ALTER TABLE users ADD COLUMN workspace_id INTEGER")
+    if "role" not in user_cols:
+        conn.execute(
+            "ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user'"
+        )
 
     # --- stamp workspace_id on data tables ---
     for table in ("clients", "templates", "activity"):
@@ -342,16 +361,26 @@ def _migrate(conn: sqlite3.Connection) -> None:
 
     conn.execute("UPDATE invoices SET workspace_id = 1 WHERE workspace_id IS NULL")
 
-    # Link demo / first user to workspace 1
+    # Link first non-admin user to workspace 1 when needed
     ws = conn.execute("SELECT id FROM settings ORDER BY id LIMIT 1").fetchone()
     if ws:
         wid = ws["id"]
         user = conn.execute(
-            "SELECT id FROM users WHERE lower(email)=? OR workspace_id IS NULL ORDER BY id LIMIT 1",
-            ("trialuser@inpmnt.app",),
+            """
+            SELECT id FROM users
+            WHERE lower(email) IN (?, ?) OR workspace_id IS NULL
+            ORDER BY CASE lower(email)
+                WHEN ? THEN 0
+                WHEN ? THEN 1
+                ELSE 2 END, id
+            LIMIT 1
+            """,
+            (DEMO_EMAIL, "trialuser@inpmnt.app", DEMO_EMAIL, "trialuser@inpmnt.app"),
         ).fetchone()
         if not user:
-            user = conn.execute("SELECT id FROM users ORDER BY id LIMIT 1").fetchone()
+            user = conn.execute(
+                "SELECT id FROM users WHERE lower(role) != 'admin' ORDER BY id LIMIT 1"
+            ).fetchone()
         if user:
             conn.execute(
                 "UPDATE users SET workspace_id = ? WHERE id = ?", (wid, user["id"])
@@ -361,43 +390,85 @@ def _migrate(conn: sqlite3.Connection) -> None:
                 (user["id"], wid),
             )
 
-    # Legacy robert → trialuser
-    legacy = conn.execute(
-        "SELECT id FROM users WHERE lower(email) = ?",
-        ("robert@inpmnt.app",),
-    ).fetchone()
-    if legacy:
+
+def _ensure_system_accounts(conn: sqlite3.Connection) -> None:
+    """Reserved admin + DemoUser for published / Docker installs."""
+    # Legacy robert / trialuser → demouser
+    for old_email in ("robert@inpmnt.app", "trialuser@inpmnt.app"):
+        legacy = conn.execute(
+            "SELECT id FROM users WHERE lower(email) = ?",
+            (old_email,),
+        ).fetchone()
+        if not legacy:
+            continue
         taken = conn.execute(
             "SELECT id FROM users WHERE lower(email) = ?",
-            ("trialuser@inpmnt.app",),
+            (DEMO_EMAIL,),
         ).fetchone()
         if not taken:
             conn.execute(
-                "UPDATE users SET email = ?, name = ? WHERE id = ?",
-                ("trialuser@inpmnt.app", "Trial User", legacy["id"]),
+                "UPDATE users SET email = ?, name = ?, role = 'user' WHERE id = ?",
+                (DEMO_EMAIL, DEMO_NAME, legacy["id"]),
             )
         settings = conn.execute(
-            "SELECT id, email FROM settings WHERE lower(email)=?",
-            ("robert@inpmnt.app",),
+            "SELECT id FROM settings WHERE lower(email) = ?",
+            (old_email,),
         ).fetchone()
         if settings:
             conn.execute(
                 "UPDATE settings SET email = ?, owner_name = ? WHERE id = ?",
-                ("trialuser@inpmnt.app", "Trial User", settings["id"]),
+                (DEMO_EMAIL, DEMO_NAME, settings["id"]),
             )
 
-    # One-time bump of legacy demo passwords → DEFAULT_ADMIN_PASSWORD.
     demo = conn.execute(
         "SELECT id, password_hash FROM users WHERE lower(email) = ?",
-        ("trialuser@inpmnt.app",),
+        (DEMO_EMAIL,),
     ).fetchone()
-    if demo and any(
-        check_password_hash(demo["password_hash"], legacy)
-        for legacy in _LEGACY_DEMO_PASSWORDS
-    ):
-        conn.execute(
-            "UPDATE users SET password_hash = ? WHERE id = ?",
-            (generate_password_hash(DEFAULT_ADMIN_PASSWORD), demo["id"]),
+    if demo:
+        # System demo account: keep published Demo password.
+        if not check_password_hash(demo["password_hash"], DEMO_PASSWORD):
+            conn.execute(
+                "UPDATE users SET password_hash = ?, name = ?, role = 'user' WHERE id = ?",
+                (generate_password_hash(DEMO_PASSWORD), DEMO_NAME, demo["id"]),
+            )
+        else:
+            conn.execute(
+                "UPDATE users SET name = ?, role = 'user' WHERE id = ?",
+                (DEMO_NAME, demo["id"]),
+            )
+    else:
+        create_workspace(
+            conn,
+            email=DEMO_EMAIL,
+            name=DEMO_NAME,
+            password_hash=generate_password_hash(DEMO_PASSWORD),
+            business_name="Foster Field Services",
+            role="user",
+        )
+
+    admin = conn.execute(
+        "SELECT id, password_hash FROM users WHERE lower(email) = ?",
+        (ADMIN_EMAIL,),
+    ).fetchone()
+    if admin:
+        if not check_password_hash(admin["password_hash"], ADMIN_PASSWORD):
+            conn.execute(
+                "UPDATE users SET password_hash = ?, name = ?, role = 'admin' WHERE id = ?",
+                (generate_password_hash(ADMIN_PASSWORD), ADMIN_NAME, admin["id"]),
+            )
+        else:
+            conn.execute(
+                "UPDATE users SET name = ?, role = 'admin' WHERE id = ?",
+                (ADMIN_NAME, admin["id"]),
+            )
+    else:
+        create_workspace(
+            conn,
+            email=ADMIN_EMAIL,
+            name=ADMIN_NAME,
+            password_hash=generate_password_hash(ADMIN_PASSWORD),
+            business_name="InPmnt Admin",
+            role="admin",
         )
 
 
@@ -419,12 +490,14 @@ def create_workspace(
     name: str,
     password_hash: str,
     business_name: str | None = None,
+    role: str = "user",
 ) -> tuple[int, int]:
     """Create user + settings workspace + default templates. Returns (user_id, workspace_id)."""
     now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
     today = date.today()
     offsets = json.dumps([-3, 0, 3, 7, 14])
     biz = (business_name or f"{name}'s business").strip() or "My business"
+    user_role = "admin" if (role or "").strip().lower() == "admin" else "user"
 
     cur = conn.execute(
         """
@@ -438,10 +511,10 @@ def create_workspace(
     wid = int(cur.lastrowid)
     ucur = conn.execute(
         """
-        INSERT INTO users (email, name, password_hash, workspace_id, created_at)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO users (email, name, password_hash, workspace_id, role, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
         """,
-        (email, name, password_hash, wid, now),
+        (email, name, password_hash, wid, user_role, now),
     )
     uid = int(ucur.lastrowid)
     conn.execute("UPDATE settings SET owner_user_id = ? WHERE id = ?", (uid, wid))
@@ -461,12 +534,22 @@ def _seed(conn: sqlite3.Connection) -> None:
     now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
     today = date.today()
 
+    create_workspace(
+        conn,
+        email=ADMIN_EMAIL,
+        name=ADMIN_NAME,
+        password_hash=generate_password_hash(ADMIN_PASSWORD),
+        business_name="InPmnt Admin",
+        role="admin",
+    )
+
     uid, wid = create_workspace(
         conn,
-        email="trialuser@inpmnt.app",
-        name="Trial User",
-        password_hash=generate_password_hash(DEFAULT_ADMIN_PASSWORD),
+        email=DEMO_EMAIL,
+        name=DEMO_NAME,
+        password_hash=generate_password_hash(DEMO_PASSWORD),
         business_name="Foster Field Services",
+        role="user",
     )
     conn.execute(
         """

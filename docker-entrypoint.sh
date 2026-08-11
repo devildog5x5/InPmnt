@@ -79,7 +79,7 @@ export PORT="${PORT:-5055}"
 unset FLASK_SECRET_KEY || true
 
 echo "Starting InPmnt (Gunicorn) on 0.0.0.0:${PORT}"
-echo "Demo login: trialuser@inpmnt.app / LifeMadeUSMCForged100!"
+echo "Demo login: demouser@inpmnt.app / Demo"
 
 # SQLite + multi-worker is unsafe; default to 1 unless overridden carefully.
 WORKERS="${WEB_CONCURRENCY:-1}"

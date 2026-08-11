@@ -28,6 +28,7 @@ from .billing import (
     plan_from_price_id,
 )
 from .database import (
+    RESERVED_SIGNUP_EMAILS,
     create_workspace,
     db_session,
     log_activity,
@@ -150,6 +151,8 @@ def signup():
         password = request.form.get("password") or ""
         if not email or "@" not in email:
             error = "Enter a valid email."
+        elif email in RESERVED_SIGNUP_EMAILS:
+            error = "That email is reserved. Choose another or log in."
         elif len(password) < 8:
             error = "Password must be at least 8 characters."
         elif not name:

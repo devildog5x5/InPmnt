@@ -33,18 +33,18 @@
         {% endif %}
         <div class="field">
           <label for="email">Email</label>
-          <input id="email" name="email" type="email" required value="{% if show_demo_login %}trialuser@inpmnt.app{% endif %}" autocomplete="username" />
+          <input id="email" name="email" type="email" required value="{% if show_demo_login %}demouser@inpmnt.app{% endif %}" autocomplete="username" />
         </div>
         <div class="field">
           <label for="password">Password</label>
-          <input id="password" name="password" type="password" required value="{% if show_demo_login %}LifeMadeUSMCForged100!{% endif %}" autocomplete="current-password" />
+          <input id="password" name="password" type="password" required value="{% if show_demo_login %}Demo{% endif %}" autocomplete="current-password" />
         </div>
         <button class="btn" type="submit">Sign in</button>
       </form>
       <p class="auth-foot">
         New here? <a href="{{ url_for('main.signup') }}">Start free trial</a><br />
         <a href="{{ url_for('main.landing') }}">← Back to home</a>
-        {% if show_demo_login %}<br />Demo: trialuser@inpmnt.app / LifeMadeUSMCForged100!{% endif %}
+        {% if show_demo_login %}<br />Demo: demouser@inpmnt.app / Demo{% endif %}
       </p>
     </div>
   </div>

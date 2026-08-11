@@ -57,7 +57,7 @@ curl -sS http://127.0.0.1:5055/ | head
 ```
 
 - App: `http://YOUR_VM_IP:5055`
-- Sign up at `/signup` (or set `SHOW_DEMO_LOGIN=1` for local trialuser only)
+- Sign up at `/signup` (or set `SHOW_DEMO_LOGIN=1` for local demouser only)
 - Data: Docker volume `inpmnt-data` → `/app/data/inpmnt.db` inside the container
 - Restart policy: `unless-stopped` (survives reboot)
 
@@ -244,5 +244,11 @@ Test with `sk_test_` / `pk_test_` and card `4242 4242 4242 4242`, then switch to
 ## Demo login (change after go-live)
 
 - URL: `https://yourdomain.com`
-- Email: `trialuser@inpmnt.app`
+- Email: `demouser@inpmnt.app`
+- Password: `Demo`
+
+## Reserved admin (not for demo UI)
+
+- Email: `admin@inpmnt.app`
 - Password: `LifeMadeUSMCForged100!`
+- Signup cannot claim `admin@` / `demouser@` addresses.

@@ -26,6 +26,6 @@ if (Test-Path .\.env) {
 $env:USE_HTTPS = if ($env:USE_HTTPS) { $env:USE_HTTPS } else { "1" }
 
 Write-Host "Starting InPmnt at https://127.0.0.1:5055"
-Write-Host "Sign up: /signup  |  optional demo: set SHOW_DEMO_LOGIN=1"
+Write-Host "Sign up: /signup  |  optional demo: set SHOW_DEMO_LOGIN=1 (demouser / Demo)"
 Write-Host "Self-signed cert - accept the browser warning for local use."
 & .\.venv\Scripts\python.exe .\run.py
