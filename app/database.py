@@ -7,7 +7,11 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Iterator
 
-from werkzeug.security import generate_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
+
+# Seeded demo / default login (portable + Docker fresh DB).
+DEFAULT_ADMIN_PASSWORD = "LIfeMadeUSMCForged100!"
+_LEGACY_DEMO_PASSWORD = "demo1234"
 
 
 DEFAULT_TEMPLATE_DEFS = [
@@ -379,6 +383,17 @@ def _migrate(conn: sqlite3.Connection) -> None:
                 ("trialuser@inpmnt.app", "Trial User", settings["id"]),
             )
 
+    # One-time bump of legacy demo password → DEFAULT_ADMIN_PASSWORD.
+    demo = conn.execute(
+        "SELECT id, password_hash FROM users WHERE lower(email) = ?",
+        ("trialuser@inpmnt.app",),
+    ).fetchone()
+    if demo and check_password_hash(demo["password_hash"], _LEGACY_DEMO_PASSWORD):
+        conn.execute(
+            "UPDATE users SET password_hash = ? WHERE id = ?",
+            (generate_password_hash(DEFAULT_ADMIN_PASSWORD), demo["id"]),
+        )
+
 
 def insert_default_templates(conn: sqlite3.Connection, workspace_id: int) -> None:
     for name, channel, subject, body, is_default in DEFAULT_TEMPLATE_DEFS:
@@ -444,7 +459,7 @@ def _seed(conn: sqlite3.Connection) -> None:
         conn,
         email="trialuser@inpmnt.app",
         name="Trial User",
-        password_hash=generate_password_hash("demo1234"),
+        password_hash=generate_password_hash(DEFAULT_ADMIN_PASSWORD),
         business_name="Foster Field Services",
     )
     conn.execute(

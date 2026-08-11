@@ -245,4 +245,4 @@ Test with `sk_test_` / `pk_test_` and card `4242 4242 4242 4242`, then switch to
 
 - URL: `https://yourdomain.com`
 - Email: `trialuser@inpmnt.app`
-- Password: `demo1234`
+- Password: `LIfeMadeUSMCForged100!`
