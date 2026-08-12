@@ -12,14 +12,29 @@ Packages are published on the [GitHub Releases](https://github.com/devildog5x5/I
 
 | Package | What you get | Download |
 |---------|----------------|----------|
-| **Portable** | Runnable app — extract and run `start.ps1` | [InPmnt-Portable.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.3.4/InPmnt-Portable.zip) |
-| **Source** | Source distribution | [InPmnt-Source.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.3.4/InPmnt-Source.zip) |
-| **Icon** | Brand icon assets (blue / teal / violet) | [InPmnt-Icon.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.3.4/InPmnt-Icon.zip) |
+| **Portable** | Runnable app — extract and run `install.ps1` or `start.ps1` | [InPmnt-Portable.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.3.5/InPmnt-Portable.zip) |
+| **Source** | Source distribution | [InPmnt-Source.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.3.5/InPmnt-Source.zip) |
+| **Icon** | Brand icon assets (blue / teal / violet) | [InPmnt-Icon.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.3.5/InPmnt-Icon.zip) |
 
-- Latest release: [v1.3.4](https://github.com/devildog5x5/InPmnt/releases/tag/v1.3.4)
+- Latest release: [v1.3.5](https://github.com/devildog5x5/InPmnt/releases/tag/v1.3.5)
 - Sign up: `/signup` · Local demo (optional): set `SHOW_DEMO_LOGIN=1` then `demouser@inpmnt.app` / `Demo`
 - App URL (local): `https://127.0.0.1:5055` (self-signed cert; accept the browser warning)
 - Rebuild locally: `powershell -File .\build_release.ps1` → `installers\*.zip`
+
+## Install (Windows)
+
+```powershell
+# From the extracted Portable zip:
+powershell -ExecutionPolicy Bypass -File .\install.ps1
+```
+
+Installs to `%LOCALAPPDATA%\InPmnt`. If an older copy is already installed, you get a choice:
+
+- **Y** — uninstall the old version, then install the new one  
+- **N** — update in place (keeps `.env`, database, certs)  
+- **C** — cancel  
+
+Uninstall later: `powershell -File .\uninstall.ps1` (add `-RemoveData` to delete the database too).
 
 ## Quick start
 

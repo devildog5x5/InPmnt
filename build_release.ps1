@@ -3,7 +3,14 @@ $ErrorActionPreference = "Stop"
 $Root = $PSScriptRoot
 $Out = Join-Path $Root "installers"
 $Stage = Join-Path $Root "build\stage"
-$Version = if ($args[0]) { $args[0] } else { "1.3.4" }
+$VersionFile = Join-Path $Root "VERSION"
+$Version = if ($args[0]) {
+    $args[0]
+} elseif (Test-Path $VersionFile) {
+    (Get-Content $VersionFile -Raw).Trim()
+} else {
+    "1.3.5"
+}
 
 New-Item -ItemType Directory -Force -Path $Out | Out-Null
 if (Test-Path $Stage) { Remove-Item -Recurse -Force $Stage }
@@ -11,7 +18,7 @@ New-Item -ItemType Directory -Force -Path $Stage | Out-Null
 
 $include = @(
     "app", "static", "templates", "assets", "deploy",
-    "requirements.txt", "run.py", "start.ps1",
+    "requirements.txt", "run.py", "start.ps1", "install.ps1", "uninstall.ps1", "VERSION",
     "Dockerfile", "docker-compose.yml", "docker-entrypoint.sh", ".dockerignore",
     "README.md", "GO_TO_MARKET.md", "LICENSE", ".env.example", ".gitignore", ".gitattributes"
 )
