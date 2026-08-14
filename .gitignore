@@ -16,4 +16,6 @@ installers/
 certs/*.pem
 certs/*.key
 !certs/.gitkeep
+php/.env
+php/data/*.db
 

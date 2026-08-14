@@ -2,17 +2,37 @@
 
 **Direct doc:** https://github.com/devildog5x5/InPmnt/blob/main/deploy/DEPLOY.md
 
-InPmnt is a **Python (Flask)** app. It does **not** run as a PHP-style FTP drop into `public_html`. Use a real VM / dedicated box, or cPanel **Setup Python App** (Passenger) — not Hostinger Web/Cloud shared hosting.
+InPmnt is a **Python (Flask)** app for Windows/VPS, and a **PHP** app for Hostinger shared hosting (FTP into `public_html`).
 
 | Platform | Recommended stack |
 |----------|-------------------|
+| **Hostinger Web / Cloud** | PHP zip → `public_html` → [Hostinger PHP](#hostinger-php-shared-hosting) |
 | **Docker** (any Linux VM) | `docker compose up` → [Docker](#docker-linux-vm) |
-| **FTP + cPanel Python App** | Upload files, `passenger_wsgi.py` → [FTP](#ftp--cpanel-python-app) |
 | **Linux** (GoDaddy VPS, Ubuntu, etc.) | Nginx + Gunicorn + systemd → [Linux](#linux-ubuntu--godaddy-vps) |
 | **Windows Server** | Waitress + Windows Service (NSSM) + IIS reverse proxy → [Windows](#windows-server) |
 
 Download zips: [latest release](https://github.com/devildog5x5/InPmnt/releases/latest)  
-(`InPmnt-Portable.zip` works for native Windows/Linux; Docker uses the repo `Dockerfile`.)
+(`InPmnt-PHP.zip` → Hostinger `public_html`; `InPmnt-Portable.zip` for native Windows; Docker uses the repo `Dockerfile`.)
+
+---
+
+## Hostinger PHP (shared hosting)
+
+No VPS. Uses the PHP rewrite in `php/`.
+
+1. Download **[InPmnt-PHP.zip](https://github.com/devildog5x5/InPmnt/releases/latest)**.
+2. hPanel → **Files → File Manager** (or FTP). Unzip **every file into `public_html`** (not a subfolder).
+3. Copy `.env.example` to `.env`. Set:
+   - `APP_SECRET` — long random string
+   - `BASE_URL=https://yourdomain.com`
+   - Stripe / Resend or SMTP when you want billing and email
+4. **Advanced → PHP Configuration**: PHP 8.2 or 8.3. Enable **pdo_sqlite** (and `curl` if listed).
+5. Open `https://yourdomain.com` → **Start free trial**.
+6. Stripe webhook: `https://yourdomain.com/api/billing/webhook`
+
+The database file is `public_html/data/inpmnt.db`. `.htaccess` blocks web access to `data/`, `src/`, and `.env`.
+
+Leave `SHOW_DEMO_LOGIN=0` on a public site. Point the domain at this Web hosting plan (not a separate VPS).
 
 ---
 
@@ -80,7 +100,7 @@ Terminate TLS on the host (nginx/Caddy) and proxy to `127.0.0.1:5055`. Set `BASE
 
 ## FTP / cPanel Python App
 
-This is the closest thing to “upload files via FTP.” The host must provide **Setup Python App** (Phusion Passenger). **Hostinger Web and Cloud plans do not** — use a VPS instead.
+This is the closest thing to “upload files via FTP” for **Python**. Hostinger Web/Cloud should use the **[PHP zip](#hostinger-php-shared-hosting)** instead.
 
 ### Do not
 

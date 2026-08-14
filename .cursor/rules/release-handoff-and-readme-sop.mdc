@@ -1,5 +1,5 @@
 ---
-description: Release SOP — commit/push, build zips, README Downloads links, chat handoff for Portable/Source/Icon.
+description: Release SOP — commit/push, build zips, README Downloads links, chat handoff for PHP/Portable/Source/Icon.
 alwaysApply: true
 ---
 
@@ -16,11 +16,12 @@ alwaysApply: true
 ## Builds + GitHub Release (required)
 
 1. `powershell -File .\build_release.ps1 <version>`
-2. Produce **all three** zips under `installers\`:
-   - `InPmnt-Portable.zip` — runnable app (use `start.ps1`)
+2. Produce **all four** zips under `installers\`:
+   - `InPmnt-PHP.zip` — Hostinger / `public_html` drop
+   - `InPmnt-Portable.zip` — runnable Windows app (use `start.ps1`)
    - `InPmnt-Source.zip` — source distribution
    - `InPmnt-Icon.zip` — brand icon assets
-3. Create the next tag (`vX.Y.Z`) and **GitHub Release**, uploading **all three** assets.
+3. Create the next tag (`vX.Y.Z`) and **GitHub Release**, uploading **all four** assets.
 4. Update README Downloads with verbatim HTTPS links for the same tag.
 5. Commit and push the README if links changed.
 
@@ -28,6 +29,7 @@ alwaysApply: true
 
 | Line | Content |
 |------|---------|
+| **PHP** | Full URL to `InPmnt-PHP.zip` |
 | **Portable** | Full URL to `InPmnt-Portable.zip` |
 | **Source** | Full URL to `InPmnt-Source.zip` |
 | **Icon** | Full URL to `InPmnt-Icon.zip` |
