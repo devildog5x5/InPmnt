@@ -9,7 +9,7 @@ $Version = if ($args[0]) {
 } elseif (Test-Path $VersionFile) {
     (Get-Content $VersionFile -Raw).Trim()
 } else {
-    "1.3.5"
+    "1.3.6"
 }
 
 New-Item -ItemType Directory -Force -Path $Out | Out-Null
@@ -18,7 +18,7 @@ New-Item -ItemType Directory -Force -Path $Stage | Out-Null
 
 $include = @(
     "app", "static", "templates", "assets", "deploy",
-    "requirements.txt", "run.py", "start.ps1", "install.ps1", "uninstall.ps1", "VERSION",
+    "requirements.txt", "run.py", "passenger_wsgi.py", "start.ps1", "install.ps1", "uninstall.ps1", "VERSION",
     "Dockerfile", "docker-compose.yml", "docker-entrypoint.sh", ".dockerignore",
     "README.md", "GO_TO_MARKET.md", "LICENSE", ".env.example", ".gitignore", ".gitattributes"
 )

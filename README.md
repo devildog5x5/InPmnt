@@ -12,11 +12,11 @@ Packages are published on the [GitHub Releases](https://github.com/devildog5x5/I
 
 | Package | What you get | Download |
 |---------|----------------|----------|
-| **Portable** | Runnable app — extract and run `install.ps1` or `start.ps1` | [InPmnt-Portable.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.3.5/InPmnt-Portable.zip) |
-| **Source** | Source distribution | [InPmnt-Source.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.3.5/InPmnt-Source.zip) |
-| **Icon** | Brand icon assets (blue / teal / violet) | [InPmnt-Icon.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.3.5/InPmnt-Icon.zip) |
+| **Portable** | Runnable app — extract and run `install.ps1` or `start.ps1` | [InPmnt-Portable.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.3.6/InPmnt-Portable.zip) |
+| **Source** | Source distribution | [InPmnt-Source.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.3.6/InPmnt-Source.zip) |
+| **Icon** | Brand icon assets (blue / teal / violet) | [InPmnt-Icon.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.3.6/InPmnt-Icon.zip) |
 
-- Latest release: [v1.3.5](https://github.com/devildog5x5/InPmnt/releases/tag/v1.3.5)
+- Latest release: [v1.3.6](https://github.com/devildog5x5/InPmnt/releases/tag/v1.3.6)
 - Sign up: `/signup` · Local demo (optional): set `SHOW_DEMO_LOGIN=1` then `demouser@inpmnt.app` / `Demo`
 - App URL (local): `https://127.0.0.1:5055` (self-signed cert; accept the browser warning)
 - Rebuild locally: `powershell -File .\build_release.ps1` → `installers\*.zip`
@@ -93,6 +93,15 @@ BASE_URL=https://127.0.0.1:5055
 3. Restart the app. Browsers trust public CAs; self-signed and private CAs still show a warning unless you trust them in the OS/browser store.
 
 Production TLS (Let's Encrypt / IIS) is handled by nginx or IIS in front of the app — see [deploy/DEPLOY.md](deploy/DEPLOY.md). Do not use the local `certs/` files on a public server.
+
+## FTP / shared hosting
+
+InPmnt is a **Python (Flask)** app, not PHP. Dropping files into `public_html` via FTP will **not** run it.
+
+| Host | What to do |
+|------|------------|
+| **Hostinger Web / Cloud** | Flask is not supported. Use a **VPS** and Docker (below) or `deploy/setup-vps.sh`. |
+| **cPanel with Setup Python App** | FTP the source into the Python app root (not `public_html`). Startup file: `passenger_wsgi.py`. See [deploy/DEPLOY.md](deploy/DEPLOY.md#ftp--cpanel-python-app). |
 
 ## Docker (Linux container)
 

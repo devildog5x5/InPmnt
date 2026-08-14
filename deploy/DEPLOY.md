@@ -2,11 +2,12 @@
 
 **Direct doc:** https://github.com/devildog5x5/InPmnt/blob/main/deploy/DEPLOY.md
 
-InPmnt runs on **Linux VPS** or a **Windows server**. Use a real VM / dedicated box — not shared cPanel-only hosting.
+InPmnt is a **Python (Flask)** app. It does **not** run as a PHP-style FTP drop into `public_html`. Use a real VM / dedicated box, or cPanel **Setup Python App** (Passenger) — not Hostinger Web/Cloud shared hosting.
 
 | Platform | Recommended stack |
 |----------|-------------------|
 | **Docker** (any Linux VM) | `docker compose up` → [Docker](#docker-linux-vm) |
+| **FTP + cPanel Python App** | Upload files, `passenger_wsgi.py` → [FTP](#ftp--cpanel-python-app) |
 | **Linux** (GoDaddy VPS, Ubuntu, etc.) | Nginx + Gunicorn + systemd → [Linux](#linux-ubuntu--godaddy-vps) |
 | **Windows Server** | Waitress + Windows Service (NSSM) + IIS reverse proxy → [Windows](#windows-server) |
 
@@ -74,6 +75,35 @@ docker compose down   # stop (volume keeps the DB)
 ### HTTPS in front of Docker
 
 Terminate TLS on the host (nginx/Caddy) and proxy to `127.0.0.1:5055`. Set `BASE_URL=https://yourdomain.com` in the environment or `.env` used by Compose. Do not use the Windows local `certs/` files inside the container.
+
+---
+
+## FTP / cPanel Python App
+
+This is the closest thing to “upload files via FTP.” The host must provide **Setup Python App** (Phusion Passenger). **Hostinger Web and Cloud plans do not** — use a VPS instead.
+
+### Do not
+
+- FTP into `public_html` / `www` / `htdocs` like a PHP site. Apache will not execute this app.
+- Expect a zip drop alone to start InPmnt. Python packages must be installed in the host’s virtualenv.
+
+### Steps
+
+1. In cPanel → **Software → Setup Python App → Create Application**:
+   - Python **3.12** (or 3.11)
+   - Application root: e.g. `inpmnt` (outside `public_html`)
+   - Application URL: your domain
+   - Startup file: `passenger_wsgi.py`
+   - Entry point: `application`
+2. Download [InPmnt-Source.zip](https://github.com/devildog5x5/InPmnt/releases/latest) and FTP/SFTP (or File Manager) extract it into that application root.
+3. Copy `.env.example` → `.env` and set `FLASK_SECRET_KEY`, `BASE_URL=https://yourdomain.com`, Stripe / email keys. Set `USE_HTTPS=0`.
+4. In Setup Python App, **Run Pip Install** on `requirements.txt` (or activate the venv they show and `pip install -r requirements.txt`).
+5. Click **Restart**. Open `https://yourdomain.com`.
+6. Stripe webhook: `https://yourdomain.com/api/billing/webhook`
+
+After later FTP uploads, Restart the Python app (or `touch tmp/restart.txt` in the app root).
+
+SQLite lives as `inpmnt.db` in the app root unless you set `DATABASE_PATH`. Keep that file off public_html and back it up.
 
 ---
 
