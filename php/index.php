@@ -1,6 +1,10 @@
 <?php
 declare(strict_types=1);
 
+header('X-InPmnt: php');
+header('Cache-Control: private, no-store, no-cache, must-revalidate');
+header('Pragma: no-cache');
+
 $db = require __DIR__ . '/bootstrap.php';
 
 $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';

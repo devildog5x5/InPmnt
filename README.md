@@ -99,7 +99,10 @@ Production TLS (Let's Encrypt / IIS) is handled by nginx or IIS in front of the 
 
 InPmnt now ships a **PHP** build you can drop on Hostinger Web/Cloud (no VPS).
 
-**If you still see WordPress:** Hostinger Web plans usually pre-install WordPress in `public_html`. Visiting `https://yourdomain.com` runs WordPress’s `index.php`, not InPmnt, until you replace it. File Manager **Extract** also likes to create a subfolder (`InPmnt-PHP/`); the domain root stays WordPress. Open `https://yourdomain.com/inpmnt-check.php` — if that page loads, the PHP files are on the server and the homepage is still WordPress’s `index.php`.
+**If you still see WordPress after installing:** two different problems look the same.
+
+- **Wrong files:** Hostinger often pre-installs WordPress, or File Manager Extract leaves the zip in a subfolder. `public_html/index.php` must be InPmnt’s file (it includes `bootstrap.php`), not WordPress.
+- **Right files, old page:** If File Manager already shows InPmnt’s `index.php` but the browser still shows WordPress, **Hostinger Cache Manager is serving a cached WordPress homepage** and is not running the new PHP. That cache is *not* inside `public_html`, so deleting WordPress files does not clear it. In the website dashboard: **Advanced → Cache Manager → Purge all**, turn **Automatic cache** off, then open the site in a private window. Confirm with View Source (`wp-content` = still WordPress HTML; `InPmnt` = this app) or `https://yourdomain.com/inpmnt-check.php`.
 
 1. Download [InPmnt-PHP.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.4.0/InPmnt-PHP.zip).
 2. In hPanel → **Files → File Manager** (or FTP), unzip **all files into `public_html`** (not a subfolder). Overwrite `index.php` and `.htaccess`.

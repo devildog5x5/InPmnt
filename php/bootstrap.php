@@ -2,6 +2,14 @@
 declare(strict_types=1);
 
 $root = __DIR__;
+if (!is_file($root . '/src/Env.php')) {
+    http_response_code(500);
+    header('Content-Type: text/plain; charset=utf-8');
+    header('X-InPmnt: php');
+    echo "InPmnt PHP is running from {$root}\n";
+    echo "Missing src/Env.php next to index.php. Upload the full PHP zip into this same folder.\n";
+    exit;
+}
 require $root . '/src/Env.php';
 require $root . '/src/Http.php';
 require $root . '/src/Db.php';

@@ -22,6 +22,8 @@ No VPS. Uses the PHP rewrite in `php/`.
 
 Hostinger Web plans usually **pre-install WordPress** in `public_html`. Until InPmnt’s `index.php` replaces WordPress’s, the domain homepage is WordPress. Confirm with `https://yourdomain.com/inpmnt-check.php`.
 
+If **File Manager already shows InPmnt’s `index.php`** but the browser is still WordPress, purge **Advanced → Cache Manager → Purge all** (and turn Automatic cache off). Hostinger’s LiteSpeed cache lives outside `public_html`, so clearing the folder does not drop the old homepage.
+
 1. Download **[InPmnt-PHP.zip](https://github.com/devildog5x5/InPmnt/releases/latest)**.
 2. hPanel → **Files → File Manager** (or FTP). Unzip **every file into `public_html`** (not a subfolder named `InPmnt-PHP`). Overwrite `index.php` and `.htaccess`.
 3. If WordPress is still there, delete or rename `wp-admin`, `wp-content`, `wp-includes`, and `wp-config.php`.

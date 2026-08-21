@@ -29,11 +29,12 @@ echo "WordPress files in this same folder: " . ($wpHere ? "YES (wp-admin / wp-co
 echo "InPmnt app files present: " . ($inpmnt ? "yes" : "NO") . "\n\n";
 
 echo "If https://yourdomain.com still shows WordPress:\n";
-echo "1. Hostinger usually pre-installs WordPress in public_html. Visiting the domain\n";
-echo "   runs WordPress's index.php, not InPmnt, until you replace it.\n";
-echo "2. File Manager Extract often creates public_html/InPmnt-PHP/ (or similar).\n";
-echo "   The domain root is still WordPress. Move EVERY file up into public_html.\n";
-echo "3. Overwrite index.php and .htaccess. Then delete or rename wp-admin,\n";
-echo "   wp-content, wp-includes, and wp-config.php if you do not need WordPress.\n";
-echo "4. In hPanel → Websites, open the domain URL itself (not the WordPress button).\n";
-echo "5. Purge LiteSpeed / Hostinger cache if the old homepage is stuck.\n";
+echo "A. If this folder's index.php is already InPmnt: Hostinger Cache Manager is\n";
+echo "   serving a cached WordPress homepage. hPanel → Advanced → Cache Manager\n";
+echo "   → Purge all, turn Automatic cache off, then use a private window.\n";
+echo "B. If index.php is still WordPress, or files are in a subfolder:\n";
+echo "   1. Hostinger usually pre-installs WordPress in public_html.\n";
+echo "   2. File Manager Extract often creates public_html/InPmnt-PHP/.\n";
+echo "      Move EVERY file up into public_html and overwrite index.php / .htaccess.\n";
+echo "   3. Delete wp-admin, wp-content, wp-includes, wp-config.php if unused.\n";
+echo "C. In hPanel open the domain URL itself (not the WordPress button).\n";

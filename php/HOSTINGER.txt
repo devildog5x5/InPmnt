@@ -1,14 +1,21 @@
 InPmnt PHP — Hostinger / shared hosting
 ========================================
 
-If the site still shows WordPress, InPmnt is not the document root yet.
-Hostinger Web plans ship with WordPress already in public_html. Visiting
-https://yourdomain.com runs WordPress's index.php until you replace it.
+If File Manager already shows InPmnt's index.php but the browser still
+shows WordPress, the files are fine. Hostinger Cache Manager / LiteSpeed
+is serving a cached copy of the old WordPress homepage and is not running
+the new PHP at all.
+
+Fix that first:
+  hPanel → the website dashboard → Advanced → Cache Manager → Purge all
+  Turn Automatic cache OFF while you test.
+  Then open the site in a private/incognito window.
 
 Quick check: open https://yourdomain.com/inpmnt-check.php
-  - If that page loads, the PHP files are on the server.
-  - If the homepage is still WordPress, index.php at public_html is still WordPress
-    (or the zip was extracted into a subfolder).
+  - If that page loads, PHP is running this folder.
+  - If the homepage is still WordPress after a purge, View Source:
+      wp-content / wp-includes  → still cache or the domain DNS is not this host
+      InPmnt / Get paid without the chase → this app is serving
 
 Install
 -------
@@ -19,7 +26,7 @@ Install
    unless you truly want WordPress on this same domain (you should not).
 3. Copy .env.example to .env and set APP_SECRET and BASE_URL=https://yourdomain.com
 4. In hPanel → Advanced → PHP Configuration: PHP 8.2+ and enable pdo_sqlite
-5. Open https://yourdomain.com  → Sign up
+5. Purge Cache Manager, then open https://yourdomain.com  → Sign up
 6. Stripe webhook: https://yourdomain.com/api/billing/webhook
 
 The SQLite database is created automatically at data/inpmnt.db (blocked from the web).
