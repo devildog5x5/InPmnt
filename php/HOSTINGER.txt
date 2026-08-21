@@ -6,6 +6,10 @@ shows WordPress, the files are fine. Hostinger Cache Manager / LiteSpeed
 is serving a cached copy of the old WordPress homepage and is not running
 the new PHP at all.
 
+A subdomain (sandbox.example.com) can work while the main domain 500s:
+the first PHP zip looked for src/ in the PARENT of public_html. That
+accidentally works for a subfolder and fatals on the real domain root.
+
 Fix that first:
   hPanel → the website dashboard → Advanced → Cache Manager → Purge all
   Turn Automatic cache OFF while you test.

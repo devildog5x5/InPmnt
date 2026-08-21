@@ -1,15 +1,42 @@
 <?php
 declare(strict_types=1);
 
-$root = __DIR__;
-if (!is_file($root . '/src/Env.php')) {
-    http_response_code(500);
-    header('Content-Type: text/plain; charset=utf-8');
-    header('X-InPmnt: php');
-    echo "InPmnt PHP is running from {$root}\n";
-    echo "Missing src/Env.php next to index.php. Upload the full PHP zip into this same folder.\n";
+/**
+ * Hostinger layout:
+ * - Main domain public_html/index.php → src/ is in THIS folder (__DIR__).
+ * - Subdomain folders (sandbox/) can sit inside public_html; the released zip
+ *   used dirname(__DIR__) which accidentally worked for the subdomain and
+ *   500'd the main domain. Prefer this folder, then the parent.
+ */
+function inpmnt_fail(string $msg): never
+{
+    if (!headers_sent()) {
+        http_response_code(500);
+        header('Content-Type: text/plain; charset=utf-8');
+        header('X-InPmnt: php');
+        header('Cache-Control: no-store');
+    }
+    echo "InPmnt PHP error\n\n{$msg}\n";
     exit;
 }
+
+$root = null;
+$tried = [];
+foreach ([__DIR__, dirname(__DIR__)] as $dir) {
+    $tried[] = $dir . '/src/Env.php';
+    if (is_file($dir . '/src/Env.php')) {
+        $root = $dir;
+        break;
+    }
+}
+if ($root === null) {
+    inpmnt_fail(
+        "Cannot find src/Env.php (this is the usual cause of a blank 500 on the main domain).\nLooked in:\n- " .
+        implode("\n- ", $tried) .
+        "\n\nUpload the full PHP zip so index.php, bootstrap.php, src/, views/, and data/ are in the same folder as this file."
+    );
+}
+
 require $root . '/src/Env.php';
 require $root . '/src/Http.php';
 require $root . '/src/Db.php';
@@ -35,7 +62,11 @@ session_set_cookie_params([
     'httponly' => true,
     'samesite' => 'Lax',
 ]);
-session_start();
+try {
+    session_start();
+} catch (Throwable $e) {
+    inpmnt_fail('Could not start a PHP session: ' . $e->getMessage());
+}
 
 $dbPath = Env::get('DATABASE_PATH');
 if ($dbPath === '') {
@@ -45,13 +76,18 @@ if ($dbPath === '') {
 }
 
 if (!extension_loaded('pdo_sqlite')) {
-    http_response_code(500);
-    header('Content-Type: text/plain; charset=utf-8');
-    echo "InPmnt needs the PHP PDO SQLite extension. Enable it in hPanel → PHP Configuration, or ask Hostinger support to turn on pdo_sqlite.";
-    exit;
+    inpmnt_fail('InPmnt needs the PHP PDO SQLite extension. Enable it in hPanel → PHP Configuration, or ask Hostinger support to turn on pdo_sqlite.');
 }
 
-$db = Db::connect($dbPath);
-Db::init($db);
+try {
+    $db = Db::connect($dbPath);
+    Db::init($db);
+} catch (Throwable $e) {
+    inpmnt_fail(
+        "Could not open the SQLite database at {$dbPath}\n" .
+        $e->getMessage() .
+        "\n\nOn Hostinger, the data/ folder next to index.php must be writable."
+    );
+}
 
 return $db;
