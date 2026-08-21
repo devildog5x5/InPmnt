@@ -99,11 +99,14 @@ Production TLS (Let's Encrypt / IIS) is handled by nginx or IIS in front of the 
 
 InPmnt now ships a **PHP** build you can drop on Hostinger Web/Cloud (no VPS).
 
+**If you still see WordPress:** Hostinger Web plans usually pre-install WordPress in `public_html`. Visiting `https://yourdomain.com` runs WordPress’s `index.php`, not InPmnt, until you replace it. File Manager **Extract** also likes to create a subfolder (`InPmnt-PHP/`); the domain root stays WordPress. Open `https://yourdomain.com/inpmnt-check.php` — if that page loads, the PHP files are on the server and the homepage is still WordPress’s `index.php`.
+
 1. Download [InPmnt-PHP.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.4.0/InPmnt-PHP.zip).
-2. In hPanel → **Files → File Manager** (or FTP), unzip **all files into `public_html`**.
-3. Copy `.env.example` → `.env`. Set `APP_SECRET` (long random string) and `BASE_URL=https://yourdomain.com`.
-4. hPanel → **Advanced → PHP Configuration**: PHP **8.2+**, enable **pdo_sqlite**.
-5. Open `https://yourdomain.com` and sign up.
+2. In hPanel → **Files → File Manager** (or FTP), unzip **all files into `public_html`** (not a subfolder). Overwrite `index.php` and `.htaccess`.
+3. Remove leftover WordPress folders if you do not need them: `wp-admin`, `wp-content`, `wp-includes`, `wp-config.php`.
+4. Copy `.env.example` → `.env`. Set `APP_SECRET` (long random string) and `BASE_URL=https://yourdomain.com`.
+5. hPanel → **Advanced → PHP Configuration**: PHP **8.2+**, enable **pdo_sqlite**.
+6. Open `https://yourdomain.com` (type the URL; do not use the WordPress button in hPanel) and sign up. Purge LiteSpeed / Hostinger cache if the old homepage sticks.
 
 Stripe webhook: `https://yourdomain.com/api/billing/webhook`  
 SQLite is created at `data/inpmnt.db` (blocked from the web).

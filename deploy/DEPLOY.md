@@ -20,15 +20,18 @@ Download zips: [latest release](https://github.com/devildog5x5/InPmnt/releases/l
 
 No VPS. Uses the PHP rewrite in `php/`.
 
+Hostinger Web plans usually **pre-install WordPress** in `public_html`. Until InPmnt’s `index.php` replaces WordPress’s, the domain homepage is WordPress. Confirm with `https://yourdomain.com/inpmnt-check.php`.
+
 1. Download **[InPmnt-PHP.zip](https://github.com/devildog5x5/InPmnt/releases/latest)**.
-2. hPanel → **Files → File Manager** (or FTP). Unzip **every file into `public_html`** (not a subfolder).
-3. Copy `.env.example` to `.env`. Set:
+2. hPanel → **Files → File Manager** (or FTP). Unzip **every file into `public_html`** (not a subfolder named `InPmnt-PHP`). Overwrite `index.php` and `.htaccess`.
+3. If WordPress is still there, delete or rename `wp-admin`, `wp-content`, `wp-includes`, and `wp-config.php`.
+4. Copy `.env.example` to `.env`. Set:
    - `APP_SECRET` — long random string
    - `BASE_URL=https://yourdomain.com`
    - Stripe / Resend or SMTP when you want billing and email
-4. **Advanced → PHP Configuration**: PHP 8.2 or 8.3. Enable **pdo_sqlite** (and `curl` if listed).
-5. Open `https://yourdomain.com` → **Start free trial**.
-6. Stripe webhook: `https://yourdomain.com/api/billing/webhook`
+5. **Advanced → PHP Configuration**: PHP 8.2 or 8.3. Enable **pdo_sqlite** (and `curl` if listed).
+6. Open `https://yourdomain.com` (not the WordPress button in hPanel) → **Start free trial**. Purge LiteSpeed cache if the old homepage sticks.
+7. Stripe webhook: `https://yourdomain.com/api/billing/webhook`
 
 The database file is `public_html/data/inpmnt.db`. `.htaccess` blocks web access to `data/`, `src/`, and `.env`.
 

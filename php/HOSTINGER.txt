@@ -1,0 +1,25 @@
+InPmnt PHP — Hostinger / shared hosting
+========================================
+
+If the site still shows WordPress, InPmnt is not the document root yet.
+Hostinger Web plans ship with WordPress already in public_html. Visiting
+https://yourdomain.com runs WordPress's index.php until you replace it.
+
+Quick check: open https://yourdomain.com/inpmnt-check.php
+  - If that page loads, the PHP files are on the server.
+  - If the homepage is still WordPress, index.php at public_html is still WordPress
+    (or the zip was extracted into a subfolder).
+
+Install
+-------
+1. Unzip ALL of these files into public_html (File Manager or FTP).
+   Do not leave them in a folder named InPmnt-PHP (or similar).
+2. If WordPress is already there, OVERWRITE index.php and .htaccess.
+   Then remove wp-admin, wp-content, wp-includes, and wp-config.php
+   unless you truly want WordPress on this same domain (you should not).
+3. Copy .env.example to .env and set APP_SECRET and BASE_URL=https://yourdomain.com
+4. In hPanel → Advanced → PHP Configuration: PHP 8.2+ and enable pdo_sqlite
+5. Open https://yourdomain.com  → Sign up
+6. Stripe webhook: https://yourdomain.com/api/billing/webhook
+
+The SQLite database is created automatically at data/inpmnt.db (blocked from the web).
