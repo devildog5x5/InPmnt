@@ -33,6 +33,8 @@ final class Db
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         ]);
         $pdo->exec('PRAGMA foreign_keys = ON');
+        $pdo->exec('PRAGMA busy_timeout = 8000');
+        $pdo->exec('PRAGMA journal_mode = WAL');
         return $pdo;
     }
 

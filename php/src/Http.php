@@ -14,8 +14,23 @@ final class Http
     public static function redirect(string $url, int $status = 302): never
     {
         http_response_code($status);
+        header('Cache-Control: no-store, no-cache, must-revalidate');
         header('Location: ' . $url);
         exit;
+    }
+
+    /** Host the user is actually on, so sandbox is not bounced to a broken main domain. */
+    public static function publicOrigin(): string
+    {
+        $host = preg_replace('/[^A-Za-z0-9.:\[\]-]/', '', (string) ($_SERVER['HTTP_HOST'] ?? '')) ?? '';
+        $fwd = strtolower((string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? ''));
+        $https = $fwd === 'https'
+            || (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+            || (int) ($_SERVER['SERVER_PORT'] ?? 0) === 443;
+        if ($host !== '') {
+            return ($https ? 'https://' : 'http://') . $host;
+        }
+        return rtrim(Env::get('BASE_URL', 'http://127.0.0.1:5055'), '/');
     }
 
     public static function bodyJson(): array
