@@ -30,7 +30,10 @@ Install
    unless you truly want WordPress on this same domain (you should not).
 3. Copy .env.example to .env and set APP_SECRET and BASE_URL=https://yourdomain.com
 4. In hPanel → Advanced → PHP Configuration: PHP 8.2+ and enable pdo_sqlite
-5. Purge Cache Manager, then open https://yourdomain.com  → Sign up
-6. Stripe webhook: https://yourdomain.com/api/billing/webhook
+5. Permissions: files 644, folders 755. Do not leave PHP files at 777 (Hostinger
+   can 500 those). data/ must be writable so SQLite can create inpmnt.db.
+   hPanel → Advanced → Fix File Ownership resets the account to those defaults.
+6. Purge Cache Manager, then open https://yourdomain.com  → Sign up
+7. Stripe webhook: https://yourdomain.com/api/billing/webhook
 
 The SQLite database is created automatically at data/inpmnt.db (blocked from the web).

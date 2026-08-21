@@ -28,6 +28,55 @@ if ($indexIsInpmnt) {
 echo "WordPress files in this same folder: " . ($wpHere ? "YES (wp-admin / wp-config.php still here)" : "no") . "\n";
 echo "InPmnt app files present: " . ($inpmnt ? "yes" : "NO") . "\n\n";
 
+echo "Permissions (Hostinger default: files 644, folders 755)\n";
+$permTargets = [
+    'index.php' => $here . '/index.php',
+    'bootstrap.php' => $here . '/bootstrap.php',
+    'src/' => $here . '/src',
+    'src/Env.php' => $here . '/src/Env.php',
+    'data/' => $here . '/data',
+    'data/inpmnt.db' => $here . '/data/inpmnt.db',
+    '.htaccess' => $here . '/.htaccess',
+];
+foreach ($permTargets as $label => $path) {
+    if (!file_exists($path)) {
+        echo "  {$label}: missing\n";
+        continue;
+    }
+    $mode = substr(sprintf('%o', fileperms($path)), -4);
+    $bits = [];
+    if (is_readable($path)) {
+        $bits[] = 'readable';
+    } else {
+        $bits[] = 'NOT readable';
+    }
+    if (is_dir($path)) {
+        $bits[] = is_writable($path) ? 'writable' : 'NOT writable';
+    } elseif (is_writable($path)) {
+        $bits[] = 'writable';
+    }
+    if (!is_dir($path) && str_ends_with($label, '.php') && (fileperms($path) & 0x0002)) {
+        $bits[] = 'WORLD-WRITABLE (Hostinger can 500 on 777 PHP files — set 644)';
+    }
+    echo "  {$label}: {$mode} (" . implode(', ', $bits) . ")\n";
+}
+echo '  pdo_sqlite: ' . (extension_loaded('pdo_sqlite') ? "enabled\n" : "MISSING — this 500s the app\n");
+$sessionPath = session_save_path();
+if ($sessionPath === '') {
+    $sessionPath = sys_get_temp_dir();
+}
+echo '  session path: ' . $sessionPath . (is_writable($sessionPath) ? " (writable)\n" : " (NOT writable — can 500)\n");
+
+$dataDir = $here . '/data';
+if (!is_dir($dataDir)) {
+    echo "  data/ missing — the app must be able to create it (parent folder writable).\n";
+} elseif (!is_writable($dataDir)) {
+    echo "  data/ is not writable — SQLite cannot create inpmnt.db (common 500).\n";
+    echo "  Fix: File Manager → data → Permissions → 755. Or hPanel → Advanced → Fix File Ownership.\n";
+}
+
+echo "\n";
+
 echo "If https://yourdomain.com still shows WordPress:\n";
 echo "A. If this folder's index.php is already InPmnt: Hostinger Cache Manager is\n";
 echo "   serving a cached WordPress homepage. hPanel → Advanced → Cache Manager\n";
