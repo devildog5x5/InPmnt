@@ -36,6 +36,45 @@ Leave `SHOW_DEMO_LOGIN=0` on a public site. Point the domain at this Web hosting
 
 ---
 
+## Apache2 (Ubuntu / Debian)
+
+Same PHP zip as Hostinger. Document root is usually `/var/www/html` (not `/var/www`).
+
+Unzip so these sit **in the document root**:
+
+```
+/var/www/html/index.php
+/var/www/html/bootstrap.php
+/var/www/html/src/Env.php
+/var/www/html/views/
+/var/www/html/data/
+/var/www/html/.htaccess
+```
+
+If Apache logs `Failed opening required '/var/www/src/Env.php'`, the app was resolving paths one directory above the document root. Current `bootstrap.php` loads `src/` next to itself — keep `index.php`, `bootstrap.php`, and `src/` together in `/var/www/html` (or `public_html`).
+
+```bash
+sudo apt update
+sudo apt install -y apache2 php php-sqlite3 libapache2-mod-php
+sudo a2enmod rewrite
+sudo systemctl restart apache2
+```
+
+The site vhost must allow `.htaccess` (URL rewrite + block `src/`, `data/`, `.env`):
+
+```apache
+<Directory /var/www/html>
+    AllowOverride All
+    Require all granted
+</Directory>
+```
+
+Copy `.env.example` to `/var/www/html/.env` and set `APP_SECRET` and `BASE_URL`. PHP 8.2+ with `pdo_sqlite`.
+
+Then: `https://yourdomain.com` → sign up. Stripe webhook: `https://yourdomain.com/api/billing/webhook`.
+
+---
+
 ## Docker (Linux VM)
 
 Easiest way to keep InPmnt “just running” on a VM.

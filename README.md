@@ -103,10 +103,13 @@ InPmnt now ships a **PHP** build you can drop on Hostinger Web/Cloud (no VPS).
 2. In hPanel → **Files → File Manager** (or FTP), unzip **all files into `public_html`**.
 3. Copy `.env.example` → `.env`. Set `APP_SECRET` (long random string) and `BASE_URL=https://yourdomain.com`.
 4. hPanel → **Advanced → PHP Configuration**: PHP **8.2+**, enable **pdo_sqlite**.
-5. Open `https://yourdomain.com` and sign up.
+5. Open `https://yourdomain.com/inpmnt-check.php`, then the homepage, and sign up.
+   If Apache logged `Failed opening required '/var/www/src/Env.php'`, replace `bootstrap.php` with the copy from this release (it loads `src/` next to itself, not one folder above the document root).
 
 Stripe webhook: `https://yourdomain.com/api/billing/webhook`  
 SQLite is created at `data/inpmnt.db` (blocked from the web).
+
+On Apache2 (Ubuntu/Debian), unzip into `/var/www/html` (the document root) so `src/Env.php` sits next to `bootstrap.php`. Do not leave `src/` in `/var/www/src`. Enable `mod_rewrite`, `AllowOverride All`, and `php-sqlite3`. See [deploy/DEPLOY.md](deploy/DEPLOY.md#apache2-ubuntu--debian).
 
 The Windows portable app is still Python (`start.ps1`). Use PHP only on shared hosting.
 

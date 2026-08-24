@@ -1,0 +1,31 @@
+InPmnt PHP — Hostinger / Apache / shared hosting
+================================================
+
+The blank HTTP 500 is almost always this path bug:
+
+  bootstrap.php used dirname(__DIR__) as the app root.
+  On Apache document root /var/www/html that requires /var/www/src/Env.php
+  (one folder ABOVE html). Error log:
+
+    PHP Fatal error: Failed opening required '/var/www/src/Env.php'
+    in /var/www/html/bootstrap.php on line 5
+
+This zip's bootstrap.php looks next to itself first (__DIR__).
+
+Install
+-------
+1. Unzip ALL of these files into public_html or /var/www/html.
+   Do not leave them in a folder named InPmnt-PHP.
+2. If WordPress is already there, OVERWRITE index.php and .htaccess.
+   Then remove wp-admin, wp-content, wp-includes, and wp-config.php.
+3. Copy .env.example to .env and set APP_SECRET and BASE_URL=https://yourdomain.com
+4. PHP 8.2+ with pdo_sqlite (Apache: apt install php-sqlite3).
+5. Permissions: files 644, folders 755. data/ must be writable.
+   Do not leave PHP files at 777.
+6. Open https://yourdomain.com/inpmnt-check.php then the homepage.
+7. Stripe webhook: https://yourdomain.com/api/billing/webhook
+
+Apache2 extra: enable mod_rewrite, AllowOverride All, DirectoryIndex index.php.
+See deploy/DEPLOY.md.
+
+The SQLite database is created at data/inpmnt.db (blocked from the web).
