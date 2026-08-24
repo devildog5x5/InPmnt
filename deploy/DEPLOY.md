@@ -80,13 +80,21 @@ Or paste:
 </Directory>
 ```
 
-If the browser says **Forbidden / You don't have permission to access this resource**, Apache is denying the request before PHP runs. Usually `.htaccess` is unreadable or the vhost has `AllowOverride None` / `Require all denied`. Fix permissions, then open `/index.php`:
+If **Log in / Sign up / App** 404 while the homepage and Pricing work, Apache is not rewriting `/login` to `index.php`. This build’s buttons go to `/index.php/login` so they work without `mod_rewrite`. Still enable rewrite for short URLs:
+
+```bash
+sudo a2enmod rewrite
+sudo a2enconf inpmnt-html
+sudo systemctl reload apache2
+```
+
+You do **not** need 777 on PHP files. Only `data/` must be writable:
 
 ```bash
 sudo chown -R www-data:www-data /var/www/html
 sudo find /var/www/html -type d -exec chmod 755 {} \;
 sudo find /var/www/html -type f -exec chmod 644 {} \;
-sudo systemctl reload apache2
+sudo chmod 775 /var/www/html/data
 ```
 
 Do not open `/bootstrap.php` or `/src/` — those URLs are blocked on purpose.

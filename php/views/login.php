@@ -43,8 +43,8 @@
         <button class="btn" type="submit">Sign in</button>
       </form>
       <p class="auth-foot">
-        New here? <a href="/signup">Start free trial</a><br />
-        <a href="/">← Back to home</a>
+        New here? <a href="<?= Http::e(Http::url('/signup')) ?>">Start free trial</a><br />
+        <a href="<?= Http::e(Http::url('/')) ?>">← Back to home</a>
         <?php if (!empty($show_demo_login)): ?><br />Demo: demouser@inpmnt.app / Demo<?php endif; ?>
       </p>
     </div>

@@ -48,8 +48,8 @@
         <button class="btn" type="submit">Create account</button>
       </form>
       <p class="auth-foot">
-        Already have an account? <a href="/login">Log in</a><br />
-        <a href="/">← Back to home</a>
+        Already have an account? <a href="<?= Http::e(Http::url('/login')) ?>">Log in</a><br />
+        <a href="<?= Http::e(Http::url('/')) ?>">← Back to home</a>
       </p>
     </div>
   </div>

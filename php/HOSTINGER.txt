@@ -1,34 +1,28 @@
 InPmnt PHP — Hostinger / Apache / shared hosting
 ================================================
 
-If the browser says "Forbidden / You don't have permission to access this resource":
+777 on every file is not required. Apache only needs:
+  folders 755, PHP/html/css 644, and data/ writable (775).
+  sudo chown -R www-data:www-data /var/www/html
+  sudo find /var/www/html -type d -exec chmod 755 {} \;
+  sudo find /var/www/html -type f -exec chmod 644 {} \;
+  sudo chmod 775 /var/www/html/data
 
-  Apache cannot run the homepage. On the server:
+Log in / Sign up / App links need PHP to see /index.php/login
+(this zip uses those URLs so they work even if mod_rewrite is off).
 
-    sudo chown -R www-data:www-data /var/www/html
-    sudo find /var/www/html -type d -exec chmod 755 {} \;
-    sudo find /var/www/html -type f -exec chmod 644 {} \;
-    sudo a2enmod rewrite
-    sudo cp deploy/apache-html.conf /etc/apache2/conf-available/inpmnt-html.conf
-    sudo a2enconf inpmnt-html
-    sudo systemctl reload apache2
+  sudo a2enmod rewrite
+  sudo cp deploy/apache-html.conf /etc/apache2/conf-available/inpmnt-html.conf
+  sudo a2enconf inpmnt-html
+  sudo systemctl reload apache2
 
-  Then open http://YOUR-SERVER/index.php  (not /src/ or /bootstrap.php).
-  If that works, / should work too.
-
-If Apache logged Failed opening required '/var/www/src/Env.php':
-  bootstrap.php was looking one folder above the document root. This zip
-  loads src/ next to bootstrap.php.
+Then open http://YOUR-SERVER/index.php  (not /src/ or /bootstrap.php).
 
 Install
 -------
 1. Unzip ALL of these files into public_html or /var/www/html.
-   Do not leave them in a folder named InPmnt-PHP.
-2. If WordPress is already there, OVERWRITE index.php and .htaccess.
-3. Copy .env.example to .env and set APP_SECRET and BASE_URL=https://yourdomain.com
-4. PHP 8.2+ with pdo_sqlite (Apache: apt install php-sqlite3).
-5. Permissions: files 644, folders 755. data/ must be writable.
-6. Open https://yourdomain.com/index.php then /inpmnt-check.php
-7. Stripe webhook: https://yourdomain.com/api/billing/webhook
-
-The SQLite database is created at data/inpmnt.db (blocked from the web).
+2. OVERWRITE index.php and .htaccess if WordPress is there.
+3. Copy .env.example to .env — APP_SECRET and BASE_URL=https://yourdomain.com
+4. PHP 8.2+ with pdo_sqlite.
+5. Open /index.php then Sign up. Stripe webhook: /index.php/api/billing/webhook
+   (pretty /api/billing/webhook also works once rewrite is on).

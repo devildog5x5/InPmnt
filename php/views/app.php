@@ -73,10 +73,10 @@
   <div id="modal-root" class="modal-backdrop"></div>
 
   <script>
-    window.__INPMNT__ = {
+    window.__INPMNT__ = Object.assign(window.__INPMNT__ || {}, {
       user: <?= json_encode($user ?? new stdClass(), JSON_UNESCAPED_SLASHES) ?>,
-      logoutUrl: "/logout"
-    };
+      logoutUrl: <?= json_encode(Http::url('/logout'), JSON_UNESCAPED_SLASHES) ?>
+    });
   </script>
   <script type="module" src="/static/js/app.js"></script>
 </body>
