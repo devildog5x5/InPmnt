@@ -20,12 +20,13 @@ function toast(message) {
 }
 
 async function api(path, options = {}) {
-  const res = await fetch(path, {
+  const to = (window.__INPMNT__ && window.__INPMNT__.path) ? window.__INPMNT__.path(path) : path;
+  const res = await fetch(to, {
     headers: { "Content-Type": "application/json", ...(options.headers || {}) },
     ...options,
   });
   if (res.status === 401) {
-    location.href = "/login";
+    location.href = (window.__INPMNT__ && window.__INPMNT__.path) ? window.__INPMNT__.path("/login") : "/login";
     throw new Error("Unauthorized");
   }
   const data = await res.json().catch(() => ({}));

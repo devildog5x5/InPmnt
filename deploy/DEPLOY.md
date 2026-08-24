@@ -36,6 +36,77 @@ Leave `SHOW_DEMO_LOGIN=0` on a public site. Point the domain at this Web hosting
 
 ---
 
+## Apache2 (Ubuntu / Debian)
+
+Same PHP zip as Hostinger. Document root is usually `/var/www/html` (not `/var/www`).
+
+Unzip so these sit **in the document root**:
+
+```
+/var/www/html/index.php
+/var/www/html/bootstrap.php
+/var/www/html/src/Env.php
+/var/www/html/views/
+/var/www/html/data/
+/var/www/html/.htaccess
+```
+
+If Apache logs `Failed opening required '/var/www/src/Env.php'`, the app was resolving paths one directory above the document root. Current `bootstrap.php` loads `src/` next to itself — keep `index.php`, `bootstrap.php`, and `src/` together in `/var/www/html` (or `public_html`).
+
+```bash
+sudo apt update
+sudo apt install -y apache2 php php-sqlite3 libapache2-mod-php
+sudo a2enmod rewrite
+sudo systemctl restart apache2
+```
+
+The site vhost must allow `.htaccess` (URL rewrite + block `src/`, `data/`, `.env`). Copy the snippet from this repo (`deploy/apache-html.conf`) or from **InPmnt-PHP.zip** (`apache-html.conf` next to `index.php`):
+
+```bash
+# git clone:
+sudo cp deploy/apache-html.conf /etc/apache2/conf-available/inpmnt-html.conf
+# PHP zip:
+sudo cp /var/www/html/apache-html.conf /etc/apache2/conf-available/inpmnt-html.conf
+
+sudo a2enconf inpmnt-html
+sudo a2enmod rewrite
+sudo systemctl reload apache2
+```
+
+```apache
+<Directory /var/www/html>
+    Options -Indexes +FollowSymLinks
+    AllowOverride All
+    DirectoryIndex index.php
+    Require all granted
+</Directory>
+```
+
+After unzip, set Ubuntu Apache ownership (do **not** `chmod -R 777`):
+
+```bash
+sudo bash /var/www/html/fix-ubuntu-perms.sh
+```
+
+That script was verified on Ubuntu 24.04 / Apache 2.4.58 as `www-data` (this environment, live HTTP):
+
+| Layout | Result |
+|--------|--------|
+| dirs 755, files 644, unzipped as `ubuntu`, `data/` 755 | GET `/index.php` is **500** — Apache can read the files, but cannot create SQLite |
+| same + `sudo bash fix-ubuntu-perms.sh` (`www-data`, `data/` 775) | Homepage **200**, `/index.php/login` **200**, POST signup **302**, DB created. PHP stays **644** |
+| document root `700` owned by `ubuntu` (mkdir with umask 077) | **403** *You don't have permission to access this resource* |
+| `chmod -R 777` | Works, **not required** |
+
+`/var/www` itself must stay 755 so Apache can walk into `html`. The script chmod's the document root, not `/var/www`.
+
+Do not open `/bootstrap.php` or `/src/` — those URLs are blocked on purpose.
+
+Copy `.env.example` to `/var/www/html/.env` and set `APP_SECRET` and `BASE_URL`. PHP 8.2+ with `pdo_sqlite`.
+
+Then: `https://yourdomain.com/index.php` → sign up. Stripe webhook: `https://yourdomain.com/api/billing/webhook`.
+
+---
+
 ## Docker (Linux VM)
 
 Easiest way to keep InPmnt “just running” on a VM.
