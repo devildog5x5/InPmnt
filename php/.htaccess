@@ -1,5 +1,21 @@
-RewriteEngine On
 DirectoryIndex index.php
+Options +FollowSymLinks -Indexes
+
+# Apache 2.4: a parent "Require all denied" or an unreadable overlay
+# must not 403 the whole site. data/.htaccess still denies /data/.
+<IfModule mod_authz_core.c>
+  Require all granted
+</IfModule>
+<IfModule !mod_authz_core.c>
+  Order allow,deny
+  Allow from all
+</IfModule>
+
+RewriteEngine On
+# Document-root installs (/var/www/html, public_html). A relative
+# rewrite of "index.php" without this can map to /var/www/index.php
+# (outside the vhost) and Apache returns 403 Forbidden.
+RewriteBase /
 
 # Hostinger LiteSpeed can keep a full-page cache of an old WordPress homepage.
 <IfModule LiteSpeed>
@@ -7,16 +23,18 @@ CacheDisable public /
 RewriteRule .* - [E=cache-control:no-cache]
 </IfModule>
 
-# Do not set RewriteBase / — extracting the zip into a subfolder would then
-# send pretty URLs to a leftover WordPress index.php at the domain root.
-
-# Never serve secrets, PHP sources, or the SQLite file
-RewriteRule ^(\.env|bootstrap\.php)$ - [F,L]
-RewriteRule ^(src|views|data)(/|$) - [F,L]
+# Never serve secrets, PHP sources, or the SQLite file.
+# Patterns must not match "/" (that was a 403 on the homepage).
+RewriteRule ^\.env$ - [F,L]
+RewriteRule ^bootstrap\.php$ - [F,L]
+RewriteRule ^src(/|$) - [F,L]
+RewriteRule ^views(/|$) - [F,L]
+RewriteRule ^data(/|$) - [F,L]
 RewriteRule \.db$ - [F,L]
 
-# Existing public files (CSS/JS/images) are served as-is
+# Existing public files (CSS/JS/images, index.php) are served as-is
 RewriteCond %{REQUEST_FILENAME} -f
 RewriteRule ^ - [L]
 
-RewriteRule ^ index.php [QSA,L]
+# Leading slash = URL-path, not a filesystem path relative to /var/www
+RewriteRule ^ /index.php [QSA,L]

@@ -53,10 +53,16 @@ final class Http
         $uri = $_SERVER['REQUEST_URI'] ?? '/';
         $path = parse_url($uri, PHP_URL_PATH) ?: '/';
         $path = '/' . ltrim($path, '/');
+        // /index.php and /index.php/login must route like / and /login
+        if (strcasecmp($path, '/index.php') === 0) {
+            $path = '/';
+        } elseif (str_starts_with(strtolower($path), '/index.php/')) {
+            $path = substr($path, strlen('/index.php'));
+        }
         if (strlen($path) > 1) {
             $path = rtrim($path, '/');
         }
-        return $path;
+        return $path === '' ? '/' : $path;
     }
 
     public static function e(?string $s): string

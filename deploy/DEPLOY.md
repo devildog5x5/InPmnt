@@ -60,18 +60,40 @@ sudo a2enmod rewrite
 sudo systemctl restart apache2
 ```
 
-The site vhost must allow `.htaccess` (URL rewrite + block `src/`, `data/`, `.env`):
+The site vhost must allow `.htaccess` (URL rewrite + block `src/`, `data/`, `.env`). Copy the snippet from this repo:
+
+```bash
+sudo cp deploy/apache-html.conf /etc/apache2/conf-available/inpmnt-html.conf
+sudo a2enconf inpmnt-html
+sudo a2enmod rewrite
+sudo systemctl reload apache2
+```
+
+Or paste:
 
 ```apache
 <Directory /var/www/html>
+    Options -Indexes +FollowSymLinks
     AllowOverride All
+    DirectoryIndex index.php
     Require all granted
 </Directory>
 ```
 
+If the browser says **Forbidden / You don't have permission to access this resource**, Apache is denying the request before PHP runs. Usually `.htaccess` is unreadable or the vhost has `AllowOverride None` / `Require all denied`. Fix permissions, then open `/index.php`:
+
+```bash
+sudo chown -R www-data:www-data /var/www/html
+sudo find /var/www/html -type d -exec chmod 755 {} \;
+sudo find /var/www/html -type f -exec chmod 644 {} \;
+sudo systemctl reload apache2
+```
+
+Do not open `/bootstrap.php` or `/src/` — those URLs are blocked on purpose.
+
 Copy `.env.example` to `/var/www/html/.env` and set `APP_SECRET` and `BASE_URL`. PHP 8.2+ with `pdo_sqlite`.
 
-Then: `https://yourdomain.com` → sign up. Stripe webhook: `https://yourdomain.com/api/billing/webhook`.
+Then: `https://yourdomain.com/index.php` → sign up. Stripe webhook: `https://yourdomain.com/api/billing/webhook`.
 
 ---
 

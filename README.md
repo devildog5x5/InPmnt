@@ -12,12 +12,12 @@ Packages are published on the [GitHub Releases](https://github.com/devildog5x5/I
 
 | Package | What you get | Download |
 |---------|----------------|----------|
-| **PHP (Hostinger)** | Unzip into `public_html` — no VPS | [InPmnt-PHP.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.4.1/InPmnt-PHP.zip) |
-| **Portable** | Runnable Windows app — `install.ps1` or `start.ps1` | [InPmnt-Portable.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.4.1/InPmnt-Portable.zip) |
-| **Source** | Full source (Python + PHP + Docker) | [InPmnt-Source.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.4.1/InPmnt-Source.zip) |
-| **Icon** | Brand icon assets (blue / teal / violet) | [InPmnt-Icon.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.4.1/InPmnt-Icon.zip) |
+| **PHP (Hostinger)** | Unzip into `public_html` — no VPS | [InPmnt-PHP.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.4.2/InPmnt-PHP.zip) |
+| **Portable** | Runnable Windows app — `install.ps1` or `start.ps1` | [InPmnt-Portable.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.4.2/InPmnt-Portable.zip) |
+| **Source** | Full source (Python + PHP + Docker) | [InPmnt-Source.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.4.2/InPmnt-Source.zip) |
+| **Icon** | Brand icon assets (blue / teal / violet) | [InPmnt-Icon.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.4.2/InPmnt-Icon.zip) |
 
-- Latest release: [v1.4.1](https://github.com/devildog5x5/InPmnt/releases/tag/v1.4.1)
+- Latest release: [v1.4.2](https://github.com/devildog5x5/InPmnt/releases/tag/v1.4.2)
 - Sign up: `/signup` · Local demo (optional): set `SHOW_DEMO_LOGIN=1` then `demouser@inpmnt.app` / `Demo`
 - App URL (local): `https://127.0.0.1:5055` (self-signed cert; accept the browser warning)
 - Rebuild locally: `powershell -File .\build_release.ps1` → `installers\*.zip`
@@ -99,12 +99,13 @@ Production TLS (Let's Encrypt / IIS) is handled by nginx or IIS in front of the 
 
 InPmnt now ships a **PHP** build you can drop on Hostinger Web/Cloud (no VPS).
 
-1. Download [InPmnt-PHP.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.4.1/InPmnt-PHP.zip).
+1. Download [InPmnt-PHP.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.4.2/InPmnt-PHP.zip).
 2. In hPanel → **Files → File Manager** (or FTP), unzip **all files into `public_html`**.
 3. Copy `.env.example` → `.env`. Set `APP_SECRET` (long random string) and `BASE_URL=https://yourdomain.com`.
 4. hPanel → **Advanced → PHP Configuration**: PHP **8.2+**, enable **pdo_sqlite**.
-5. Open `https://yourdomain.com/inpmnt-check.php`, then the homepage, and sign up.
+5. Open `https://yourdomain.com/index.php` (or `/inpmnt-check.php`), then sign up.
    If Apache logged `Failed opening required '/var/www/src/Env.php'`, replace `bootstrap.php` with the copy from this release (it loads `src/` next to itself, not one folder above the document root).
+   If the browser says **Forbidden**, Apache is blocking the folder — `chmod 755` directories, `chmod 644` files, enable `mod_rewrite` / `AllowOverride All`, and try `/index.php` (do not open `/bootstrap.php`).
 
 Stripe webhook: `https://yourdomain.com/api/billing/webhook`  
 SQLite is created at `data/inpmnt.db` (blocked from the web).
