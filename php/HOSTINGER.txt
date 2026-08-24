@@ -14,14 +14,13 @@ Ubuntu Apache2 (verified Ubuntu 24.04 / Apache 2.4.58 as www-data)
 -------------------------------------------------------------------
 Do not chmod -R 777. That works but leaves PHP world-writable.
 
-  Document root 755, files 644     → homepage readable
-  data/ 775 owned by www-data      → signup can create SQLite
-  Document root 700 (umask 077)    → 403 unable to read .htaccess
-  777 on PHP files                 → NOT required
-  dirs 755 + files 644, unzipped
-    as ubuntu (not www-data)       → homepage OK; signup fails until data/ is 775 www-data
+  dirs 755, files 644, unzipped as ubuntu
+    data/ 755 not www-data             → GET /index.php is HTTP 500 (SQLite)
+  same + sudo bash fix-ubuntu-perms.sh → homepage 200, signup 302, PHP stays 644
+  Document root 700 owned by ubuntu    → 403 Forbidden
+  777 on PHP files                     → NOT required
 
-After unzip into /var/www/html:
+/var/www must be 755 so Apache can walk into html. After unzip into /var/www/html:
 
   sudo bash /var/www/html/fix-ubuntu-perms.sh
   sudo a2enmod rewrite

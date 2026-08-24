@@ -93,7 +93,8 @@ try {
     inpmnt_fail(
         "Could not open the SQLite database at {$dbPath}\n" .
         $e->getMessage() .
-        "\n\nThe data/ folder next to index.php must be writable (755). PHP files should be 644, not 777."
+        "\n\nOn Ubuntu Apache: sudo bash fix-ubuntu-perms.sh" .
+        "\nPHP files should be 644 (not 777). data/ must be 775 and owned by www-data."
     );
 }
 

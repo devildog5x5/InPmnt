@@ -118,7 +118,7 @@ sudo a2enconf inpmnt-html
 sudo systemctl reload apache2
 ```
 
-Verified on Ubuntu 24.04 / Apache 2.4 as `www-data`: document root **755**, files **644**, `data/` **775** owned by `www-data`. A **700** document root (mkdir with umask 077) is a 403. Enable `mod_rewrite`, `AllowOverride All`, and `php-sqlite3`. See [deploy/DEPLOY.md](deploy/DEPLOY.md#apache2-ubuntu--debian).
+Verified on Ubuntu 24.04 / Apache 2.4 as `www-data`: run that script so the document root is **755**, files **644**, `data/` **775** `www-data`. Unzip as `ubuntu` without it is HTTP **500** (SQLite). A **700** document root is **403**. Do not `chmod -R 777`. Enable `mod_rewrite`, `AllowOverride All`, and `php-sqlite3`. See [deploy/DEPLOY.md](deploy/DEPLOY.md#apache2-ubuntu--debian).
 
 The Windows portable app is still Python (`start.ps1`). Use PHP only on shared hosting.
 

@@ -88,13 +88,16 @@ After unzip, set Ubuntu Apache ownership (do **not** `chmod -R 777`):
 sudo bash /var/www/html/fix-ubuntu-perms.sh
 ```
 
-That script was verified on Ubuntu 24.04 / Apache 2.4.58 as `www-data`:
+That script was verified on Ubuntu 24.04 / Apache 2.4.58 as `www-data` (this environment, live HTTP):
 
 | Layout | Result |
 |--------|--------|
-| dirs 755, files 644, unzipped as `ubuntu` | Homepage readable; SQLite cannot create `data/inpmnt.db` |
-| same + `chown www-data` and `data/` 775 | Homepage 200, signup 302, DB created |
-| document root `700` (mkdir with umask 077) | 403 *unable to read htaccess file* |
+| dirs 755, files 644, unzipped as `ubuntu`, `data/` 755 | GET `/index.php` is **500** — Apache can read the files, but cannot create SQLite |
+| same + `sudo bash fix-ubuntu-perms.sh` (`www-data`, `data/` 775) | Homepage **200**, `/index.php/login` **200**, POST signup **302**, DB created. PHP stays **644** |
+| document root `700` owned by `ubuntu` (mkdir with umask 077) | **403** *You don't have permission to access this resource* |
+| `chmod -R 777` | Works, **not required** |
+
+`/var/www` itself must stay 755 so Apache can walk into `html`. The script chmod's the document root, not `/var/www`.
 
 Do not open `/bootstrap.php` or `/src/` — those URLs are blocked on purpose.
 
