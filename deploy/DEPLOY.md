@@ -60,16 +60,18 @@ sudo a2enmod rewrite
 sudo systemctl restart apache2
 ```
 
-The site vhost must allow `.htaccess` (URL rewrite + block `src/`, `data/`, `.env`). Copy the snippet from this repo:
+The site vhost must allow `.htaccess` (URL rewrite + block `src/`, `data/`, `.env`). Copy the snippet from this repo (`deploy/apache-html.conf`) or from **InPmnt-PHP.zip** (`apache-html.conf` next to `index.php`):
 
 ```bash
+# git clone:
 sudo cp deploy/apache-html.conf /etc/apache2/conf-available/inpmnt-html.conf
+# PHP zip:
+sudo cp /var/www/html/apache-html.conf /etc/apache2/conf-available/inpmnt-html.conf
+
 sudo a2enconf inpmnt-html
 sudo a2enmod rewrite
 sudo systemctl reload apache2
 ```
-
-Or paste:
 
 ```apache
 <Directory /var/www/html>
@@ -80,22 +82,19 @@ Or paste:
 </Directory>
 ```
 
-If **Log in / Sign up / App** 404 while the homepage and Pricing work, Apache is not rewriting `/login` to `index.php`. This build’s buttons go to `/index.php/login` so they work without `mod_rewrite`. Still enable rewrite for short URLs:
+After unzip, set Ubuntu Apache ownership (do **not** `chmod -R 777`):
 
 ```bash
-sudo a2enmod rewrite
-sudo a2enconf inpmnt-html
-sudo systemctl reload apache2
+sudo bash /var/www/html/fix-ubuntu-perms.sh
 ```
 
-You do **not** need 777 on PHP files. Only `data/` must be writable:
+That script was verified on Ubuntu 24.04 / Apache 2.4.58 as `www-data`:
 
-```bash
-sudo chown -R www-data:www-data /var/www/html
-sudo find /var/www/html -type d -exec chmod 755 {} \;
-sudo find /var/www/html -type f -exec chmod 644 {} \;
-sudo chmod 775 /var/www/html/data
-```
+| Layout | Result |
+|--------|--------|
+| dirs 755, files 644, unzipped as `ubuntu` | Homepage readable; SQLite cannot create `data/inpmnt.db` |
+| same + `chown www-data` and `data/` 775 | Homepage 200, signup 302, DB created |
+| document root `700` (mkdir with umask 077) | 403 *unable to read htaccess file* |
 
 Do not open `/bootstrap.php` or `/src/` — those URLs are blocked on purpose.
 

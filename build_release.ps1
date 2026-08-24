@@ -60,19 +60,7 @@ Get-ChildItem -Path (Join-Path $Root "php") -Force | ForEach-Object {
 }
 Copy-Item -Path (Join-Path $Root "static") -Destination (Join-Path $phpStage "static") -Recurse -Force
 Get-ChildItem -Path (Join-Path $phpStage "data") -Filter "*.db" -ErrorAction SilentlyContinue | Remove-Item -Force
-$phpReadme = @"
-InPmnt PHP — Hostinger / shared hosting
-========================================
-1. Unzip ALL of these files into public_html or /var/www/html (the Apache document root).
-2. Copy .env.example to .env and set APP_SECRET and BASE_URL=https://yourdomain.com
-3. In hPanel → Advanced → PHP Configuration: PHP 8.2+ and enable pdo_sqlite
-4. Open https://yourdomain.com  → Sign up
-5. Stripe webhook: https://yourdomain.com/api/billing/webhook
-
-Do not upload into a subfolder unless that subfolder is the site document root.
-The SQLite database is created automatically at data/inpmnt.db (blocked from the web).
-"@
-Set-Content -Path (Join-Path $phpStage "HOSTINGER.txt") -Value $phpReadme -Encoding UTF8
+# Keep php/HOSTINGER.txt (Ubuntu permission notes). Do not overwrite it.
 Get-ChildItem -Path $phpStage -Force | Compress-Archive -DestinationPath $phpZip -Force
 
 Write-Host "Built v$Version"

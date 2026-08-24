@@ -1,28 +1,33 @@
-InPmnt PHP — Hostinger / Apache / shared hosting
-================================================
+InPmnt PHP — Hostinger / Apache / Ubuntu
+========================================
 
-777 on every file is not required. Apache only needs:
-  folders 755, PHP/html/css 644, and data/ writable (775).
-  sudo chown -R www-data:www-data /var/www/html
-  sudo find /var/www/html -type d -exec chmod 755 {} \;
-  sudo find /var/www/html -type f -exec chmod 644 {} \;
-  sudo chmod 775 /var/www/html/data
+1. Unzip ALL of these files into public_html or /var/www/html (the Apache document root).
+2. Copy .env.example to .env and set APP_SECRET and BASE_URL=https://yourdomain.com
+3. Hostinger hPanel → Advanced → PHP Configuration: PHP 8.2+ and enable pdo_sqlite
+4. Open https://yourdomain.com/index.php  → Sign up (/index.php/signup)
+5. Stripe webhook: https://yourdomain.com/api/billing/webhook
 
-Log in / Sign up / App links need PHP to see /index.php/login
-(this zip uses those URLs so they work even if mod_rewrite is off).
+Do not upload into a subfolder unless that subfolder is the site document root.
+The SQLite database is created automatically at data/inpmnt.db (blocked from the web).
 
+Ubuntu Apache2 (verified Ubuntu 24.04 / Apache 2.4.58 as www-data)
+-------------------------------------------------------------------
+Do not chmod -R 777. That works but leaves PHP world-writable.
+
+  Document root 755, files 644     → homepage readable
+  data/ 775 owned by www-data      → signup can create SQLite
+  Document root 700 (umask 077)    → 403 unable to read .htaccess
+  777 on PHP files                 → NOT required
+  dirs 755 + files 644, unzipped
+    as ubuntu (not www-data)       → homepage OK; signup fails until data/ is 775 www-data
+
+After unzip into /var/www/html:
+
+  sudo bash /var/www/html/fix-ubuntu-perms.sh
   sudo a2enmod rewrite
-  sudo cp deploy/apache-html.conf /etc/apache2/conf-available/inpmnt-html.conf
+  sudo cp apache-html.conf /etc/apache2/conf-available/inpmnt-html.conf
   sudo a2enconf inpmnt-html
   sudo systemctl reload apache2
 
-Then open http://YOUR-SERVER/index.php  (not /src/ or /bootstrap.php).
-
-Install
--------
-1. Unzip ALL of these files into public_html or /var/www/html.
-2. OVERWRITE index.php and .htaccess if WordPress is there.
-3. Copy .env.example to .env — APP_SECRET and BASE_URL=https://yourdomain.com
-4. PHP 8.2+ with pdo_sqlite.
-5. Open /index.php then Sign up. Stripe webhook: /index.php/api/billing/webhook
-   (pretty /api/billing/webhook also works once rewrite is on).
+Then open http://YOUR-SERVER/index.php
+Log in / Sign up use /index.php/login and /index.php/signup if rewrite is off.

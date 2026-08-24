@@ -23,10 +23,17 @@ final class Db
             throw new RuntimeException("Cannot create database folder {$dir}. Make the data/ directory writable in File Manager.");
         }
         if (is_dir($dir) && !is_writable($dir)) {
+            @chmod($dir, 0775);
+        }
+        if (is_dir($dir) && !is_writable($dir)) {
             @chmod($dir, 0777);
         }
         if (!is_writable($dir)) {
-            throw new RuntimeException("Database folder is not writable: {$dir}. In File Manager, set data/ permissions to 0755 or 0777.");
+            throw new RuntimeException(
+                "Database folder is not writable: {$dir}. " .
+                "On Ubuntu: sudo bash fix-ubuntu-perms.sh  (or chown www-data:www-data data && chmod 775 data). " .
+                "755 is not enough if you unzipped as root/ubuntu — Apache runs as www-data."
+            );
         }
         $pdo = new PDO('sqlite:' . $path, null, null, [
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
