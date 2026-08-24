@@ -392,9 +392,32 @@ td.mono, .mono {
 }
 .cell-sub {
   display: block;
-  margin-top: 3px;
   color: var(--muted);
   font-size: 0.78rem;
+  margin-top: 2px;
+}
+.client-name {
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  font-weight: 650;
+  color: var(--brand-dark);
+  cursor: pointer;
+  text-align: left;
+  text-decoration: underline;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+}
+.client-name:hover { color: var(--brand); }
+.client-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 /* ---------- Badges ---------- */
@@ -689,7 +712,7 @@ td.mono, .mono {
 .bar.warn i { background: linear-gradient(90deg, #d4a017, var(--warn)); }
 .bar.danger i { background: linear-gradient(90deg, #e35d4f, var(--danger)); }
 
-.row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.row-actions { display: flex; gap: 6px; flex-wrap: wrap; white-space: nowrap; }
 .muted { color: var(--muted); }
 .right { text-align: right; }
 

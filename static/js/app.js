@@ -20,12 +20,13 @@ function toast(message) {
 }
 
 async function api(path, options = {}) {
-  const res = await fetch(path, {
+  const to = (window.__INPMNT__ && window.__INPMNT__.path) ? window.__INPMNT__.path(path) : path;
+  const res = await fetch(to, {
     headers: { "Content-Type": "application/json", ...(options.headers || {}) },
     ...options,
   });
   if (res.status === 401) {
-    location.href = "/login";
+    location.href = (window.__INPMNT__ && window.__INPMNT__.path) ? window.__INPMNT__.path("/login") : "/login";
     throw new Error("Unauthorized");
   }
   const data = await res.json().catch(() => ({}));
@@ -90,6 +91,55 @@ function openModal({ title, lead = "", body, onMount }) {
 
 function empty(msg) {
   return `<div class="empty">${msg}</div>`;
+}
+
+function esc(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function openClientModal(existing, afterSave) {
+  const editing = Boolean(existing && existing.id);
+  openModal({
+    title: editing ? "Edit client" : "Add client",
+    lead: editing
+      ? "Update name, company, or contact info. Invoices already issued stay linked to this client."
+      : "Add a person or business you invoice.",
+    body: `
+      <form id="client-form" class="form-grid">
+        <div class="field"><label>Name</label><input name="name" required value="${esc(existing?.name)}" /></div>
+        <div class="field"><label>Company</label><input name="company" value="${esc(existing?.company)}" /></div>
+        <div class="field"><label>Email</label><input name="email" type="email" value="${esc(existing?.email)}" /></div>
+        <div class="field"><label>Phone</label><input name="phone" value="${esc(existing?.phone)}" /></div>
+        <div class="field full"><label>Notes</label><textarea name="notes">${esc(existing?.notes)}</textarea></div>
+        <div class="modal-actions field full">
+          <button type="button" class="btn secondary" id="m-cancel">Cancel</button>
+          <button class="btn" type="submit">${editing ? "Save changes" : "Save client"}</button>
+        </div>
+      </form>
+    `,
+    onMount: (modal) => {
+      modal.querySelector("#m-cancel").onclick = closeModal;
+      modal.querySelector("[name=name]")?.focus();
+      modal.querySelector("#client-form").onsubmit = async (e) => {
+        e.preventDefault();
+        const payload = Object.fromEntries(new FormData(e.target).entries());
+        if (editing) {
+          await api(`/api/clients/${existing.id}`, { method: "PUT", body: JSON.stringify(payload) });
+          toast("Client updated");
+        } else {
+          await api("/api/clients", { method: "POST", body: JSON.stringify(payload) });
+          toast("Client added");
+        }
+        closeModal();
+        if (afterSave) afterSave();
+        else renderClients();
+      };
+    },
+  });
 }
 
 /* ---------- Dashboard ---------- */
@@ -341,7 +391,12 @@ async function renderInvoiceDetail(id) {
       <div class="panel">
         <div class="panel-header"><h2>Details</h2></div>
         <div class="form-grid">
-          <div class="field"><label>Client</label><div>${inv.client_name}${inv.client_company ? ` · ${inv.client_company}` : ""}</div></div>
+          <div class="field"><label>Client</label>
+            <div class="client-line">
+              <div>${esc(inv.client_name)}${inv.client_company ? ` · ${esc(inv.client_company)}` : ""}</div>
+              <button type="button" class="btn sm" id="btn-edit-client">Edit client</button>
+            </div>
+          </div>
           <div class="field"><label>Contact</label><div>${inv.client_email || "—"}<span class="cell-sub">${inv.client_phone || ""}</span></div></div>
           <div class="field"><label>Issue date</label><div>${fmtDate(inv.issue_date)}</div></div>
           <div class="field"><label>Due date</label><div>${fmtDate(inv.due_date)}</div></div>
@@ -402,6 +457,15 @@ async function renderInvoiceDetail(id) {
     await api(`/api/invoices/${id}/final-notice`, { method: "POST", body: "{}" });
     toast("Final notice sent");
     renderInvoiceDetail(id);
+  });
+  appEl.querySelector("#btn-edit-client")?.addEventListener("click", async () => {
+    const clients = await api("/api/clients");
+    const row = clients.find((x) => String(x.id) === String(inv.client_id));
+    if (!row) {
+      toast("Client not found");
+      return;
+    }
+    openClientModal(row, () => renderInvoiceDetail(id));
   });
 }
 
@@ -493,7 +557,7 @@ async function renderClients() {
     ${topbar({
       eyebrow: "Collections",
       title: "Clients",
-      subtitle: "People and businesses you invoice.",
+      subtitle: "Click a name or Edit to change contact details. Add client is for someone new.",
       actions: `<button class="btn" id="btn-new-client">Add client</button>`,
     })}
     <div class="toolbar">
@@ -507,20 +571,32 @@ async function renderClients() {
     const el = appEl.querySelector("#client-table");
     el.innerHTML = rows.length
       ? `<table>
-          <thead><tr><th>Name</th><th>Company</th><th>Email</th><th>Phone</th><th>Open balance</th><th>Invoices</th></tr></thead>
+          <thead><tr><th>Name</th><th>Company</th><th>Email</th><th>Phone</th><th>Open balance</th><th>Invoices</th><th></th></tr></thead>
           <tbody>${rows
             .map(
               (c) => `<tr>
-                <td>${c.name}</td>
-                <td>${c.company || "—"}</td>
-                <td>${c.email || "—"}</td>
-                <td>${c.phone || "—"}</td>
+                <td>
+                  <button type="button" class="client-name" data-edit-client="${c.id}">${esc(c.name)}</button>
+                  ${c.notes ? `<span class="cell-sub">Has notes</span>` : ""}
+                </td>
+                <td>${esc(c.company) || "—"}</td>
+                <td>${esc(c.email) || "—"}</td>
+                <td>${esc(c.phone) || "—"}</td>
                 <td class="mono">${money(c.open_balance)}</td>
                 <td>${c.invoice_count}</td>
+                <td class="row-actions">
+                  <button type="button" class="btn sm" data-edit-client="${c.id}">Edit</button>
+                </td>
               </tr>`
             )
             .join("")}</tbody></table>`
-      : empty("No clients yet.");
+      : empty("No clients yet. Use Add client to create the first one.");
+    el.querySelectorAll("[data-edit-client]").forEach((btn) => {
+      btn.onclick = () => {
+        const row = clients.find((x) => String(x.id) === String(btn.dataset.editClient));
+        if (row) openClientModal(row, renderClients);
+      };
+    });
   };
   paint(clients);
   appEl.querySelector("#client-q").oninput = (e) => {
@@ -534,35 +610,7 @@ async function renderClients() {
       )
     );
   };
-  appEl.querySelector("#btn-new-client").onclick = () => {
-    openModal({
-      title: "Add client",
-      body: `
-        <form id="client-form" class="form-grid">
-          <div class="field"><label>Name</label><input name="name" required /></div>
-          <div class="field"><label>Company</label><input name="company" /></div>
-          <div class="field"><label>Email</label><input name="email" type="email" /></div>
-          <div class="field"><label>Phone</label><input name="phone" /></div>
-          <div class="field full"><label>Notes</label><textarea name="notes"></textarea></div>
-          <div class="modal-actions field full">
-            <button type="button" class="btn secondary" id="m-cancel">Cancel</button>
-            <button class="btn" type="submit">Save</button>
-          </div>
-        </form>
-      `,
-      onMount: (modal) => {
-        modal.querySelector("#m-cancel").onclick = closeModal;
-        modal.querySelector("#client-form").onsubmit = async (e) => {
-          e.preventDefault();
-          const payload = Object.fromEntries(new FormData(e.target).entries());
-          await api("/api/clients", { method: "POST", body: JSON.stringify(payload) });
-          closeModal();
-          toast("Client added");
-          renderClients();
-        };
-      },
-    });
-  };
+  appEl.querySelector("#btn-new-client").onclick = () => openClientModal(null, renderClients);
 }
 
 /* ---------- Reminders ---------- */

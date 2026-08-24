@@ -1,13 +1,32 @@
+DirectoryIndex index.php
+Options +FollowSymLinks -Indexes -MultiViews
+
+<IfModule mod_authz_core.c>
+  Require all granted
+</IfModule>
+<IfModule !mod_authz_core.c>
+  Order allow,deny
+  Allow from all
+</IfModule>
+
+<IfModule mod_rewrite.c>
 RewriteEngine On
 RewriteBase /
 
-# Never serve secrets, PHP sources, or the SQLite file
-RewriteRule ^(\.env|bootstrap\.php)$ - [F,L]
-RewriteRule ^(src|views|data)(/|$) - [F,L]
+<IfModule LiteSpeed>
+CacheDisable public /
+RewriteRule .* - [E=cache-control:no-cache]
+</IfModule>
+
+RewriteRule ^\.env$ - [F,L]
+RewriteRule ^bootstrap\.php$ - [F,L]
+RewriteRule ^src(/|$) - [F,L]
+RewriteRule ^views(/|$) - [F,L]
+RewriteRule ^data(/|$) - [F,L]
 RewriteRule \.db$ - [F,L]
 
-# Existing public files (CSS/JS/images) are served as-is
 RewriteCond %{REQUEST_FILENAME} -f
 RewriteRule ^ - [L]
 
-RewriteRule ^ index.php [QSA,L]
+RewriteRule ^ /index.php [QSA,L]
+</IfModule>

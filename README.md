@@ -12,13 +12,13 @@ Packages are published on the [GitHub Releases](https://github.com/devildog5x5/I
 
 | Package | What you get | Download |
 |---------|----------------|----------|
-| **PHP (Hostinger)** | Unzip into `public_html` — no VPS | [InPmnt-PHP.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.4.0/InPmnt-PHP.zip) |
-| **Portable** | Runnable Windows app — `install.ps1` or `start.ps1` | [InPmnt-Portable.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.4.0/InPmnt-Portable.zip) |
-| **Source** | Full source (Python + PHP + Docker) | [InPmnt-Source.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.4.0/InPmnt-Source.zip) |
-| **Icon** | Brand icon assets (blue / teal / violet) | [InPmnt-Icon.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.4.0/InPmnt-Icon.zip) |
+| **PHP (Hostinger)** | Unzip into `public_html` — no VPS | [InPmnt-PHP.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.4.5/InPmnt-PHP.zip) |
+| **Portable** | Runnable Windows app — `install.ps1` or `start.ps1` | [InPmnt-Portable.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.4.5/InPmnt-Portable.zip) |
+| **Source** | Full source (Python + PHP + Docker) | [InPmnt-Source.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.4.5/InPmnt-Source.zip) |
+| **Icon** | Brand icon assets (blue / teal / violet) | [InPmnt-Icon.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.4.5/InPmnt-Icon.zip) |
 
-- Latest release: [v1.4.0](https://github.com/devildog5x5/InPmnt/releases/tag/v1.4.0)
-- Sign up: `/signup` · Local demo (optional): set `SHOW_DEMO_LOGIN=1` then `demouser@inpmnt.app` / `Demo`
+- Latest release: [v1.4.5](https://github.com/devildog5x5/InPmnt/releases/tag/v1.4.5)
+- Sign up: `/index.php/signup` (or `/signup` once Apache rewrite is on) · Local demo (optional): set `SHOW_DEMO_LOGIN=1` then `demouser@inpmnt.app` / `Demo`
 - App URL (local): `https://127.0.0.1:5055` (self-signed cert; accept the browser warning)
 - Rebuild locally: `powershell -File .\build_release.ps1` → `installers\*.zip`
 
@@ -99,14 +99,26 @@ Production TLS (Let's Encrypt / IIS) is handled by nginx or IIS in front of the 
 
 InPmnt now ships a **PHP** build you can drop on Hostinger Web/Cloud (no VPS).
 
-1. Download [InPmnt-PHP.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.4.0/InPmnt-PHP.zip).
+1. Download [InPmnt-PHP.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.4.5/InPmnt-PHP.zip).
 2. In hPanel → **Files → File Manager** (or FTP), unzip **all files into `public_html`**.
 3. Copy `.env.example` → `.env`. Set `APP_SECRET` (long random string) and `BASE_URL=https://yourdomain.com`.
 4. hPanel → **Advanced → PHP Configuration**: PHP **8.2+**, enable **pdo_sqlite**.
-5. Open `https://yourdomain.com` and sign up.
+5. Open `https://yourdomain.com/index.php` then **Start free trial** (`/index.php/signup`). Pricing is on the same homepage (`#pricing`); Log in / Sign up need that `/index.php/...` form when Apache rewrite is off.
 
 Stripe webhook: `https://yourdomain.com/api/billing/webhook`  
 SQLite is created at `data/inpmnt.db` (blocked from the web).
+
+On Apache2 (Ubuntu/Debian), unzip into `/var/www/html` so `src/Env.php` sits next to `bootstrap.php`. Do **not** `chmod -R 777`. After unzip:
+
+```bash
+sudo bash /var/www/html/fix-ubuntu-perms.sh
+sudo a2enmod rewrite
+sudo cp /var/www/html/apache-html.conf /etc/apache2/conf-available/inpmnt-html.conf
+sudo a2enconf inpmnt-html
+sudo systemctl reload apache2
+```
+
+Verified on Ubuntu 24.04 / Apache 2.4 as `www-data`: run that script so the document root is **755**, files **644**, `data/` **775** `www-data`. Unzip as `ubuntu` without it is HTTP **500** (SQLite). A **700** document root is **403**. Do not `chmod -R 777`. Enable `mod_rewrite`, `AllowOverride All`, and `php-sqlite3`. See [deploy/DEPLOY.md](deploy/DEPLOY.md#apache2-ubuntu--debian).
 
 The Windows portable app is still Python (`start.ps1`). Use PHP only on shared hosting.
 
