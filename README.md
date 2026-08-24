@@ -108,6 +108,8 @@ InPmnt now ships a **PHP** build you can drop on Hostinger Web/Cloud (no VPS).
 Stripe webhook: `https://yourdomain.com/api/billing/webhook`  
 SQLite is created at `data/inpmnt.db` (blocked from the web).
 
+On Apache2 (Ubuntu/Debian), unzip into `/var/www/html` (the document root) so `src/Env.php` sits next to `bootstrap.php`. Do not leave `src/` in `/var/www/src`. Enable `mod_rewrite`, `AllowOverride All`, and `php-sqlite3`. See [deploy/DEPLOY.md](deploy/DEPLOY.md#apache2-ubuntu--debian).
+
 The Windows portable app is still Python (`start.ps1`). Use PHP only on shared hosting.
 
 ## FTP / shared hosting
