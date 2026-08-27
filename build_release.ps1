@@ -17,7 +17,7 @@ if (Test-Path $Stage) { Remove-Item -Recurse -Force $Stage }
 New-Item -ItemType Directory -Force -Path $Stage | Out-Null
 
 $include = @(
-    "app", "static", "templates", "assets", "deploy", "php",
+    "app", "static", "templates", "assets", "deploy", "php", "scripts",
     "requirements.txt", "run.py", "passenger_wsgi.py", "start.ps1", "install.ps1", "uninstall.ps1", "VERSION",
     "Dockerfile", "docker-compose.yml", "docker-entrypoint.sh", ".dockerignore",
     "README.md", "GO_TO_MARKET.md", "LICENSE", ".env.example", ".gitignore", ".gitattributes"
@@ -58,7 +58,15 @@ Copy-Item -Path (Join-Path $Root "php\*") -Destination $phpStage -Recurse -Force
 Copy-Item -Path (Join-Path $Root "static") -Destination (Join-Path $phpStage "static") -Recurse -Force
 Get-ChildItem -Path (Join-Path $phpStage "data") -Filter "*.db" -ErrorAction SilentlyContinue | Remove-Item -Force
 # HOSTINGER.txt ships from php/HOSTINGER.txt (copied with php\*)
-Get-ChildItem -Path $phpStage -Force | Compress-Archive -DestinationPath $phpZip -Force
+$pack = Join-Path $Root "scripts\pack_unix_zip.py"
+$py = Get-Command python3 -ErrorAction SilentlyContinue
+if (-not $py) { $py = Get-Command python -ErrorAction SilentlyContinue }
+if ($py) {
+    & $py.Source $pack $phpStage $phpZip
+    if ($LASTEXITCODE -ne 0) { throw "pack_unix_zip.py failed" }
+} else {
+    Get-ChildItem -Path $phpStage -Force | Compress-Archive -DestinationPath $phpZip -Force
+}
 
 Write-Host "Built v$Version"
 Write-Host "  $portableZip"

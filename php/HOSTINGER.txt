@@ -30,9 +30,11 @@ Install
    unless you truly want WordPress on this same domain (you should not).
 3. Copy .env.example to .env and set APP_SECRET and BASE_URL=https://yourdomain.com
 4. In hPanel → Advanced → PHP Configuration: PHP 8.2+ and enable pdo_sqlite
-5. Permissions: files 644, folders 755. Do not leave PHP files at 777 (Hostinger
-   can 500 those). data/ must be writable so SQLite can create inpmnt.db.
-   hPanel → Advanced → Fix File Ownership resets the account to those defaults.
+5. The PHP zip is packed with files 644 and folders 755. On first request the
+   app chmods world-writable PHP files back to 644 and keeps data/ writable.
+   You should not need Fix File Ownership on a fresh unzip. If PHP never
+   starts (blank 500 before any InPmnt text), run hPanel → Advanced → Fix
+   File Ownership once — LiteSpeed will not execute 777 PHP files.
 6. Purge Cache Manager, then open https://yourdomain.com  → Sign up
 7. Stripe webhook: https://yourdomain.com/api/billing/webhook
 

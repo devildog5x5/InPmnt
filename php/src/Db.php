@@ -23,10 +23,10 @@ final class Db
             throw new RuntimeException("Cannot create database folder {$dir}. Make the data/ directory writable in File Manager.");
         }
         if (is_dir($dir) && !is_writable($dir)) {
-            @chmod($dir, 0777);
+            @chmod($dir, 0775);
         }
         if (!is_writable($dir)) {
-            throw new RuntimeException("Database folder is not writable: {$dir}. In File Manager, set data/ permissions to 0755 or 0777.");
+            throw new RuntimeException("Database folder is not writable: {$dir}. The app tried chmod 775; if this persists, hPanel → Advanced → Fix File Ownership.");
         }
         $pdo = new PDO('sqlite:' . $path, null, null, [
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
@@ -35,6 +35,9 @@ final class Db
         $pdo->exec('PRAGMA foreign_keys = ON');
         $pdo->exec('PRAGMA busy_timeout = 8000');
         $pdo->exec('PRAGMA journal_mode = WAL');
+        if (is_file($path)) {
+            @chmod($path, 0664);
+        }
         return $pdo;
     }
 

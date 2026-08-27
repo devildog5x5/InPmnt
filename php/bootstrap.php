@@ -20,6 +20,36 @@ function inpmnt_fail(string $msg): never
     exit;
 }
 
+function inpmnt_normalize_perms(string $root): void
+{
+    $data = $root . '/data';
+    if (!is_dir($data)) {
+        @mkdir($data, 0755, true);
+    }
+    if (is_dir($data)) {
+        @chmod($data, 0755);
+    }
+    $groups = [
+        glob($root . '/*.php') ?: [],
+        glob($root . '/src/*.php') ?: [],
+        glob($root . '/views/*.php') ?: [],
+    ];
+    foreach ($groups as $files) {
+        foreach ($files as $path) {
+            if (!is_file($path)) {
+                continue;
+            }
+            if ((fileperms($path) & 0002) === 0002) {
+                @chmod($path, 0644);
+            }
+        }
+    }
+    $env = $root . '/.env';
+    if (is_file($env)) {
+        @chmod($env, 0600);
+    }
+}
+
 $root = null;
 $tried = [];
 foreach ([__DIR__, dirname(__DIR__)] as $dir) {
@@ -36,6 +66,8 @@ if ($root === null) {
         "\n\nUpload the full PHP zip so index.php, bootstrap.php, src/, views/, and data/ are in the same folder as this file."
     );
 }
+
+inpmnt_normalize_perms($root);
 
 require $root . '/src/Env.php';
 require $root . '/src/Http.php';
