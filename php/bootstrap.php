@@ -3,13 +3,12 @@ declare(strict_types=1);
 
 /**
  * Document-root drop-in (Apache /var/www/html, Hostinger public_html):
- * src/ lives NEXT TO this file, so the root is __DIR__.
+ * src/ lives NEXT TO this file. Always try __DIR__ first.
  *
- * dirname(__DIR__) is wrong for that layout — it looks for /var/www/src/Env.php
+ * The old bug was ONLY dirname(__DIR__), which looks for /var/www/src/Env.php
  * and Apache logs: Failed opening required '/var/www/src/Env.php'.
  *
- * Parent is only a fallback for a subdomain folder that still shares the
- * parent's src/ (sandbox.example.com → public_html/sandbox/).
+ * Parent and ./php are fallbacks (subdomain folder, or an extra php/ directory).
  */
 function inpmnt_fail(string $msg): never
 {
@@ -23,11 +22,12 @@ function inpmnt_fail(string $msg): never
     exit;
 }
 
-$root = null;
 $tried = [];
-foreach ([__DIR__, dirname(__DIR__)] as $dir) {
-    $tried[] = $dir . '/src/Env.php';
-    if (is_file($dir . '/src/Env.php')) {
+$root = null;
+foreach ([__DIR__, __DIR__ . '/php', dirname(__DIR__)] as $dir) {
+    $envFile = $dir . '/src/Env.php';
+    $tried[] = $envFile;
+    if (is_file($envFile)) {
         $root = $dir;
         break;
     }
@@ -38,6 +38,9 @@ if ($root === null) {
         implode("\n- ", $tried) .
         "\n\nUnzip InPmnt-PHP.zip so index.php, bootstrap.php, src/, views/, and data/ sit in the web root\n(/var/www/html or public_html). Then open /inpmnt-check.php"
     );
+}
+if (!headers_sent()) {
+    header('X-InPmnt-Root: ' . $root);
 }
 
 require $root . '/src/Env.php';

@@ -28,8 +28,9 @@ if ($indexIsInpmnt) {
 
 echo "WordPress files in this same folder: " . ($wpHere ? "YES (wp-admin / wp-config.php still here)" : "no") . "\n";
 echo "InPmnt app files present: " . ($inpmnt ? "yes" : "NO") . "\n";
-echo "src/Env.php next to this file: " . ($envHere ? "yes (Apache document-root layout)" : "NO") . "\n";
-echo "src/Env.php in parent folder: " . ($parentEnv ? "yes (subdomain/shared-parent layout)" : "no") . "\n";
+echo "src/Env.php next to this file: " . ($envHere ? "yes (used first — correct for /var/www/html)" : "NO") . "\n";
+echo "src/Env.php in php/ subfolder: " . (is_file($here . '/php/src/Env.php') ? "yes" : "no") . "\n";
+echo "src/Env.php in parent folder: " . ($parentEnv ? "yes (fallback only)" : "no") . "\n";
 if (!$envHere && !$parentEnv) {
     echo "  THIS is the Apache 500: Failed opening required '.../src/Env.php'\n";
     echo "  Unzip so bootstrap.php and src/Env.php are in the same folder.\n";
