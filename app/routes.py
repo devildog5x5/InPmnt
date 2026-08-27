@@ -37,7 +37,7 @@ from .database import (
     row_to_dict,
     rows_to_list,
 )
-from .mail import mail_configured, send_email
+from .mail import mail_configured, mail_status, send_email
 from .workspace import (
     assert_can_add_open_invoice,
     effective_plan,
@@ -890,7 +890,8 @@ def _email_not_configured_response():
                     "Email is not configured. Set RESEND_API_KEY or "
                     "SMTP_HOST/SMTP_USER/MAIL_FROM in .env "
                     "(or ALLOW_FAKE_EMAIL=1 for local testing)."
-                )
+                ),
+                "status": mail_status(),
             }
         ),
         503,
@@ -1208,6 +1209,50 @@ def api_get_settings():
         settings["plan"] = settings.get("plan") or "trial"
         settings["trial_ends_on"] = settings.get("trial_ends_on")
     return jsonify(settings)
+
+
+@bp.get("/api/mail/status")
+@login_required
+def api_mail_status():
+    return jsonify(mail_status())
+
+
+@bp.post("/api/mail/test")
+@login_required
+def api_mail_test():
+    user = g.user or {}
+    to = (user.get("email") or "").strip()
+    wid = require_workspace_id()
+    with db_session(db_path()) as conn:
+        settings = get_settings(conn, wid)
+        if not to:
+            to = ((settings["email"] if settings else "") or "").strip()
+        if not to or "@" not in to:
+            return jsonify(
+                {"error": "No mailbox to send a test to. Add an email on this account or in Settings."}
+            ), 400
+        if not mail_configured():
+            if not _allow_fake_email():
+                return _email_not_configured_response()
+            return jsonify({"ok": True, "provider": "fake", "to": to, "status": mail_status()})
+        try:
+            result = send_email(
+                to=to,
+                subject="InPmnt test email",
+                body="This is a test from InPmnt.\n\nIf you received this, outbound mail is working.\n",
+                from_name=settings["business_name"] if settings else None,
+            )
+        except Exception as exc:  # noqa: BLE001
+            return jsonify({"error": str(exc), "status": mail_status()}), 502
+        log_activity(
+            conn,
+            "reminder",
+            f"Sent test email to {to}",
+            "settings",
+            wid,
+            workspace_id=wid,
+        )
+    return jsonify({"ok": True, "to": to, "status": mail_status(), **result})
 
 
 @bp.put("/api/settings")

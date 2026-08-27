@@ -257,6 +257,12 @@ final class App
         if ($method === 'POST' && $path === '/api/billing/portal') {
             $this->apiBillingPortal($wid);
         }
+        if ($method === 'GET' && $path === '/api/mail/status') {
+            Http::json(Mailer::status());
+        }
+        if ($method === 'POST' && $path === '/api/mail/test') {
+            $this->apiMailTest($wid);
+        }
         Http::json(['error' => 'Not found'], 404);
     }
 
@@ -737,7 +743,39 @@ final class App
     {
         Http::json([
             'error' => 'Email is not configured. Set RESEND_API_KEY or SMTP_HOST/SMTP_USER/MAIL_FROM in .env (or ALLOW_FAKE_EMAIL=1 for local testing).',
+            'status' => Mailer::status(),
         ], 503);
+    }
+
+    private function apiMailTest(int $wid): void
+    {
+        $user = $GLOBALS['inpmnt_user'] ?? [];
+        $settings = Workspace::settings($this->db, $wid) ?: [];
+        $to = trim((string) ($user['email'] ?? ''));
+        if ($to === '') {
+            $to = trim((string) ($settings['email'] ?? ''));
+        }
+        if ($to === '' || !str_contains($to, '@')) {
+            Http::json(['error' => 'No mailbox to send a test to. Add an email on this account or in Settings.'], 400);
+        }
+        if (!Mailer::configured()) {
+            if (!Env::truthy('ALLOW_FAKE_EMAIL')) {
+                $this->emailNotConfigured();
+            }
+            Http::json(['ok' => true, 'provider' => 'fake', 'to' => $to, 'status' => Mailer::status()]);
+        }
+        try {
+            $result = Mailer::send(
+                $to,
+                'InPmnt test email',
+                "This is a test from InPmnt.\n\nIf you received this, outbound mail is working.\n",
+                $settings['business_name'] ?? null
+            );
+            Db::log($this->db, 'reminder', "Sent test email to {$to}", 'settings', $wid, $wid);
+            Http::json(['ok' => true, 'to' => $to, 'status' => Mailer::status()] + $result);
+        } catch (Throwable $e) {
+            Http::json(['error' => $e->getMessage(), 'status' => Mailer::status()], 502);
+        }
     }
 
     private function apiReminders(int $wid): void

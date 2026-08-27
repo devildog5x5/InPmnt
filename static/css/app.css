@@ -530,7 +530,11 @@ td.mono, .mono {
   border: 1px solid rgba(255,255,255,0.08);
   animation: rise 220ms ease;
   font-size: 0.9rem;
-  max-width: 360px;
+  max-width: 420px;
+}
+.toast.error {
+  background: #7a1f2b;
+  border-color: rgba(255,255,255,0.12);
 }
 
 .modal-backdrop {

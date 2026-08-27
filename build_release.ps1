@@ -62,9 +62,14 @@ InPmnt PHP — Hostinger / shared hosting
 ========================================
 1. Unzip ALL of these files into public_html (File Manager or FTP).
 2. Copy .env.example to .env and set APP_SECRET and BASE_URL=https://yourdomain.com
-3. In hPanel → Advanced → PHP Configuration: PHP 8.2+ and enable pdo_sqlite
-4. Open https://yourdomain.com  → Sign up
-5. Stripe webhook: https://yourdomain.com/api/billing/webhook
+3. For email: set SMTP_HOST=smtp.hostinger.com, SMTP_PORT=465, SMTP_SSL=1,
+   SMTP_USER and MAIL_FROM to your Hostinger mailbox, and SMTP_PASSWORD.
+   Leave RESEND_API_KEY blank unless you have a real Resend key + verified domain.
+   Optional: MAIL_PROVIDER=smtp to force the mailbox even if a Resend key is set.
+4. In hPanel → Advanced → PHP Configuration: PHP 8.2+ and enable pdo_sqlite
+5. Open https://yourdomain.com  → Sign up
+6. In the app: Settings → Email delivery → Send test email to me
+7. Stripe webhook: https://yourdomain.com/api/billing/webhook
 
 Do not upload into a subfolder unless that subfolder is the site document root.
 The SQLite database is created automatically at data/inpmnt.db (blocked from the web).

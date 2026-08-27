@@ -11,12 +11,12 @@ const fmtDate = (d) => {
   return `${m}/${day}/${y}`;
 };
 
-function toast(message) {
+function toast(message, kind = "") {
   const el = document.createElement("div");
-  el.className = "toast";
+  el.className = kind ? `toast ${kind}` : "toast";
   el.textContent = message;
   toastHost.appendChild(el);
-  setTimeout(() => el.remove(), 3200);
+  setTimeout(() => el.remove(), kind === "error" ? 8000 : 3200);
 }
 
 async function api(path, options = {}) {
@@ -222,9 +222,13 @@ async function renderDashboard() {
 
   appEl.querySelector("#btn-new-inv")?.addEventListener("click", () => openInvoiceModal());
   appEl.querySelector("#btn-send-due")?.addEventListener("click", async () => {
-    const res = await api("/api/reminders/send-due", { method: "POST", body: "{}" });
-    toast(`Sent ${res.sent} reminder${res.sent === 1 ? "" : "s"}`);
-    renderDashboard();
+    try {
+      const res = await api("/api/reminders/send-due", { method: "POST", body: "{}" });
+      toast(`Sent ${res.sent} reminder${res.sent === 1 ? "" : "s"}`);
+      renderDashboard();
+    } catch (err) {
+      toast(err.message || "Send failed", "error");
+    }
   });
   wireCommon(appEl);
 }
@@ -309,9 +313,13 @@ async function renderInvoices(filter = "all") {
   );
   appEl.querySelectorAll("[data-send-inv]").forEach((btn) =>
     btn.addEventListener("click", async () => {
-      await api(`/api/invoices/${btn.dataset.sendInv}/send`, { method: "POST", body: "{}" });
-      toast("Invoice sent — reminders scheduled");
-      renderInvoices(filter);
+      try {
+        await api(`/api/invoices/${btn.dataset.sendInv}/send`, { method: "POST", body: "{}" });
+        toast("Invoice sent — reminders scheduled");
+        renderInvoices(filter);
+      } catch (err) {
+        toast(err.message || "Send failed", "error");
+      }
     })
   );
 }
@@ -393,15 +401,23 @@ async function renderInvoiceDetail(id) {
   `;
   wireCommon(appEl);
   appEl.querySelector("#btn-send")?.addEventListener("click", async () => {
-    await api(`/api/invoices/${id}/send`, { method: "POST", body: "{}" });
-    toast("Invoice sent — reminders scheduled");
-    renderInvoiceDetail(id);
+    try {
+      await api(`/api/invoices/${id}/send`, { method: "POST", body: "{}" });
+      toast("Invoice sent — reminders scheduled");
+      renderInvoiceDetail(id);
+    } catch (err) {
+      toast(err.message || "Send failed", "error");
+    }
   });
   appEl.querySelector("#btn-pay")?.addEventListener("click", () => openPaymentModal(id, () => renderInvoiceDetail(id)));
   appEl.querySelector("#btn-final")?.addEventListener("click", async () => {
-    await api(`/api/invoices/${id}/final-notice`, { method: "POST", body: "{}" });
-    toast("Final notice sent");
-    renderInvoiceDetail(id);
+    try {
+      await api(`/api/invoices/${id}/final-notice`, { method: "POST", body: "{}" });
+      toast("Final notice sent");
+      renderInvoiceDetail(id);
+    } catch (err) {
+      toast(err.message || "Send failed", "error");
+    }
   });
 }
 
@@ -604,9 +620,13 @@ async function renderReminders() {
     </div>
   `;
   appEl.querySelector("#btn-send-due").onclick = async () => {
-    const res = await api("/api/reminders/send-due", { method: "POST", body: "{}" });
-    toast(`Sent ${res.sent} reminder${res.sent === 1 ? "" : "s"}`);
-    renderReminders();
+    try {
+      const res = await api("/api/reminders/send-due", { method: "POST", body: "{}" });
+      toast(`Sent ${res.sent} reminder${res.sent === 1 ? "" : "s"}`);
+      renderReminders();
+    } catch (err) {
+      toast(err.message || "Send failed", "error");
+    }
   };
   wireCommon(appEl);
 }
@@ -673,7 +693,20 @@ async function renderTemplates() {
 
 /* ---------- Settings ---------- */
 async function renderSettings() {
-  const [s, billing] = await Promise.all([api("/api/settings"), api("/api/billing/status")]);
+  const [s, billing, mail] = await Promise.all([
+    api("/api/settings"),
+    api("/api/billing/status"),
+    api("/api/mail/status").catch(() => ({ configured: false, provider: "none" })),
+  ]);
+  const mailLabel = mail.configured
+    ? mail.provider === "smtp"
+      ? `SMTP ready (${mail.smtp_host}:${mail.smtp_port}) sending as ${mail.mail_from}`
+      : mail.provider === "resend"
+        ? `Resend ready, sending as ${mail.mail_from}`
+        : mail.provider === "resend_then_smtp"
+          ? `Resend first, Hostinger SMTP fallback (${mail.smtp_host}) as ${mail.mail_from}`
+          : `Mail ready (${mail.provider})`
+    : "Not configured — add SMTP or RESEND_API_KEY in .env on the server.";
   appEl.innerHTML = `
     ${topbar({
       eyebrow: "Workspace",
@@ -695,6 +728,13 @@ async function renderSettings() {
         ${billing.has_customer ? `<button class="btn ghost sm" id="btn-portal">Manage billing</button>` : ""}
       </div>
     </div>
+    <div class="panel" style="margin-bottom:14px">
+      <div class="panel-header"><h2>Email delivery</h2></div>
+      <p class="settings-note" style="margin-bottom:14px">${mailLabel}</p>
+      <div class="actions">
+        <button class="btn sm" type="button" id="btn-mail-test">Send test email to me</button>
+      </div>
+    </div>
     <form id="settings-form" class="panel form-grid">
       <div class="field"><label>Business name</label><input name="business_name" value="${s.business_name || ""}" required /></div>
       <div class="field"><label>Owner</label><input name="owner_name" value="${s.owner_name || ""}" required /></div>
@@ -713,7 +753,7 @@ async function renderSettings() {
       </div>
       <div class="field full">
         <p class="settings-note">
-          Reminder sends are logged in-app until SMTP/Twilio are connected (see GO_TO_MARKET.md).
+          Email reminders send through .env (Resend or Hostinger SMTP). SMS still requires Pro and is not wired yet.
         </p>
       </div>
       <div class="field full actions">
@@ -748,7 +788,19 @@ async function renderSettings() {
       const res = await api("/api/billing/portal", { method: "POST", body: "{}" });
       if (res.url) location.href = res.url;
     } catch (err) {
-      toast(err.message || "Portal unavailable");
+      toast(err.message || "Portal unavailable", "error");
+    }
+  });
+  appEl.querySelector("#btn-mail-test")?.addEventListener("click", async () => {
+    const btn = appEl.querySelector("#btn-mail-test");
+    btn.disabled = true;
+    try {
+      const res = await api("/api/mail/test", { method: "POST", body: "{}" });
+      toast(`Test email sent to ${res.to} via ${res.provider || "mail"}`);
+    } catch (err) {
+      toast(err.message || "Test email failed", "error");
+    } finally {
+      btn.disabled = false;
     }
   });
 }
@@ -761,9 +813,13 @@ function wireCommon(root) {
   });
   root.querySelectorAll("[data-send-reminder]").forEach((btn) => {
     btn.addEventListener("click", async () => {
-      await api(`/api/reminders/${btn.dataset.sendReminder}/send`, { method: "POST", body: "{}" });
-      toast("Reminder sent");
-      route();
+      try {
+        await api(`/api/reminders/${btn.dataset.sendReminder}/send`, { method: "POST", body: "{}" });
+        toast("Reminder sent");
+        route();
+      } catch (err) {
+        toast(err.message || "Send failed", "error");
+      }
     });
   });
 }
@@ -784,7 +840,7 @@ async function route() {
     else await renderDashboard();
   } catch (err) {
     console.error(err);
-    toast(err.message || "Something went wrong");
+    toast(err.message || "Something went wrong", "error");
   }
 }
 

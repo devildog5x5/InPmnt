@@ -105,6 +105,25 @@ InPmnt now ships a **PHP** build you can drop on Hostinger Web/Cloud (no VPS).
 4. hPanel → **Advanced → PHP Configuration**: PHP **8.2+**, enable **pdo_sqlite**.
 5. Open `https://yourdomain.com` and sign up.
 
+### Email on Hostinger
+
+Reminders send from `.env`, not from the Settings form. Use the Hostinger mailbox:
+
+```env
+MAIL_FROM=billing@yourdomain.com
+MAIL_FROM_NAME=InPmnt
+SMTP_HOST=smtp.hostinger.com
+SMTP_PORT=465
+SMTP_USER=billing@yourdomain.com
+SMTP_PASSWORD=your-mailbox-password
+SMTP_SSL=1
+SMTP_STARTTLS=0
+```
+
+`MAIL_FROM` and `SMTP_USER` must be the same mailbox you created in hPanel. Leave `RESEND_API_KEY` blank (or set `MAIL_PROVIDER=smtp`) unless you have a real Resend key **and** have verified `yourdomain.com` in Resend. A placeholder Resend key used to block SMTP; the app now falls back, but SMTP-only is simpler on shared hosting.
+
+After upload, open **Settings → Email delivery → Send test email to me**.
+
 Stripe webhook: `https://yourdomain.com/api/billing/webhook`  
 SQLite is created at `data/inpmnt.db` (blocked from the web).
 
