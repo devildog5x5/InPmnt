@@ -23,9 +23,21 @@ register_shutdown_function(static function (): void {
 });
 
 try {
+    $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+    if ($path === '/sitemap.xml' || $path === '/robots.txt') {
+        $file = __DIR__ . $path;
+        if (is_file($file)) {
+            header('Content-Type: ' . ($path === '/sitemap.xml'
+                ? 'application/xml; charset=utf-8'
+                : 'text/plain; charset=utf-8'));
+            header('Cache-Control: public, max-age=3600');
+            readfile($file);
+            exit;
+        }
+    }
+
     $db = require __DIR__ . '/bootstrap.php';
 
-    $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
     if (str_starts_with($path, '/static/')) {
         $rel = str_replace('..', '', substr($path, 8));
         foreach ([__DIR__ . '/static/' . $rel, dirname(__DIR__) . '/static/' . $rel] as $file) {

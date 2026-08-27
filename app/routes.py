@@ -7,6 +7,8 @@ from datetime import date, datetime, timedelta
 from functools import wraps
 from typing import Any
 
+from pathlib import Path
+
 from flask import (
     Blueprint,
     current_app,
@@ -15,6 +17,7 @@ from flask import (
     redirect,
     render_template,
     request,
+    send_file,
     session,
     url_for,
 )
@@ -92,6 +95,26 @@ def landing():
         plans=PLANS,
         show_demo_login=_show_demo_login(),
     )
+
+
+def _php_public_file(name: str) -> Path:
+    return Path(current_app.root_path).resolve().parent / "php" / name
+
+
+@bp.get("/sitemap.xml")
+def sitemap_xml():
+    path = _php_public_file("sitemap.xml")
+    if not path.is_file():
+        return "Missing sitemap.xml", 404
+    return send_file(path, mimetype="application/xml")
+
+
+@bp.get("/robots.txt")
+def robots_txt():
+    path = _php_public_file("robots.txt")
+    if not path.is_file():
+        return "Missing robots.txt", 404
+    return send_file(path, mimetype="text/plain; charset=utf-8")
 
 
 def _show_demo_login() -> bool:

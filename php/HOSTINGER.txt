@@ -6,6 +6,9 @@ InPmnt PHP — Hostinger / Apache / Ubuntu
 3. Hostinger hPanel → Advanced → PHP Configuration: PHP 8.2+ and enable pdo_sqlite
 4. Open https://yourdomain.com/index.php  → Sign up (/index.php/signup)
 5. Stripe webhook: https://yourdomain.com/api/billing/webhook
+6. Search engines: unzip puts sitemap.xml and robots.txt at the site root.
+   Submit https://yourdomain.com/sitemap.xml in Google Search Console and Bing Webmaster Tools.
+   Production URL: https://invcpay.com/sitemap.xml  (do not submit sandbox unless you want it indexed)
 
 Do not upload into a subfolder unless that subfolder is the site document root.
 The SQLite database is created automatically at data/inpmnt.db (blocked from the web).
