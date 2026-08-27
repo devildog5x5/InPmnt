@@ -39,6 +39,7 @@ if ($root === null) {
 
 require $root . '/src/Env.php';
 require $root . '/src/Http.php';
+require $root . '/src/Seo.php';
 require $root . '/src/Db.php';
 require $root . '/src/Mail.php';
 require $root . '/src/Billing.php';

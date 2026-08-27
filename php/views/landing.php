@@ -3,8 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>InPmnt — Get paid without the chase</title>
-  <meta name="description" content="InPmnt automatically reminds clients about unpaid invoices so solo trades and freelancers get paid faster." />
+  <?php Seo::landingHead(); ?>
   <link rel="icon" type="image/png" href="/static/img/inpmnt-icon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -34,16 +33,16 @@
       <div class="brand-mark">InPmnt</div>
       <h1>Get paid without the chase.</h1>
       <p class="sub">
-        Paste unpaid invoices, set polite reminder schedules, and stop losing cash to late payers.
-        Built for plumbers, landscapers, photographers, and consultants.
+        Invoice reminder software for plumbers, landscapers, photographers, and consultants.
+        Paste unpaid invoices, auto-send payment reminders, and stop losing cash to late payers.
       </p>
       <div class="hero-cta">
         <a class="btn" href="/signup">Start free trial</a>
         <a class="btn secondary" href="#pricing">See pricing</a>
       </div>
     </div>
-    <div class="hero-visual" aria-hidden="true">
-      <img src="/static/img/inpmnt-icon.png" alt="InPmnt icon" />
+    <div class="hero-visual">
+      <img src="/static/img/inpmnt-icon.png" alt="InPmnt invoice reminder app" width="256" height="256" />
     </div>
   </header>
 
@@ -125,6 +124,8 @@
       Or <a href="/signup">start the free trial</a> first.
     </p>
   </section>
+
+  <?php require __DIR__ . '/_faq.php'; ?>
 
   <footer class="landing-footer">
     <p>© 2026 Robert Foster · InPmnt · MIT License</p>

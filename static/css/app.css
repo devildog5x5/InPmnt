@@ -885,6 +885,29 @@ td.mono, .mono {
   font-size: 0.9rem;
   line-height: 1.7;
 }
+.faq-list {
+  display: grid;
+  gap: 10px;
+  max-width: 72ch;
+}
+.faq-list details {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px 18px;
+  box-shadow: var(--shadow-sm);
+}
+.faq-list summary {
+  cursor: pointer;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.faq-list details p {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
 .landing-footer {
   border-top: 1px solid var(--line);
   padding: 28px 24px 40px;
