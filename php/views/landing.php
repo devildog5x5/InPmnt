@@ -10,6 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/css/app.css" />
+  <?php require __DIR__ . '/_client_boot.php'; ?>
 </head>
 <body class="landing">
   <nav class="landing-nav">
@@ -23,8 +24,8 @@
       </div>
     </div>
     <div class="nav-actions">
-      <a class="btn secondary sm" href="/login">Log in</a>
-      <a class="btn sm" href="/signup">Start free trial</a>
+      <a class="btn secondary sm" href="<?= Http::e(Http::url('/login')) ?>">Log in</a>
+      <a class="btn sm" href="<?= Http::e(Http::url('/signup')) ?>">Start free trial</a>
     </div>
   </nav>
 
@@ -37,7 +38,7 @@
         Built for plumbers, landscapers, photographers, and consultants.
       </p>
       <div class="hero-cta">
-        <a class="btn" href="/signup">Start free trial</a>
+        <a class="btn" href="<?= Http::e(Http::url('/signup')) ?>">Start free trial</a>
         <a class="btn secondary" href="#pricing">See pricing</a>
       </div>
     </div>
@@ -121,7 +122,7 @@
       <?php else: ?>
       Stripe keys not configured yet — buttons open the demo workspace. Add keys from <code>.env.example</code> to go live.
       <?php endif; ?>
-      Or <a href="/signup">start the free trial</a> first.
+      Or <a href="<?= Http::e(Http::url('/signup')) ?>">start the free trial</a> first.
     </p>
   </section>
 
@@ -137,23 +138,23 @@
         const plan = btn.getAttribute("data-checkout");
         btn.disabled = true;
         try {
-          const res = await fetch("/api/billing/checkout", {
+          const res = await fetch(window.__INPMNT__.path("/api/billing/checkout"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ plan }),
           });
           const data = await res.json();
           if (res.status === 401) {
-            location.href = "/login?next=" + encodeURIComponent("/app#/settings");
+            location.href = window.__INPMNT__.path("/login?next=" + encodeURIComponent("/app#/settings"));
             return;
           }
           if (data.url) {
             location.href = data.url;
             return;
           }
-          location.href = "/login";
+          location.href = window.__INPMNT__.path("/login");
         } catch (e) {
-          location.href = "/login";
+          location.href = window.__INPMNT__.path("/login");
         } finally {
           btn.disabled = false;
         }

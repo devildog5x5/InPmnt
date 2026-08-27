@@ -19,14 +19,29 @@ final class Db
     public static function connect(string $path): PDO
     {
         $dir = dirname($path);
-        if (!is_dir($dir)) {
-            mkdir($dir, 0775, true);
+        if (!is_dir($dir) && !@mkdir($dir, 0775, true) && !is_dir($dir)) {
+            throw new RuntimeException("Cannot create database folder {$dir}. Make the data/ directory writable in File Manager.");
+        }
+        if (is_dir($dir) && !is_writable($dir)) {
+            @chmod($dir, 0775);
+        }
+        if (is_dir($dir) && !is_writable($dir)) {
+            @chmod($dir, 0777);
+        }
+        if (!is_writable($dir)) {
+            throw new RuntimeException(
+                "Database folder is not writable: {$dir}. " .
+                "On Ubuntu: sudo bash fix-ubuntu-perms.sh  (or chown www-data:www-data data && chmod 775 data). " .
+                "755 is not enough if you unzipped as root/ubuntu — Apache runs as www-data."
+            );
         }
         $pdo = new PDO('sqlite:' . $path, null, null, [
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         ]);
         $pdo->exec('PRAGMA foreign_keys = ON');
+        $pdo->exec('PRAGMA busy_timeout = 8000');
+        $pdo->exec('PRAGMA journal_mode = WAL');
         return $pdo;
     }
 

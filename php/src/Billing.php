@@ -36,7 +36,7 @@ final class Billing
             'secret_key' => $secret,
             'publishable_key' => trim(Env::get('STRIPE_PUBLISHABLE_KEY')),
             'webhook_secret' => trim(Env::get('STRIPE_WEBHOOK_SECRET')),
-            'base_url' => rtrim(Env::get('BASE_URL', 'http://127.0.0.1:5055'), '/'),
+            'base_url' => Http::publicOrigin(),
             'prices' => $prices,
             'enabled' => $enabled,
         ];
