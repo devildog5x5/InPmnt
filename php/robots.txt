@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+Disallow: /app
+Disallow: /api/
+Disallow: /src/
+Disallow: /data/
+Disallow: /views/
+Disallow: /bootstrap.php
+Disallow: /.env
+
+Sitemap: https://invcpay.com/sitemap.xml

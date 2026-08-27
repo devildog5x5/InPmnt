@@ -14,8 +14,64 @@ final class Http
     public static function redirect(string $url, int $status = 302): never
     {
         http_response_code($status);
+        header('Cache-Control: no-store, no-cache, must-revalidate');
+        if (str_starts_with($url, '/') && !str_starts_with($url, '//')) {
+            $url = self::url($url);
+        }
         header('Location: ' . $url);
         exit;
+    }
+
+    /** Front controller path so /login works even when mod_rewrite is off. */
+    public static function front(): string
+    {
+        $script = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? '/index.php'));
+        if ($script === '' || $script === '/') {
+            $script = '/index.php';
+        }
+        if (!str_ends_with(strtolower($script), 'index.php')) {
+            $script = rtrim($script, '/') . '/index.php';
+        }
+        return $script;
+    }
+
+    /** App URL that works without Apache rewrite: /index.php/login, /index.php/app#/settings. */
+    public static function url(string $path): string
+    {
+        $hash = '';
+        $query = '';
+        if (str_contains($path, '#')) {
+            [$path, $frag] = explode('#', $path, 2);
+            $hash = '#' . $frag;
+        }
+        if (str_contains($path, '?')) {
+            [$path, $q] = explode('?', $path, 2);
+            $query = '?' . $q;
+        }
+        $path = '/' . ltrim($path, '/');
+        $front = self::front();
+        $frontLen = strlen($front);
+        if (strncasecmp($path, $front, $frontLen) === 0) {
+            return $path . $query . $hash;
+        }
+        if ($path === '/') {
+            return $front . $query . $hash;
+        }
+        return $front . $path . $query . $hash;
+    }
+
+    /** Host the visitor is actually on, so a sandbox subdomain is not bounced to a broken main domain. */
+    public static function publicOrigin(): string
+    {
+        $host = preg_replace('/[^A-Za-z0-9.:\[\]-]/', '', (string) ($_SERVER['HTTP_HOST'] ?? '')) ?? '';
+        $fwd = strtolower((string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? ''));
+        $https = $fwd === 'https'
+            || (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+            || (int) ($_SERVER['SERVER_PORT'] ?? 0) === 443;
+        if ($host !== '') {
+            return ($https ? 'https://' : 'http://') . $host;
+        }
+        return rtrim(Env::get('BASE_URL', 'http://127.0.0.1:5055'), '/');
     }
 
     public static function bodyJson(): array
@@ -35,13 +91,26 @@ final class Http
 
     public static function path(): string
     {
-        $uri = $_SERVER['REQUEST_URI'] ?? '/';
-        $path = parse_url($uri, PHP_URL_PATH) ?: '/';
+        $info = $_SERVER['PATH_INFO'] ?? '';
+        if (is_string($info) && $info !== '' && $info !== '/') {
+            $path = $info;
+        } else {
+            $uri = (string) ($_SERVER['REDIRECT_URL'] ?? $_SERVER['REQUEST_URI'] ?? '/');
+            $path = parse_url($uri, PHP_URL_PATH) ?: '/';
+        }
         $path = '/' . ltrim($path, '/');
+        $front = self::front();
+        if (strcasecmp($path, $front) === 0 || strcasecmp($path, '/index.php') === 0) {
+            $path = '/';
+        } elseif (str_starts_with(strtolower($path), strtolower($front) . '/')) {
+            $path = substr($path, strlen($front));
+        } elseif (str_starts_with(strtolower($path), '/index.php/')) {
+            $path = substr($path, strlen('/index.php'));
+        }
         if (strlen($path) > 1) {
             $path = rtrim($path, '/');
         }
-        return $path;
+        return $path === '' ? '/' : $path;
     }
 
     public static function e(?string $s): string
