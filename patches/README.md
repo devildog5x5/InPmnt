@@ -7,9 +7,9 @@ These are the mail + invoice-send changes, split so you can apply (or roll back)
 | `001-mail-smtp-fallback.patch` | Resend → Hostinger SMTP fallback, real PHP SMTP, test-email in Settings |
 | `002-invoice-send-email.patch` | **Send invoice** actually emails the client (apply after 001) |
 | `inpmnt-mail-invoice-ubuntu.patch` | 001 + 002 in one patch |
-| `inpmnt-hostinger-changed.tar.gz` | Ready-to-drop `public_html` files (`src/`, `static/`) |
+| `inpmnt-ubuntu-patches.zip` | **Download this** — all of the above in one zip |
 
-Do **not** overwrite a live `.env`.
+Do **not** overwrite a live `.env`. GitHub shows `.patch` as text; use the **zip**.
 
 ## Hostinger (`public_html`)
 

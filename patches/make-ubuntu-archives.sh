@@ -13,9 +13,10 @@ if [[ -z "$mail_commit" ]]; then
   exit 1
 fi
 
-git diff --no-ext-diff --binary "$base"..."$mail_commit" > patches/001-mail-smtp-fallback.patch
-git diff --no-ext-diff --binary "$mail_commit"...HEAD > patches/002-invoice-send-email.patch
-git diff --no-ext-diff --binary "$base"...HEAD > patches/inpmnt-mail-invoice-ubuntu.patch
+excl=(-- . ':(exclude)patches' ':(exclude)installers')
+git diff --no-ext-diff --binary "$base"..."$mail_commit" "${excl[@]}" > patches/001-mail-smtp-fallback.patch
+git diff --no-ext-diff --binary "$mail_commit"...HEAD "${excl[@]}" > patches/002-invoice-send-email.patch
+git diff --no-ext-diff --binary "$base"...HEAD "${excl[@]}" > patches/inpmnt-mail-invoice-ubuntu.patch
 sed -i 's/\r$//' patches/*.patch
 
 stage="$(mktemp -d)"
@@ -33,6 +34,21 @@ find "$stage" -type f -exec chmod 644 {} \;
 ( cd "$stage" && tar --numeric-owner --owner=0 --group=0 --format=ustar --sort=name \
     -czf "$Root/patches/inpmnt-hostinger-changed.tar.gz" . )
 
-chmod 644 patches/*.patch patches/*.tar.gz patches/README.md
+zip_stage="$(mktemp -d)"
+mkdir -p "$zip_stage/inpmnt-ubuntu-patches"
+cp "$Root/patches/001-mail-smtp-fallback.patch" \
+   "$Root/patches/002-invoice-send-email.patch" \
+   "$Root/patches/inpmnt-mail-invoice-ubuntu.patch" \
+   "$Root/patches/inpmnt-hostinger-changed.tar.gz" \
+   "$Root/patches/README.md" \
+   "$zip_stage/inpmnt-ubuntu-patches/"
+chmod 644 "$zip_stage/inpmnt-ubuntu-patches"/*
+(
+  cd "$zip_stage"
+  rm -f "$Root/patches/inpmnt-ubuntu-patches.zip"
+  zip -X -r "$Root/patches/inpmnt-ubuntu-patches.zip" inpmnt-ubuntu-patches
+)
+
+chmod 644 patches/*.patch patches/*.tar.gz patches/*.zip patches/README.md
 chmod 755 patches/make-ubuntu-archives.sh
 echo "Wrote patches/ (mail commit $mail_commit)"
