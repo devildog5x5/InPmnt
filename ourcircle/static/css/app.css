@@ -94,7 +94,7 @@ img { max-width: 100%; height: auto; }
   border-radius: var(--radius);
   box-shadow: 0 10px 30px rgba(28, 42, 42, 0.06);
 }
-.hero-card { padding: 18px; }
+.hero-card a { display: block; text-decoration: none; color: inherit; }
 .grid-3, .grid-2, .plans { display: grid; gap: 16px; }
 .grid-3 { grid-template-columns: repeat(3, 1fr); }
 .grid-2 { grid-template-columns: 1fr 1fr; }

@@ -3,7 +3,7 @@
 {% block body %}
 <div class="auth-page">
   <div class="auth-card">
-    <a class="brand" href="/"><img src="{{ url_for('static', filename='img/logo.png') }}" alt="" /><div><strong>OurCircle</strong><span>Sign in</span></div></a>
+    {% with brand_sub="Sign in" %}{% include "_brand.html" %}{% endwith %}
     {% for cat, msg in get_flashed_messages(with_categories=true) %}
       <div class="flash {{ cat }}">{{ msg }}</div>
     {% endfor %}

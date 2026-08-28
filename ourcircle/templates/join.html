@@ -3,6 +3,7 @@
 {% block body %}
 <div class="auth-page">
   <div class="auth-card">
+    {% with brand_sub="Join a circle" %}{% include "_brand.html" %}{% endwith %}
     <h1>Join this family circle</h1>
     <p class="core-rule">{{ core_rule }}</p>
     {% for cat, msg in get_flashed_messages(with_categories=true) %}

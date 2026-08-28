@@ -61,6 +61,10 @@ class AppTests(unittest.TestCase):
         self.assertEqual(land.status_code, 200)
         self.assertIn(b"OurCircle", land.data)
         self.assertIn(b"Never send money", land.data)
+        self.assertIn(b'href="https://familyshieldpro.com"', land.data)
+        self.assertIn(b'alt="Family Shield Pro"', land.data)
+        login_page = self.client.get("/login")
+        self.assertIn(b'href="https://familyshieldpro.com"', login_page.data)
         login = self.client.post(
             "/login",
             data={"email": "family@ourcircle.app", "password": "password123"},
@@ -68,6 +72,7 @@ class AppTests(unittest.TestCase):
         )
         self.assertEqual(login.status_code, 200)
         self.assertIn(b"Check this with OurCircle", login.data)
+        self.assertIn(b'href="https://familyshieldpro.com"', login.data)
 
     def test_check_alert_and_reservation(self) -> None:
         self.client.post("/login", data={"email": "family@ourcircle.app", "password": "password123"})

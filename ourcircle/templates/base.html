@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>{% block title %}OurCircle{% endblock %}</title>
+  <title>{% block title %}OurCircle · Family Shield Pro{% endblock %}</title>
+  <link rel="canonical" href="{{ site_home }}{{ request.path if request.path != '/' else '/' }}" />
   <link rel="icon" href="{{ url_for('static', filename='img/logo.png') }}" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

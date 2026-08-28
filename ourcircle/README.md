@@ -1,5 +1,7 @@
 # OurCircle
 
+OurCircle is the family product at **[familyshieldpro.com](https://familyshieldpro.com)**. The logo on every page links to that site.
+
 **Pause. Ask family. Then pay.**
 
 OurCircle is a **trusted family circle** for sketchy texts, emails, phone numbers, websites, and payment asks. It is not a generic “AI scam detector” and it will **never tell you something is safe**.

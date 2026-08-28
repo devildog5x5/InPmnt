@@ -3,10 +3,7 @@
 {% block body %}
 <div class="wrap">
   <header class="site-header">
-    <a class="brand" href="/">
-      <img src="{{ url_for('static', filename='img/logo.png') }}" alt="OurCircle family mark" />
-      <div><strong>OurCircle</strong><span>A trusted family circle</span></div>
-    </a>
+    {% include "_brand.html" %}
     <nav class="nav">
       <a class="btn ghost" href="{{ url_for('offers') }}">Founding offers</a>
       <a class="btn ghost" href="{{ url_for('login') }}">Sign in</a>
@@ -26,7 +23,9 @@
       <p class="disclaimer">{{ disclaimer }}</p>
     </div>
     <div class="hero-card">
-      <img src="{{ url_for('static', filename='img/logo-lockup.png') }}" alt="OurCircle logo" />
+      <a href="{{ site_home }}" title="Family Shield Pro">
+        <img src="{{ url_for('static', filename='img/logo-lockup.png') }}" alt="Family Shield Pro" />
+      </a>
     </div>
   </section>
 

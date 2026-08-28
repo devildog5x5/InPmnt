@@ -63,6 +63,7 @@ def create_app() -> Flask:
             "core_rule": CORE_RULE,
             "disclaimer": DISCLAIMER,
             "user_name": session.get("name"),
+            "site_home": (os.environ.get("OURCIRCLE_SITE_URL") or "https://familyshieldpro.com").rstrip("/"),
         }
 
     def current_user():
