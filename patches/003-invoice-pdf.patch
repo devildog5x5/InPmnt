@@ -12,10 +12,10 @@ index 356e813..5130b20 100644
          0,
 diff --git a/app/invoice_pdf.py b/app/invoice_pdf.py
 new file mode 100644
-index 0000000..db265e8
+index 0000000..2f8d0e8
 --- /dev/null
 +++ b/app/invoice_pdf.py
-@@ -0,0 +1,352 @@
+@@ -0,0 +1,402 @@
 +"""Professional one-page invoice PDF (Helvetica + optional JPEG logo). No extra deps."""
 +from __future__ import annotations
 +
@@ -80,14 +80,26 @@ index 0000000..db265e8
 +
 +
 +def logo_path() -> Path | None:
-+    root = Path(__file__).resolve().parent.parent
-+    for p in (
-+        root / "static" / "img" / "inpmnt-logo-invoice.jpg",
-+        root / "php" / "static" / "img" / "inpmnt-logo-invoice.jpg",
-+    ):
++    for p in _logo_candidates():
 +        if p.is_file() and os.access(p, os.R_OK):
 +            return p
 +    return None
++
++
++def _logo_candidates() -> list[Path]:
++    root = Path(__file__).resolve().parent.parent
++    names = ("inpmnt-logo-invoice.jpg", "inpmnt-icon.png")
++    dirs = [
++        Path(__file__).resolve().parent,
++        root / "static" / "img",
++        root / "php" / "static" / "img",
++        root / "php" / "src",
++    ]
++    out: list[Path] = []
++    for d in dirs:
++        for name in names:
++            out.append(d / name)
++    return out
 +
 +
 +def _jpeg_size(data: bytes) -> tuple[int, int]:
@@ -111,6 +123,45 @@ index 0000000..db265e8
 +    return 160, 160
 +
 +
++def _png_file_to_jpeg(path: Path) -> bytes | None:
++    try:
++        from io import BytesIO
++
++        from PIL import Image
++
++        im = Image.open(path).convert("RGB")
++        im = im.resize((160, 160), Image.Resampling.LANCZOS)
++        buf = BytesIO()
++        im.save(buf, format="JPEG", quality=88)
++        raw = buf.getvalue()
++        return raw if raw.startswith(b"\xff\xd8") else None
++    except Exception:  # noqa: BLE001
++        return None
++
++
++def logo_jpeg() -> tuple[bytes, int, int] | None:
++    """Return (jpeg_bytes, width, height) for the InPmnt mark, or None."""
++    for p in _logo_candidates():
++        if not p.is_file() or not os.access(p, os.R_OK):
++            continue
++        suffix = p.suffix.lower()
++        if suffix in {".jpg", ".jpeg"}:
++            raw = p.read_bytes()
++            if raw.startswith(b"\xff\xd8"):
++                w, h = _jpeg_size(raw)
++                return raw, w, h
++        elif suffix == ".png":
++            converted = _png_file_to_jpeg(p)
++            if converted:
++                w, h = _jpeg_size(converted)
++                return converted, w, h
++            sibling = p.with_name("inpmnt-logo-invoice.jpg")
++            if sibling.is_file() and os.access(sibling, os.R_OK):
++                raw = sibling.read_bytes()
++                if raw.startswith(b"\xff\xd8"):
++                    w, h = _jpeg_size(raw)
++                    return raw, w, h
++    return None
 +def _money(n: float) -> str:
 +    return f"${n:,.2f}"
 +
@@ -219,10 +270,9 @@ index 0000000..db265e8
 +    logo_pt = 88.0
 +    logo_x = 40.0
 +    logo_y = 680.0  # 88pt tall → top at 768, 16pt under the teal rule
-+    lp = logo_path()
-+    if lp:
-+        jpeg = lp.read_bytes()
-+        img_w, img_h = _jpeg_size(jpeg)
++    logo = logo_jpeg()
++    if logo:
++        jpeg, img_w, img_h = logo
 +        ops.append(f"q {logo_pt:.2f} 0 0 {logo_pt:.2f} {logo_x:.2f} {logo_y:.2f} cm /Im1 Do Q")
 +    text_x = (logo_x + logo_pt + 16) if jpeg else 48.0
 +    text(text_x, 752, biz, size=16, bold=True)
@@ -692,10 +742,10 @@ index da43bef..19a80cb 100644
  require $root . '/src/App.php';
 diff --git a/php/fix-ubuntu-perms.sh b/php/fix-ubuntu-perms.sh
 new file mode 100755
-index 0000000..3979e6c
+index 0000000..5ce4bce
 --- /dev/null
 +++ b/php/fix-ubuntu-perms.sh
-@@ -0,0 +1,49 @@
+@@ -0,0 +1,52 @@
 +#!/bin/bash
 +# Ubuntu Apache: unzip then run this as root from the document root.
 +#   sudo bash /var/www/html/fix-ubuntu-perms.sh
@@ -728,6 +778,9 @@ index 0000000..3979e6c
 +# Invoice letterhead JPEG must be world-readable or the PDF has no logo.
 +if [ -f "$ROOT/static/img/inpmnt-logo-invoice.jpg" ]; then
 +  chmod 644 "$ROOT/static/img/inpmnt-logo-invoice.jpg"
++fi
++if [ -f "$ROOT/src/inpmnt-logo-invoice.jpg" ]; then
++  chmod 644 "$ROOT/src/inpmnt-logo-invoice.jpg"
 +fi
 +if [ -f "$ROOT/static/img/inpmnt-icon.png" ]; then
 +  chmod 644 "$ROOT/static/img/inpmnt-icon.png"
@@ -864,10 +917,10 @@ index b065039..96a216f 100644
          http_response_code($status);
 diff --git a/php/src/InvoicePdf.php b/php/src/InvoicePdf.php
 new file mode 100644
-index 0000000..93930f0
+index 0000000..dfa3bd1
 --- /dev/null
 +++ b/php/src/InvoicePdf.php
-@@ -0,0 +1,354 @@
+@@ -0,0 +1,417 @@
 +<?php
 +declare(strict_types=1);
 +
@@ -1093,14 +1146,36 @@ index 0000000..93930f0
 +        return rtrim($body) . "\n\nA PDF copy of this invoice is attached.\n";
 +    }
 +
++    /** @return list<string> */
++    public static function logoCandidates(): array
++    {
++        $srcDir = __DIR__;
++        $phpDir = dirname($srcDir);
++        $repoDir = dirname($phpDir);
++        $names = ['inpmnt-logo-invoice.jpg', 'inpmnt-icon.png'];
++        $dirs = [
++            $srcDir,
++            $phpDir . '/static/img',
++            $repoDir . '/static/img',
++            $phpDir . '/img',
++        ];
++        $doc = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/\\');
++        if ($doc !== '') {
++            $dirs[] = $doc . '/static/img';
++            $dirs[] = $doc . '/img';
++        }
++        $out = [];
++        foreach ($dirs as $dir) {
++            foreach ($names as $name) {
++                $out[] = $dir . '/' . $name;
++            }
++        }
++        return $out;
++    }
++
 +    public static function logoPath(): ?string
 +    {
-+        $root = dirname(__DIR__);
-+        $cands = [
-+            $root . '/static/img/inpmnt-logo-invoice.jpg',
-+            dirname($root) . '/static/img/inpmnt-logo-invoice.jpg',
-+        ];
-+        foreach ($cands as $p) {
++        foreach (self::logoCandidates() as $p) {
 +            if (is_file($p) && is_readable($p)) {
 +                return $p;
 +            }
@@ -1110,37 +1185,78 @@ index 0000000..93930f0
 +
 +    private static function logoJpeg(): ?string
 +    {
-+        $p = self::logoPath();
-+        if ($p === null) {
++        foreach (self::logoCandidates() as $p) {
++            if (!is_file($p) || !is_readable($p)) {
++                continue;
++            }
++            $raw = file_get_contents($p);
++            if ($raw === false || $raw === '') {
++                continue;
++            }
++            $ext = strtolower(pathinfo($p, PATHINFO_EXTENSION));
++            if ($ext === 'png') {
++                $jpeg = self::pngToJpeg($raw);
++                if ($jpeg !== null) {
++                    return $jpeg;
++                }
++                $sibling = dirname($p) . '/inpmnt-logo-invoice.jpg';
++                if (is_file($sibling) && is_readable($sibling)) {
++                    $alt = file_get_contents($sibling);
++                    if (is_string($alt) && str_starts_with($alt, "\xFF\xD8")) {
++                        return $alt;
++                    }
++                }
++                continue;
++            }
++            if (str_starts_with($raw, "\xFF\xD8")) {
++                return $raw;
++            }
++        }
++        return null;
++    }
++
++    private static function pngToJpeg(string $png): ?string
++    {
++        if (!function_exists('imagecreatefromstring')) {
 +            return null;
 +        }
-+        $raw = file_get_contents($p);
-+        return $raw === false ? null : $raw;
++        $im = @imagecreatefromstring($png);
++        if ($im === false) {
++            return null;
++        }
++        $size = 160;
++        $dst = imagecreatetruecolor($size, $size);
++        $bg = imagecolorallocate($dst, 16, 25, 32);
++        imagefilledrectangle($dst, 0, 0, $size, $size, $bg);
++        imagecopyresampled($dst, $im, 0, 0, 0, 0, $size, $size, imagesx($im), imagesy($im));
++        ob_start();
++        imagejpeg($dst, null, 88);
++        $jpeg = ob_get_clean();
++        imagedestroy($im);
++        imagedestroy($dst);
++        return is_string($jpeg) && str_starts_with($jpeg, "\xFF\xD8") ? $jpeg : null;
 +    }
 +
 +    /** @return array{0:int,1:int} */
 +    private static function jpegSize(string $jpeg): array
 +    {
 +        $len = strlen($jpeg);
-+        $i = 0;
++        $i = 2;
 +        while ($i < $len - 8) {
 +            if (ord($jpeg[$i]) !== 0xFF) {
-+                $i++;
-+                continue;
++                break;
 +            }
 +            $marker = ord($jpeg[$i + 1]);
-+            if ($marker === 0xD8 || $marker === 0xD9 || $marker === 0x01
-+                || ($marker >= 0xD0 && $marker <= 0xD7)) {
-+                $i += 2;
-+                continue;
-+            }
-+            $seglen = (ord($jpeg[$i + 2]) << 8) | ord($jpeg[$i + 3]);
-+            if ($marker === 0xC0 || $marker === 0xC1 || $marker === 0xC2 || $marker === 0xC3) {
++            if ($marker === 0xC0 || $marker === 0xC1 || $marker === 0xC2) {
 +                $h = (ord($jpeg[$i + 5]) << 8) | ord($jpeg[$i + 6]);
 +                $w = (ord($jpeg[$i + 7]) << 8) | ord($jpeg[$i + 8]);
-+                return [$w, $h];
++                return [$w > 0 ? $w : 160, $h > 0 ? $h : 160];
 +            }
-+            $i += 2 + max($seglen, 0);
++            $seglen = (ord($jpeg[$i + 2]) << 8) | ord($jpeg[$i + 3]);
++            if ($seglen < 2) {
++                break;
++            }
++            $i += 2 + $seglen;
 +        }
 +        return [160, 160];
 +    }
@@ -1368,12 +1484,172 @@ index 23fa803..e300bb4 100644
      /** @param callable(string):string $cmd */
      private static function smtpAuth(callable $cmd, callable $expect, string $user, string $password): void
      {
+diff --git a/php/src/inpmnt-logo-invoice.jpg b/php/src/inpmnt-logo-invoice.jpg
+new file mode 100644
+index 0000000000000000000000000000000000000000..85db2bd097c87e7d39eb23158325ebbf60d83ae3
+GIT binary patch
+literal 3845
+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
+
+literal 0
+HcmV?d00001
+
+diff --git a/php/static/img/inpmnt-logo-invoice.jpg b/php/static/img/inpmnt-logo-invoice.jpg
+new file mode 100644
+index 0000000000000000000000000000000000000000..85db2bd097c87e7d39eb23158325ebbf60d83ae3
+GIT binary patch
+literal 3845
+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
+
+literal 0
+HcmV?d00001
+
 diff --git a/scripts/check-ubuntu-perms.sh b/scripts/check-ubuntu-perms.sh
 new file mode 100755
-index 0000000..038e744
+index 0000000..c435aa4
 --- /dev/null
 +++ b/scripts/check-ubuntu-perms.sh
-@@ -0,0 +1,135 @@
+@@ -0,0 +1,136 @@
 +#!/usr/bin/env bash
 +# Fail if Linux/Ubuntu modes are wrong for Apache (www-data).
 +# Dirs 755, files 644, scripts 755, invoice logo world-readable.
@@ -1468,6 +1744,7 @@ index 0000000..038e744
 +path = sys.argv[1]
 +needed = {
 +    "./static/img/inpmnt-logo-invoice.jpg",
++    "./src/inpmnt-logo-invoice.jpg",
 +    "./src/InvoicePdf.php",
 +    "./static/js/app.js",
 +    "./static/css/app.css",
@@ -1706,13 +1983,14 @@ index 888328c..9a12f6a 100644
        ${templates
 diff --git a/tests/test_invoice_pdf.py b/tests/test_invoice_pdf.py
 new file mode 100644
-index 0000000..c39cb6e
+index 0000000..413c214
 --- /dev/null
 +++ b/tests/test_invoice_pdf.py
-@@ -0,0 +1,81 @@
+@@ -0,0 +1,92 @@
 +"""Professional invoice PDF generator."""
 +from __future__ import annotations
 +
++from pathlib import Path
 +import unittest
 +
 +from app.invoice_pdf import (
@@ -1769,6 +2047,16 @@ index 0000000..c39cb6e
 +        self.assertIn(b"/Width 160", pdf)
 +        self.assertIn(b"/Height 160", pdf)
 +        self.assertNotIn(b"endstreamendobj", pdf)
++
++    def test_logo_from_png_when_jpeg_missing(self) -> None:
++        from unittest.mock import patch
++
++        png = Path(__file__).resolve().parent.parent / "static" / "img" / "inpmnt-icon.png"
++        self.assertTrue(png.is_file())
++        with patch("app.invoice_pdf._logo_candidates", return_value=[png]):
++            pdf = build_invoice_pdf(SAMPLE)
++        self.assertIn(b"/Im1", pdf)
++        self.assertIn(b"/DCTDecode", pdf)
 +
 +    def test_payload_and_filename(self) -> None:
 +        payload = invoice_pdf_payload(
@@ -1828,10 +2116,10 @@ index 7b6856c..57eca11 100644
          no_mail = self.client.post("/api/clients", json={"name": "No Email Co"})
 diff --git a/tests/test_ubuntu_perms.py b/tests/test_ubuntu_perms.py
 new file mode 100644
-index 0000000..6d2dca8
+index 0000000..13789ea
 --- /dev/null
 +++ b/tests/test_ubuntu_perms.py
-@@ -0,0 +1,60 @@
+@@ -0,0 +1,61 @@
 +"""Ubuntu/Apache modes: dirs 755, files 644, invoice logo world-readable."""
 +from __future__ import annotations
 +
@@ -1884,6 +2172,7 @@ index 0000000..6d2dca8
 +                    self.assertEqual(mode, want, f"{member.name} {mode:03o}")
 +        for needed in (
 +            "static/img/inpmnt-logo-invoice.jpg",
++            "src/inpmnt-logo-invoice.jpg",
 +            "src/InvoicePdf.php",
 +            "fix-ubuntu-perms.sh",
 +        ):
