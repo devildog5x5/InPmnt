@@ -622,8 +622,9 @@ final class App
         ]);
         $invoiceId = (int) $this->db->lastInsertId();
         $emailed = false;
+        $provider = null;
         if ($wantSend) {
-            $this->deliverInvoice($wid, $invoiceId);
+            $provider = $this->deliverInvoice($wid, $invoiceId);
             $emailed = true;
         } elseif (in_array($insertStatus, ['sent', 'partial', 'overdue'], true)) {
             $this->scheduleReminders($invoiceId, $due, true);
@@ -632,6 +633,9 @@ final class App
         $out = $this->invoiceDetail($invoiceId, $wid);
         if (is_array($out)) {
             $out['emailed'] = $emailed;
+            if ($provider) {
+                $out['mail_provider'] = $provider;
+            }
         }
         Http::json($out, 201);
     }
@@ -704,23 +708,28 @@ final class App
         Db::refreshInvoiceStatus($this->db, $id);
         Db::log($this->db, 'invoice', "Updated invoice {$existing['number']}", 'invoice', $id, $wid);
         $emailed = false;
+        $provider = null;
         if ($wantSend) {
-            $this->deliverInvoice($wid, $id);
+            $provider = $this->deliverInvoice($wid, $id);
             $emailed = true;
         }
         $out = $this->invoiceDetail($id, $wid);
         if (is_array($out)) {
             $out['emailed'] = $emailed;
+            if ($provider) {
+                $out['mail_provider'] = $provider;
+            }
         }
         Http::json($out);
     }
 
     private function apiSendInvoice(int $wid, int $id): void
     {
-        $this->deliverInvoice($wid, $id);
+        $provider = $this->deliverInvoice($wid, $id);
         $out = $this->invoiceDetail($id, $wid);
         if (is_array($out)) {
             $out['emailed'] = true;
+            $out['mail_provider'] = $provider;
         }
         Http::json($out);
     }
@@ -743,9 +752,10 @@ final class App
         Http::pdf($pdf, InvoicePdf::filename((string) ($inv['number'] ?? 'invoice')));
     }
 
-    /** Email the Invoice template with a PDF attachment. Drafts are marked sent and reminders are scheduled. */
-    private function deliverInvoice(int $wid, int $id): void
+    /** Email the Invoice template with a PDF attachment. Drafts are marked sent and reminders are scheduled. @return string provider */
+    private function deliverInvoice(int $wid, int $id): string
     {
+        @set_time_limit(120);
         $st = $this->db->prepare(
             'SELECT i.*, c.name AS client_name, c.email AS client_email,
                     c.company AS client_company, c.phone AS client_phone
@@ -792,13 +802,15 @@ final class App
         $pdf = InvoicePdf::build(InvoicePdf::payload($inv, $settings ?? []));
         $filename = InvoicePdf::filename((string) ($inv['number'] ?? 'invoice'));
         $attachments = [['filename' => $filename, 'content' => $pdf, 'mime' => 'application/pdf']];
+        $provider = 'fake';
         if (!Mailer::configured()) {
             if (!Env::truthy('ALLOW_FAKE_EMAIL')) {
                 $this->emailNotConfigured();
             }
         } else {
             try {
-                Mailer::send($to, $subject, $body, $settings['business_name'] ?? null, $attachments);
+                $sent = Mailer::send($to, $subject, $body, $settings['business_name'] ?? null, $attachments);
+                $provider = (string) ($sent['provider'] ?? 'smtp');
             } catch (Throwable $e) {
                 Http::json(['error' => $e->getMessage()], 502);
             }
@@ -823,6 +835,7 @@ final class App
         $rid = (int) $this->db->lastInsertId();
         Db::log($this->db, 'invoice', "Emailed invoice {$inv['number']} to {$to}", 'invoice', $id, $wid);
         Db::log($this->db, 'reminder', "Sent INVOICE email for {$inv['number']} to {$to}", 'reminder', $rid, $wid);
+        return $provider;
     }
 
     private function apiRecordPayment(int $wid, int $id): void

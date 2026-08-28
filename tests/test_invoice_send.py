@@ -99,6 +99,7 @@ class InvoiceSendTests(unittest.TestCase):
             self.assertTrue(body["emailed"])
             self.assertEqual(body["status"], "sent")
             self.assertEqual(body["client_email"], "maya@client.example")
+            self.assertEqual(body.get("mail_provider"), "smtp")
             send.assert_called_once()
             kwargs = send.call_args.kwargs
             self.assertEqual(kwargs["to"], "maya@client.example")
@@ -195,6 +196,7 @@ class InvoiceSendTests(unittest.TestCase):
             self.assertTrue(body["emailed"])
             self.assertEqual(body["status"], "sent")
             self.assertEqual(body["title"], "Patio reset")
+            self.assertEqual(body.get("mail_provider"), "smtp")
             send.assert_called_once()
             self.assertIn("Patio reset", send.call_args.kwargs["body"])
             self.assertIn("$400.00", send.call_args.kwargs["body"])
@@ -209,6 +211,27 @@ class InvoiceSendTests(unittest.TestCase):
         self.assertEqual(still["title"], "Spring cleanup")
         self.assertEqual(still["amount"], 250)
         self.assertEqual(still["status"], "draft")
+
+    def test_update_paid_invoice_title(self) -> None:
+        inv = self._create_draft()
+        with patch("app.routes.send_email", return_value={"provider": "smtp", "id": None}):
+            sent = self.client.post(f"/api/invoices/{inv['id']}/send", json={})
+            self.assertEqual(sent.status_code, 200, sent.get_json())
+        pay = self.client.post(
+            f"/api/invoices/{inv['id']}/payments",
+            json={"amount": 250, "method": "ACH"},
+        )
+        self.assertEqual(pay.status_code, 200, pay.get_json())
+        self.assertEqual(pay.get_json()["status"], "paid")
+        res = self.client.put(
+            f"/api/invoices/{inv['id']}",
+            json={"title": "Spring cleanup (paid, corrected)"},
+        )
+        self.assertEqual(res.status_code, 200, res.get_json())
+        body = res.get_json()
+        self.assertEqual(body["title"], "Spring cleanup (paid, corrected)")
+        self.assertEqual(body["status"], "paid")
+        self.assertFalse(body.get("emailed"))
 
     def test_invoice_template_is_present(self) -> None:
         res = self.client.get("/api/templates")
