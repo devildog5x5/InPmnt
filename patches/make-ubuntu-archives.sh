@@ -35,7 +35,20 @@ git show HEAD:php/src/Mail.php > "$stage/src/Mail.php"
 git show HEAD:php/src/Http.php > "$stage/src/Http.php"
 git show HEAD:php/src/InvoicePdf.php > "$stage/src/InvoicePdf.php"
 git show HEAD:php/bootstrap.php > "$stage/bootstrap.php"
+if git cat-file -e HEAD:php/app.php 2>/dev/null; then
+  git show HEAD:php/app.php > "$stage/app.php"
+fi
 git show HEAD:php/.env.example > "$stage/.env.example"
+if git cat-file -e HEAD:php/.htaccess 2>/dev/null; then
+  git show HEAD:php/.htaccess > "$stage/.htaccess"
+fi
+if git cat-file -e HEAD:php/index.html 2>/dev/null; then
+  git show HEAD:php/index.html > "$stage/index.html"
+fi
+if git cat-file -e HEAD:php/remove-wordpress.sh 2>/dev/null; then
+  git show HEAD:php/remove-wordpress.sh > "$stage/remove-wordpress.sh"
+  chmod 755 "$stage/remove-wordpress.sh"
+fi
 git show HEAD:static/js/app.js > "$stage/static/js/app.js"
 git show HEAD:static/css/app.css > "$stage/static/css/app.css"
 git show HEAD:static/img/inpmnt-logo-invoice.jpg > "$stage/static/img/inpmnt-logo-invoice.jpg"
@@ -49,6 +62,9 @@ find "$stage" -type d -exec chmod 755 {} \;
 find "$stage" -type f -exec chmod 644 {} \;
 if [[ -f "$stage/fix-ubuntu-perms.sh" ]]; then
   chmod 755 "$stage/fix-ubuntu-perms.sh"
+fi
+if [[ -f "$stage/remove-wordpress.sh" ]]; then
+  chmod 755 "$stage/remove-wordpress.sh"
 fi
 ( cd "$stage" && tar --numeric-owner --owner=0 --group=0 --format=ustar --sort=name \
     -czf "$Root/patches/inpmnt-hostinger-changed.tar.gz" . )

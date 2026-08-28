@@ -27,6 +27,9 @@ fi
 if [ -f "$ROOT/fix-ubuntu-perms.sh" ]; then
   chmod 755 "$ROOT/fix-ubuntu-perms.sh"
 fi
+if [ -f "$ROOT/remove-wordpress.sh" ]; then
+  chmod 755 "$ROOT/remove-wordpress.sh"
+fi
 # Invoice letterhead JPEG must be world-readable or the PDF has no logo.
 if [ -f "$ROOT/static/img/inpmnt-logo-invoice.jpg" ]; then
   chmod 644 "$ROOT/static/img/inpmnt-logo-invoice.jpg"

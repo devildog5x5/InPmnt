@@ -29,6 +29,7 @@ class UbuntuPermsTests(unittest.TestCase):
         self.assertFalse(_mode(pdf) & 0o002, "PHP must not be world-writable")
         for rel in (
             "php/fix-ubuntu-perms.sh",
+            "php/remove-wordpress.sh",
             "scripts/check-ubuntu-perms.sh",
             "patches/make-ubuntu-archives.sh",
             "deploy/setup-vps.sh",
@@ -73,8 +74,12 @@ class UbuntuPermsTests(unittest.TestCase):
                 self.assertEqual(mode, want, f"{name} {mode:03o}")
         for needed in (
             "index.php",
+            "app.php",
+            "index.html",
+            ".htaccess",
             "bootstrap.php",
             "fix-ubuntu-perms.sh",
+            "remove-wordpress.sh",
             "src/InvoicePdf.php",
             "src/inpmnt-logo-invoice.jpg",
             "static/img/inpmnt-logo-invoice.jpg",

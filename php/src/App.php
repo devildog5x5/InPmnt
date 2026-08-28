@@ -72,6 +72,10 @@ final class App
 
     private function view(string $name, array $vars = []): void
     {
+        header('Content-Type: text/html; charset=utf-8');
+        header('Cache-Control: private, no-store, no-cache, must-revalidate');
+        header('Pragma: no-cache');
+        header('X-LiteSpeed-Cache-Control: no-cache');
         extract($vars, EXTR_SKIP);
         $root = dirname(__DIR__);
         require $root . '/views/' . $name . '.php';

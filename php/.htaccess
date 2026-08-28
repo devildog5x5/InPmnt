@@ -1,3 +1,22 @@
+# InPmnt front controller. Hostinger/LiteSpeed will otherwise keep serving
+# leftover WordPress files (index.html, wp-login.php) and cached WP HTML.
+# WordPress auto-updates overwrite index.php — DirectoryIndex and rewrites
+# always use app.php so InPmnt stays in front.
+
+DirectoryIndex app.php index.php
+
+<IfModule LiteSpeed>
+  CacheDisable public /
+  CacheLookup off
+</IfModule>
+
+<IfModule mod_headers.c>
+  <FilesMatch "\.(php)$">
+    Header set Cache-Control "private, no-store, no-cache, must-revalidate"
+    Header set Pragma "no-cache"
+  </FilesMatch>
+</IfModule>
+
 RewriteEngine On
 RewriteBase /
 
@@ -6,8 +25,25 @@ RewriteRule ^(\.env|bootstrap\.php)$ - [F,L]
 RewriteRule ^(src|views|data)(/|$) - [F,L]
 RewriteRule \.db$ - [F,L]
 
-# Existing public files (CSS/JS/images) are served as-is
+# Leftover WordPress (one-click install, auto-update, or unzip-on-top)
+RewriteRule ^wp- - [F,L]
+RewriteRule ^(xmlrpc|wp-login|wp-cron)\.php$ - [F,L]
+RewriteRule ^(license\.txt|readme\.html)$ - [F,L]
+
+# Only InPmnt's front controller may run. /index.php is rewritten to app.php
+# so a restored WordPress index.php never executes.
+RewriteRule ^app\.php$ - [L]
+RewriteRule ^index\.php$ app.php [QSA,L]
+RewriteRule \.php$ - [F,L]
+
+# Only InPmnt public assets — not leftover index.html / WordPress pages
+RewriteCond %{REQUEST_URI} ^/static/
 RewriteCond %{REQUEST_FILENAME} -f
 RewriteRule ^ - [L]
 
-RewriteRule ^ index.php [QSA,L]
+RewriteCond %{REQUEST_URI} ^/(favicon\.ico|robots\.txt)$
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteRule ^ - [L]
+
+# Everything else, including leftover index.html, goes to InPmnt
+RewriteRule ^ app.php [QSA,L]

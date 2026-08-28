@@ -22,11 +22,16 @@ Unzip ALL of these files into public_html (or /var/www/html). Do not overwrite a
 2. Email: SMTP_HOST=smtp.hostinger.com SMTP_PORT=465 SMTP_SSL=1
    SMTP_USER and MAIL_FROM = your Hostinger mailbox, plus SMTP_PASSWORD.
 3. hPanel → PHP 8.2+ and pdo_sqlite
-4. Ubuntu Apache (not Hostinger File Manager):
+4. If you still see a WordPress page: WordPress is leftover in public_html
+   (and Hostinger cache). From public_html run:
+     bash remove-wordpress.sh
+   Then hPanel → Cache → Purge All. Delete the WordPress install in hPanel
+   so it does not come back. Never chmod -R 777.
+5. Ubuntu Apache (not Hostinger File Manager):
      sudo bash fix-ubuntu-perms.sh
-   dirs 755, files 644, data/ 775, logo 644. Never chmod -R 777.
-5. Open https://yourdomain.com → Sign up
-6. Settings → Email delivery → Send test email
+   dirs 755, files 644, data/ 775, logo 644.
+6. Open https://yourdomain.com → Sign up
+7. Settings → Email delivery → Send test email
 
 This zip includes branded invoice PDFs (company logo top-left letterhead),
 invoice email on Send, SMTP fallback, edit-after-create, Send now on the
