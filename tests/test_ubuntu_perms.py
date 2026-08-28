@@ -4,10 +4,12 @@ from __future__ import annotations
 import os
 import tarfile
 import unittest
+import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 TAR = ROOT / "patches" / "inpmnt-hostinger-changed.tar.gz"
+PHP_ZIP = ROOT / "patches" / "InPmnt-PHP.zip"
 LOGO = ROOT / "static" / "img" / "inpmnt-logo-invoice.jpg"
 
 
@@ -53,6 +55,32 @@ class UbuntuPermsTests(unittest.TestCase):
             "src/inpmnt-logo-invoice.jpg",
             "src/InvoicePdf.php",
             "fix-ubuntu-perms.sh",
+        ):
+            self.assertIn(needed, names)
+
+    def test_php_zip_unix_modes(self) -> None:
+        self.assertTrue(PHP_ZIP.is_file(), "run python3 scripts/pack_php_zip.py")
+        names: set[str] = set()
+        with zipfile.ZipFile(PHP_ZIP) as zf:
+            for info in zf.infolist():
+                name = info.filename.rstrip("/")
+                names.add(name)
+                mode = (info.external_attr >> 16) & 0o777
+                if info.is_dir() or info.filename.endswith("/"):
+                    self.assertEqual(mode, 0o755, info.filename)
+                    continue
+                want = 0o755 if name.endswith(".sh") else 0o644
+                self.assertEqual(mode, want, f"{name} {mode:03o}")
+        for needed in (
+            "index.php",
+            "bootstrap.php",
+            "fix-ubuntu-perms.sh",
+            "src/InvoicePdf.php",
+            "src/inpmnt-logo-invoice.jpg",
+            "static/img/inpmnt-logo-invoice.jpg",
+            "static/img/inpmnt-icon.png",
+            "static/js/app.js",
+            "HOSTINGER.txt",
         ):
             self.assertIn(needed, names)
 

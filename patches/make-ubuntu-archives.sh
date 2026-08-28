@@ -53,6 +53,8 @@ fi
 ( cd "$stage" && tar --numeric-owner --owner=0 --group=0 --format=ustar --sort=name \
     -czf "$Root/patches/inpmnt-hostinger-changed.tar.gz" . )
 
+python3 "$Root/scripts/pack_php_zip.py"
+
 zip_stage="$(mktemp -d)"
 mkdir -p "$zip_stage/inpmnt-ubuntu-patches"
 cp "$Root/patches/001-mail-smtp-fallback.patch" \
@@ -60,6 +62,7 @@ cp "$Root/patches/001-mail-smtp-fallback.patch" \
    "$Root/patches/003-invoice-pdf.patch" \
    "$Root/patches/inpmnt-mail-invoice-ubuntu.patch" \
    "$Root/patches/inpmnt-hostinger-changed.tar.gz" \
+   "$Root/patches/InPmnt-PHP.zip" \
    "$Root/patches/README.md" \
    "$zip_stage/inpmnt-ubuntu-patches/"
 chmod 644 "$zip_stage/inpmnt-ubuntu-patches"/*

@@ -9,9 +9,12 @@ These are the mail + invoice-send + invoice-PDF changes, split so you can apply 
 | `003-invoice-pdf.patch` | Professional PDF invoice in the email body **and** as an attachment, plus Download PDF (apply after 002) |
 | `inpmnt-mail-invoice-ubuntu.patch` | 001 + 002 + 003 in one patch |
 | `inpmnt-hostinger-changed.tar.gz` | Drop-in PHP/static files for `public_html` (does **not** overwrite `.env`) |
-| `inpmnt-ubuntu-patches.zip` | **Download this** — all of the above in one zip |
+| `inpmnt-ubuntu-patches.zip` | Incremental patches + Hostinger changed-files tarball |
+| **`InPmnt-PHP.zip`** | **Full `public_html` drop** (all current PHP + static, Unix 755/644) |
 
-Do **not** overwrite a live `.env`. GitHub shows `.patch` as text; always hand the user the **zip** (repo + Cursor artifact download) unless they ask for the diff in chat.
+Do **not** overwrite a live `.env`. GitHub shows `.patch` as text; always hand the user the **zip**.
+
+**Latest full build (Hostinger / Ubuntu):** unzip `InPmnt-PHP.zip` into `public_html`, then on Ubuntu Apache run `sudo bash fix-ubuntu-perms.sh`.
 
 ## Hostinger (`public_html`)
 
