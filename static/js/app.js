@@ -334,6 +334,7 @@ async function renderInvoiceDetail(id) {
       actions: `
         <button class="btn secondary" data-go="#/invoices">Back</button>
         ${inv.status === "draft" ? `<button class="btn" id="btn-send">Send invoice</button>` : `<button class="btn secondary" id="btn-send">Email invoice</button>`}
+        <a class="btn secondary" href="/api/invoices/${id}/pdf">Download PDF</a>
         ${inv.status !== "paid" && inv.status !== "draft" ? `<button class="btn" id="btn-pay">Record payment</button>` : ""}
         ${inv.status === "overdue" || inv.status === "partial" ? `<button class="btn danger" id="btn-final">Final notice</button>` : ""}
       `,
@@ -642,7 +643,7 @@ async function renderTemplates() {
     ${topbar({
       eyebrow: "Workspace",
       title: "Message templates",
-      subtitle: "Use {{client_name}}, {{number}}, {{title}}, {{amount_due}}, {{due_date}}, {{business_name}}. The Invoice template is what Send invoice emails.",
+      subtitle: "Use {{client_name}}, {{number}}, {{title}}, {{amount_due}}, {{due_date}}, {{business_name}}. The Invoice template is what Send invoice emails (a PDF is attached automatically).",
     })}
     <div class="stack">
       ${templates

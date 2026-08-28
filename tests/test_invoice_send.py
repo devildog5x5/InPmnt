@@ -105,6 +105,12 @@ class InvoiceSendTests(unittest.TestCase):
             self.assertIn(inv["number"], kwargs["subject"])
             self.assertIn("Spring cleanup", kwargs["body"])
             self.assertIn("$250.00", kwargs["body"])
+            self.assertIn("PDF copy of this invoice is attached", kwargs["body"])
+            atts = kwargs.get("attachments") or []
+            self.assertEqual(len(atts), 1)
+            self.assertTrue(str(atts[0]["filename"]).endswith(".pdf"))
+            self.assertTrue(atts[0]["content"].startswith(b"%PDF"))
+            self.assertIn(b"/Im1", atts[0]["content"])
 
     def test_create_send_now_emails(self) -> None:
         with patch("app.routes.send_email", return_value={"provider": "smtp", "id": None}) as send:
@@ -124,6 +130,17 @@ class InvoiceSendTests(unittest.TestCase):
             send.assert_called_once()
             self.assertEqual(send.call_args.kwargs["to"], "maya@client.example")
             self.assertIn("Fence repair", send.call_args.kwargs["body"])
+            atts = send.call_args.kwargs.get("attachments") or []
+            self.assertEqual(len(atts), 1)
+            self.assertTrue(atts[0]["content"].startswith(b"%PDF"))
+
+    def test_download_pdf(self) -> None:
+        inv = self._create_draft()
+        res = self.client.get(f"/api/invoices/{inv['id']}/pdf")
+        self.assertEqual(res.status_code, 200, res.data[:200])
+        self.assertTrue(res.data.startswith(b"%PDF"))
+        self.assertIn("pdf", (res.mimetype or "").lower())
+        self.assertIn(b"INVOICE", res.data)
 
     def test_missing_client_email_blocks_send(self) -> None:
         no_mail = self.client.post("/api/clients", json={"name": "No Email Co"})

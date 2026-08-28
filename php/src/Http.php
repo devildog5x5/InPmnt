@@ -11,6 +11,17 @@ final class Http
         exit;
     }
 
+    public static function pdf(string $bytes, string $filename): never
+    {
+        $safe = preg_replace('/[^A-Za-z0-9._-]+/', '_', $filename) ?: 'invoice.pdf';
+        http_response_code(200);
+        header('Content-Type: application/pdf');
+        header('Content-Disposition: attachment; filename="' . $safe . '"');
+        header('Content-Length: ' . (string) strlen($bytes));
+        echo $bytes;
+        exit;
+    }
+
     public static function redirect(string $url, int $status = 302): never
     {
         http_response_code($status);

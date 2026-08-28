@@ -209,6 +209,9 @@ final class App
                 $this->apiDeleteInvoice($wid, (int) $m[1]);
             }
         }
+        if (preg_match('#^/api/invoices/(\d+)/pdf$#', $path, $m) && $method === 'GET') {
+            $this->apiInvoicePdf($wid, (int) $m[1]);
+        }
         if (preg_match('#^/api/invoices/(\d+)/send$#', $path, $m) && $method === 'POST') {
             $this->apiSendInvoice($wid, (int) $m[1]);
         }
@@ -685,11 +688,30 @@ final class App
         Http::json($out);
     }
 
-    /** Email the Invoice template. Drafts are marked sent and reminders are scheduled. */
+    private function apiInvoicePdf(int $wid, int $id): void
+    {
+        $st = $this->db->prepare(
+            'SELECT i.*, c.name AS client_name, c.email AS client_email,
+                    c.company AS client_company, c.phone AS client_phone
+             FROM invoices i JOIN clients c ON c.id = i.client_id
+             WHERE i.id=? AND i.workspace_id=?'
+        );
+        $st->execute([$id, $wid]);
+        $inv = $st->fetch();
+        if (!$inv) {
+            Http::json(['error' => 'Not found'], 404);
+        }
+        $settings = Workspace::settings($this->db, $wid) ?? [];
+        $pdf = InvoicePdf::build(InvoicePdf::payload($inv, $settings));
+        Http::pdf($pdf, InvoicePdf::filename((string) ($inv['number'] ?? 'invoice')));
+    }
+
+    /** Email the Invoice template with a PDF attachment. Drafts are marked sent and reminders are scheduled. */
     private function deliverInvoice(int $wid, int $id): void
     {
         $st = $this->db->prepare(
-            'SELECT i.*, c.name AS client_name, c.email AS client_email
+            'SELECT i.*, c.name AS client_name, c.email AS client_email,
+                    c.company AS client_company, c.phone AS client_phone
              FROM invoices i JOIN clients c ON c.id = i.client_id
              WHERE i.id=? AND i.workspace_id=?'
         );
@@ -726,17 +748,20 @@ final class App
             'business_name' => $settings['business_name'] ?? 'InPmnt',
         ];
         $subject = Db::renderVars($tmpl['subject'] ?? 'Invoice {{number}} from {{business_name}}', $ctx);
-        $body = Db::renderVars(
-            $tmpl['body'] ?? "Hi {{client_name}},\n\nInvoice {{number}} is ready for {{title}}.\n\nAmount due: {{amount_due}}\nDue date: {{due_date}}\n\nPlease reply to this email if you have any questions.\n\nThanks,\n{{business_name}}",
+        $body = InvoicePdf::mentionAttachment(Db::renderVars(
+            $tmpl['body'] ?? "Hi {{client_name}},\n\nInvoice {{number}} is ready for {{title}}.\n\nAmount due: {{amount_due}}\nDue date: {{due_date}}\n\nA PDF copy of this invoice is attached.\n\nPlease reply to this email if you have any questions.\n\nThanks,\n{{business_name}}",
             $ctx
-        );
+        ));
+        $pdf = InvoicePdf::build(InvoicePdf::payload($inv, $settings ?? []));
+        $filename = InvoicePdf::filename((string) ($inv['number'] ?? 'invoice'));
+        $attachments = [['filename' => $filename, 'content' => $pdf, 'mime' => 'application/pdf']];
         if (!Mailer::configured()) {
             if (!Env::truthy('ALLOW_FAKE_EMAIL')) {
                 $this->emailNotConfigured();
             }
         } else {
             try {
-                Mailer::send($to, $subject, $body, $settings['business_name'] ?? null);
+                Mailer::send($to, $subject, $body, $settings['business_name'] ?? null, $attachments);
             } catch (Throwable $e) {
                 Http::json(['error' => $e->getMessage()], 502);
             }

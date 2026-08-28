@@ -6,7 +6,7 @@ import smtplib
 import ssl
 from email.message import EmailMessage
 from email.utils import formataddr
-from typing import Any
+from typing import Any, Sequence
 
 
 _PLACEHOLDER_RESEND = {"re_...", "re_your_api_key", "re_changeme"}
@@ -65,8 +65,15 @@ def mail_status() -> dict[str, Any]:
     }
 
 
-def send_email(*, to: str, subject: str, body: str, from_name: str | None = None) -> dict[str, Any]:
-    """Send a plain-text email. Raises RuntimeError on failure / missing config."""
+def send_email(
+    *,
+    to: str,
+    subject: str,
+    body: str,
+    from_name: str | None = None,
+    attachments: Sequence[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Send a plain-text email, optionally with attachments. Raises RuntimeError on failure."""
     to = (to or "").strip()
     if not to or "@" not in to:
         raise RuntimeError("Client has no email address")
@@ -77,6 +84,7 @@ def send_email(*, to: str, subject: str, body: str, from_name: str | None = None
 
     display = (from_name or os.environ.get("MAIL_FROM_NAME") or "InPmnt").strip()
     from_header = formataddr((display, mail_from)) if display else mail_from
+    atts = list(attachments or [])
 
     force = _clean(os.environ.get("MAIL_PROVIDER")).lower()
     resend_key = _resend_key()
@@ -87,7 +95,7 @@ def send_email(*, to: str, subject: str, body: str, from_name: str | None = None
     errors: list[str] = []
     if try_resend:
         try:
-            return _send_resend(resend_key, from_header, to, subject, body)
+            return _send_resend(resend_key, from_header, to, subject, body, atts)
         except Exception as exc:  # noqa: BLE001
             errors.append(str(exc))
             if not smtp_ok or force == "resend":
@@ -99,7 +107,7 @@ def send_email(*, to: str, subject: str, body: str, from_name: str | None = None
     if try_smtp:
         host = _clean(os.environ.get("SMTP_HOST"))
         try:
-            return _send_smtp(host, from_header, mail_from, to, subject, body)
+            return _send_smtp(host, from_header, mail_from, to, subject, body, atts)
         except Exception as exc:  # noqa: BLE001
             detail = str(exc)
             if errors:
@@ -111,14 +119,41 @@ def send_email(*, to: str, subject: str, body: str, from_name: str | None = None
     )
 
 
-def _send_resend(api_key: str, from_header: str, to: str, subject: str, body: str) -> dict[str, Any]:
+def _attachment_bytes(att: dict[str, Any]) -> bytes:
+    raw = att.get("content") or b""
+    if isinstance(raw, str):
+        return raw.encode("latin-1")
+    return bytes(raw)
+
+
+def _send_resend(
+    api_key: str,
+    from_header: str,
+    to: str,
+    subject: str,
+    body: str,
+    attachments: Sequence[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    import base64
     import json
     import urllib.error
     import urllib.request
 
-    payload = json.dumps(
-        {"from": from_header, "to": [to], "subject": subject or "(no subject)", "text": body or ""}
-    ).encode("utf-8")
+    payload_obj: dict[str, Any] = {
+        "from": from_header,
+        "to": [to],
+        "subject": subject or "(no subject)",
+        "text": body or "",
+    }
+    if attachments:
+        payload_obj["attachments"] = [
+            {
+                "filename": str(att.get("filename") or "invoice.pdf"),
+                "content": base64.b64encode(_attachment_bytes(att)).decode("ascii"),
+            }
+            for att in attachments
+        ]
+    payload = json.dumps(payload_obj).encode("utf-8")
     req = urllib.request.Request(
         "https://api.resend.com/emails",
         data=payload,
@@ -141,7 +176,13 @@ def _send_resend(api_key: str, from_header: str, to: str, subject: str, body: st
 
 
 def _send_smtp(
-    host: str, from_header: str, mail_from: str, to: str, subject: str, body: str
+    host: str,
+    from_header: str,
+    mail_from: str,
+    to: str,
+    subject: str,
+    body: str,
+    attachments: Sequence[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     port = int(_clean(os.environ.get("SMTP_PORT")) or "587")
     user = _clean(os.environ.get("SMTP_USER"))
@@ -156,6 +197,15 @@ def _send_smtp(
     msg["To"] = to
     msg["Reply-To"] = mail_from
     msg.set_content(body or "")
+    for att in attachments or []:
+        mime = str(att.get("mime") or "application/pdf")
+        main, _, sub = mime.partition("/")
+        msg.add_attachment(
+            _attachment_bytes(att),
+            maintype=main or "application",
+            subtype=sub or "pdf",
+            filename=str(att.get("filename") or "invoice.pdf"),
+        )
 
     context = ssl.create_default_context()
     if use_ssl or port == 465:

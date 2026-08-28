@@ -38,6 +38,7 @@ DEFAULT_TEMPLATE_DEFS = [
         "Invoice {{number}} is ready for {{title}}.\n\n"
         "Amount due: {{amount_due}}\n"
         "Due date: {{due_date}}\n\n"
+        "A PDF copy of this invoice is attached.\n\n"
         "Please reply to this email if you have any questions.\n\n"
         "Thanks,\n{{business_name}}",
         0,

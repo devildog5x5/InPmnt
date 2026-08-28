@@ -160,7 +160,7 @@ final class Db
     {
         return [
             ['Invoice', 'email', 'Invoice {{number}} from {{business_name}}',
-                "Hi {{client_name}},\n\nInvoice {{number}} is ready for {{title}}.\n\nAmount due: {{amount_due}}\nDue date: {{due_date}}\n\nPlease reply to this email if you have any questions.\n\nThanks,\n{{business_name}}", 0],
+                "Hi {{client_name}},\n\nInvoice {{number}} is ready for {{title}}.\n\nAmount due: {{amount_due}}\nDue date: {{due_date}}\n\nA PDF copy of this invoice is attached.\n\nPlease reply to this email if you have any questions.\n\nThanks,\n{{business_name}}", 0],
             ['Friendly nudge', 'email', 'Quick reminder about invoice {{number}}',
                 "Hi {{client_name}},\n\nJust a friendly reminder that invoice {{number}} for {{amount_due}} is due on {{due_date}}.\n\nYou can reply to this email if you have any questions.\n\nThanks,\n{{business_name}}", 1],
             ['Due today', 'email', 'Invoice {{number}} is due today',

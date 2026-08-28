@@ -37,7 +37,7 @@ final class Mailer
         ];
     }
 
-    public static function send(string $to, string $subject, string $body, ?string $fromName = null): array
+    public static function send(string $to, string $subject, string $body, ?string $fromName = null, array $attachments = []): array
     {
         $to = trim($to);
         if ($to === '' || !str_contains($to, '@')) {
@@ -59,7 +59,7 @@ final class Mailer
         $errors = [];
         if ($tryResend) {
             try {
-                self::resend($resend, $fromHeader, $to, $subject, $body);
+                self::resend($resend, $fromHeader, $to, $subject, $body, $attachments);
                 return ['provider' => 'resend', 'id' => null];
             } catch (Throwable $e) {
                 $errors[] = $e->getMessage();
@@ -72,7 +72,7 @@ final class Mailer
         if ($trySmtp) {
             $host = trim(Env::get('SMTP_HOST'));
             try {
-                self::smtpSocket($host, $fromHeader, $mailFrom, $to, $subject, $body);
+                self::smtpSocket($host, $fromHeader, $mailFrom, $to, $subject, $body, $attachments);
                 return ['provider' => 'smtp', 'id' => null];
             } catch (Throwable $e) {
                 if ($errors) {
@@ -138,17 +138,27 @@ final class Mailer
         return $value;
     }
 
-    private static function resend(string $apiKey, string $from, string $to, string $subject, string $body): void
+    private static function resend(string $apiKey, string $from, string $to, string $subject, string $body, array $attachments = []): void
     {
         if (!function_exists('curl_init')) {
             throw new RuntimeException('Resend error: PHP curl extension is not enabled');
         }
-        $payload = json_encode([
+        $payloadArr = [
             'from' => $from,
             'to' => [$to],
             'subject' => $subject !== '' ? $subject : '(no subject)',
             'text' => $body,
-        ], JSON_UNESCAPED_SLASHES);
+        ];
+        if ($attachments) {
+            $payloadArr['attachments'] = [];
+            foreach ($attachments as $att) {
+                $payloadArr['attachments'][] = [
+                    'filename' => (string) ($att['filename'] ?? 'invoice.pdf'),
+                    'content' => base64_encode((string) ($att['content'] ?? '')),
+                ];
+            }
+        }
+        $payload = json_encode($payloadArr, JSON_UNESCAPED_SLASHES);
         $ch = curl_init('https://api.resend.com/emails');
         curl_setopt_array($ch, [
             CURLOPT_POST => true,
@@ -178,7 +188,8 @@ final class Mailer
         string $mailFrom,
         string $to,
         string $subject,
-        string $body
+        string $body,
+        array $attachments = []
     ): void {
         $port = self::smtpPort();
         $user = trim(Env::get('SMTP_USER'));
@@ -246,21 +257,60 @@ final class Mailer
             $expect($cmd('RCPT TO:<' . $to . '>'), '25', 'RCPT TO');
             $expect($cmd('DATA'), '354', 'DATA');
             $safeSubject = self::headerSafe($subject !== '' ? $subject : '(no subject)');
-            $dotBody = preg_replace('/^\./m', '..', str_replace(["\r\n", "\r"], "\n", $body)) ?? $body;
-            $dotBody = str_replace("\n", "\r\n", $dotBody);
-            $msg = 'Subject: ' . $safeSubject . "\r\n"
-                . 'From: ' . $fromHeader . "\r\n"
-                . 'To: ' . $to . "\r\n"
-                . 'Reply-To: ' . $mailFrom . "\r\n"
-                . "MIME-Version: 1.0\r\n"
-                . "Content-Type: text/plain; charset=UTF-8\r\n"
-                . "Content-Transfer-Encoding: 8bit\r\n\r\n"
-                . $dotBody . "\r\n.";
-            $expect($cmd($msg), '250', 'message');
+            $payload = self::rfc822($fromHeader, $mailFrom, $to, $safeSubject, $body, $attachments);
+            $expect($cmd($payload), '250', 'message');
             $cmd('QUIT');
         } finally {
             fclose($fp);
         }
+    }
+
+    /** @param list<array{filename?:string,content?:string,mime?:string}> $attachments */
+    private static function rfc822(
+        string $fromHeader,
+        string $mailFrom,
+        string $to,
+        string $safeSubject,
+        string $body,
+        array $attachments
+    ): string {
+        $dot = static function (string $s): string {
+            $s = str_replace(["\r\n", "\r"], "\n", $s);
+            $s = preg_replace('/^\./m', '..', $s) ?? $s;
+            return str_replace("\n", "\r\n", $s);
+        };
+        $headers = 'Subject: ' . $safeSubject . "\r\n"
+            . 'From: ' . $fromHeader . "\r\n"
+            . 'To: ' . $to . "\r\n"
+            . 'Reply-To: ' . $mailFrom . "\r\n"
+            . "MIME-Version: 1.0\r\n";
+        if (!$attachments) {
+            return $dot(
+                $headers
+                . "Content-Type: text/plain; charset=UTF-8\r\n"
+                . "Content-Transfer-Encoding: 8bit\r\n\r\n"
+                . $body
+            ) . "\r\n.";
+        }
+        $bound = '----=_InPmnt_' . bin2hex(random_bytes(8));
+        $parts = $headers
+            . 'Content-Type: multipart/mixed; boundary="' . $bound . "\"\r\n\r\n"
+            . '--' . $bound . "\r\n"
+            . "Content-Type: text/plain; charset=UTF-8\r\n"
+            . "Content-Transfer-Encoding: 8bit\r\n\r\n"
+            . $body . "\r\n";
+        foreach ($attachments as $att) {
+            $name = preg_replace('/[^A-Za-z0-9._-]+/', '_', (string) ($att['filename'] ?? 'invoice.pdf')) ?: 'invoice.pdf';
+            $mime = (string) ($att['mime'] ?? 'application/pdf');
+            $b64 = chunk_split(base64_encode((string) ($att['content'] ?? '')), 76, "\r\n");
+            $parts .= '--' . $bound . "\r\n"
+                . 'Content-Type: ' . $mime . '; name="' . $name . "\"\r\n"
+                . "Content-Transfer-Encoding: base64\r\n"
+                . 'Content-Disposition: attachment; filename="' . $name . "\"\r\n\r\n"
+                . $b64;
+        }
+        $parts .= '--' . $bound . "--\r\n";
+        return $dot($parts) . '.';
     }
 
     /** @param callable(string):string $cmd */

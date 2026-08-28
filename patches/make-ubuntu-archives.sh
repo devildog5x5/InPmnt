@@ -8,27 +8,37 @@ cd "$Root"
 
 base="${INPMNT_PATCH_BASE:-main}"
 mail_commit="$(git log "$base"..HEAD --reverse --format='%H' --grep='falling back from Resend' | head -1)"
+invoice_commit="$(git log "$base"..HEAD --reverse --format='%H' --grep='Clarify invoice detail copy' | head -1)"
 if [[ -z "$mail_commit" ]]; then
   echo "Could not find the mail-fallback commit. Set MAIL_COMMIT=... or change the grep." >&2
+  exit 1
+fi
+if [[ -z "$invoice_commit" ]]; then
+  echo "Could not find the invoice-send freeze commit (Clarify invoice detail copy)." >&2
   exit 1
 fi
 
 excl=(-- . ':(exclude)patches' ':(exclude)installers')
 git diff --no-ext-diff --binary "$base"..."$mail_commit" "${excl[@]}" > patches/001-mail-smtp-fallback.patch
-git diff --no-ext-diff --binary "$mail_commit"...HEAD "${excl[@]}" > patches/002-invoice-send-email.patch
+git diff --no-ext-diff --binary "$mail_commit"..."$invoice_commit" "${excl[@]}" > patches/002-invoice-send-email.patch
+git diff --no-ext-diff --binary "$invoice_commit"...HEAD "${excl[@]}" > patches/003-invoice-pdf.patch
 git diff --no-ext-diff --binary "$base"...HEAD "${excl[@]}" > patches/inpmnt-mail-invoice-ubuntu.patch
 sed -i 's/\r$//' patches/*.patch
 
 stage="$(mktemp -d)"
 trap 'rm -rf "$stage"' EXIT
-mkdir -p "$stage/src" "$stage/static/js" "$stage/static/css"
+mkdir -p "$stage/src" "$stage/static/js" "$stage/static/css" "$stage/static/img"
 git show HEAD:php/src/App.php > "$stage/src/App.php"
 git show HEAD:php/src/Db.php > "$stage/src/Db.php"
 git show HEAD:php/src/Env.php > "$stage/src/Env.php"
 git show HEAD:php/src/Mail.php > "$stage/src/Mail.php"
+git show HEAD:php/src/Http.php > "$stage/src/Http.php"
+git show HEAD:php/src/InvoicePdf.php > "$stage/src/InvoicePdf.php"
+git show HEAD:php/bootstrap.php > "$stage/bootstrap.php"
 git show HEAD:php/.env.example > "$stage/.env.example"
 git show HEAD:static/js/app.js > "$stage/static/js/app.js"
 git show HEAD:static/css/app.css > "$stage/static/css/app.css"
+git show HEAD:static/img/inpmnt-logo-invoice.jpg > "$stage/static/img/inpmnt-logo-invoice.jpg"
 find "$stage" -type d -exec chmod 755 {} \;
 find "$stage" -type f -exec chmod 644 {} \;
 ( cd "$stage" && tar --numeric-owner --owner=0 --group=0 --format=ustar --sort=name \
@@ -38,6 +48,7 @@ zip_stage="$(mktemp -d)"
 mkdir -p "$zip_stage/inpmnt-ubuntu-patches"
 cp "$Root/patches/001-mail-smtp-fallback.patch" \
    "$Root/patches/002-invoice-send-email.patch" \
+   "$Root/patches/003-invoice-pdf.patch" \
    "$Root/patches/inpmnt-mail-invoice-ubuntu.patch" \
    "$Root/patches/inpmnt-hostinger-changed.tar.gz" \
    "$Root/patches/README.md" \
@@ -51,4 +62,4 @@ chmod 644 "$zip_stage/inpmnt-ubuntu-patches"/*
 
 chmod 644 patches/*.patch patches/*.tar.gz patches/*.zip patches/README.md
 chmod 755 patches/make-ubuntu-archives.sh
-echo "Wrote patches/ (mail commit $mail_commit)"
+echo "Wrote patches/ (mail $mail_commit invoice $invoice_commit)"

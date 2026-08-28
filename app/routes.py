@@ -7,6 +7,8 @@ from datetime import date, datetime, timedelta
 from functools import wraps
 from typing import Any
 
+from io import BytesIO
+
 from flask import (
     Blueprint,
     current_app,
@@ -15,6 +17,7 @@ from flask import (
     redirect,
     render_template,
     request,
+    send_file,
     session,
     url_for,
 )
@@ -36,6 +39,12 @@ from .database import (
     refresh_invoice_status,
     row_to_dict,
     rows_to_list,
+)
+from .invoice_pdf import (
+    build_invoice_pdf,
+    invoice_pdf_payload,
+    mention_attachment,
+    pdf_filename,
 )
 from .mail import mail_configured, mail_status, send_email
 from .workspace import (
@@ -219,6 +228,7 @@ DEFAULT_INVOICE_BODY = (
     "Invoice {{number}} is ready for {{title}}.\n\n"
     "Amount due: {{amount_due}}\n"
     "Due date: {{due_date}}\n\n"
+    "A PDF copy of this invoice is attached.\n\n"
     "Please reply to this email if you have any questions.\n\n"
     "Thanks,\n{{business_name}}"
 )
@@ -248,7 +258,8 @@ def email_invoice_to_client(conn, invoice_id: int, wid: int):
     """
     inv = conn.execute(
         """
-        SELECT i.*, c.name AS client_name, c.email AS client_email
+        SELECT i.*, c.name AS client_name, c.email AS client_email,
+               c.company AS client_company, c.phone AS client_phone
         FROM invoices i JOIN clients c ON c.id = i.client_id
         WHERE i.id = ? AND i.workspace_id = ?
         """,
@@ -276,7 +287,12 @@ def email_invoice_to_client(conn, invoice_id: int, wid: int):
     subject = render_template_vars(
         tmpl["subject"] if tmpl else DEFAULT_INVOICE_SUBJECT, ctx
     )
-    body = render_template_vars(tmpl["body"] if tmpl else DEFAULT_INVOICE_BODY, ctx)
+    body = mention_attachment(
+        render_template_vars(tmpl["body"] if tmpl else DEFAULT_INVOICE_BODY, ctx)
+    )
+    pdf_bytes = build_invoice_pdf(invoice_pdf_payload(inv, settings))
+    filename = pdf_filename(str(inv["number"] or "invoice"))
+    attachments = [{"filename": filename, "content": pdf_bytes, "mime": "application/pdf"}]
 
     if not mail_configured():
         if not _allow_fake_email():
@@ -288,6 +304,7 @@ def email_invoice_to_client(conn, invoice_id: int, wid: int):
                 subject=subject,
                 body=body,
                 from_name=settings["business_name"] if settings else None,
+                attachments=attachments,
             )
         except Exception as exc:  # noqa: BLE001
             return jsonify({"error": str(exc)}), 502
@@ -714,6 +731,33 @@ def api_invoices():
         for r in rows:
             r["balance"] = invoice_balance(r)
     return jsonify(rows)
+
+
+@bp.get("/api/invoices/<int:invoice_id>/pdf")
+@login_required
+def api_invoice_pdf(invoice_id: int):
+    wid = require_workspace_id()
+    with db_session(db_path()) as conn:
+        inv = conn.execute(
+            """
+            SELECT i.*, c.name AS client_name, c.email AS client_email,
+                   c.company AS client_company, c.phone AS client_phone
+            FROM invoices i JOIN clients c ON c.id = i.client_id
+            WHERE i.id = ? AND i.workspace_id = ?
+            """,
+            (invoice_id, wid),
+        ).fetchone()
+        if not inv:
+            return jsonify({"error": "Not found"}), 404
+        settings = get_settings(conn, wid)
+        pdf_bytes = build_invoice_pdf(invoice_pdf_payload(inv, settings))
+        filename = pdf_filename(str(inv["number"] or "invoice"))
+    return send_file(
+        BytesIO(pdf_bytes),
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name=filename,
+    )
 
 
 @bp.get("/api/invoices/<int:invoice_id>")
