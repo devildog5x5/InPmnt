@@ -50,15 +50,13 @@ If none hits the bar, change the offer before writing more product code.
 
 ## Downloads
 
-Click to download (GitHub):
-
-| File | Link |
+| File | Download |
 |---|---|
-| **robots.txt** | https://raw.githubusercontent.com/devildog5x5/InPmnt/cursor/ourcircle-family-shield-4df6/ourcircle/patches/robots.txt |
-| **sitemap.xml** | https://raw.githubusercontent.com/devildog5x5/InPmnt/cursor/ourcircle-family-shield-4df6/ourcircle/patches/sitemap.xml |
-| **FamilyShieldPro.zip** (Hostinger) | https://raw.githubusercontent.com/devildog5x5/InPmnt/cursor/ourcircle-family-shield-4df6/ourcircle/patches/FamilyShieldPro.zip |
+| **FamilyShieldPro.zip** | https://raw.githubusercontent.com/devildog5x5/InPmnt/cursor/ourcircle-family-shield-4df6/patches/FamilyShieldPro.zip |
+| **robots.txt** | https://raw.githubusercontent.com/devildog5x5/InPmnt/cursor/ourcircle-family-shield-4df6/patches/robots.txt |
+| **sitemap.xml** | https://raw.githubusercontent.com/devildog5x5/InPmnt/cursor/ourcircle-family-shield-4df6/patches/sitemap.xml |
 
-After the site is live those same SEO files are at https://familyshieldpro.com/robots.txt and https://familyshieldpro.com/sitemap.xml.
+Unzip the zip into Hostinger `public_html`. After the site is live, robots/sitemap are also at https://familyshieldpro.com/robots.txt and https://familyshieldpro.com/sitemap.xml.
 
 ## Hostinger deploy (no VPS)
 

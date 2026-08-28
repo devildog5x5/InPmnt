@@ -92,12 +92,23 @@ dest = artifacts / "FamilyShieldPro.zip"
 shutil.copy2(zip_path, dest)
 patches = root / "patches"
 patches.mkdir(parents=True, exist_ok=True)
+repo_patches = root.parent / "patches"
+repo_patches.mkdir(parents=True, exist_ok=True)
 shutil.copy2(zip_path, patches / "FamilyShieldPro.zip")
+shutil.copy2(zip_path, repo_patches / "FamilyShieldPro.zip")
 shutil.copy2(stage / "robots.txt", patches / "robots.txt")
 shutil.copy2(stage / "sitemap.xml", patches / "sitemap.xml")
+shutil.copy2(stage / "robots.txt", repo_patches / "robots.txt")
+shutil.copy2(stage / "sitemap.xml", repo_patches / "sitemap.xml")
 shutil.copy2(stage / "robots.txt", artifacts / "robots.txt")
 shutil.copy2(stage / "sitemap.xml", artifacts / "sitemap.xml")
-for p in (dest, patches / "FamilyShieldPro.zip", artifacts / "robots.txt", artifacts / "sitemap.xml"):
+for p in (
+    dest,
+    patches / "FamilyShieldPro.zip",
+    repo_patches / "FamilyShieldPro.zip",
+    artifacts / "robots.txt",
+    artifacts / "sitemap.xml",
+):
     try:
         p.chmod(0o644)
     except OSError:

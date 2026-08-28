@@ -1,9 +1,9 @@
 # Family Shield Pro — deploy (no VPS)
 
 **Site:** https://familyshieldpro.com  
-**Zip:** [FamilyShieldPro.zip](https://raw.githubusercontent.com/devildog5x5/InPmnt/cursor/ourcircle-family-shield-4df6/ourcircle/patches/FamilyShieldPro.zip) — unzip into Hostinger `public_html`.  
-**robots.txt:** [download](https://raw.githubusercontent.com/devildog5x5/InPmnt/cursor/ourcircle-family-shield-4df6/ourcircle/patches/robots.txt)  
-**sitemap.xml:** [download](https://raw.githubusercontent.com/devildog5x5/InPmnt/cursor/ourcircle-family-shield-4df6/ourcircle/patches/sitemap.xml)  
+**Zip:** [FamilyShieldPro.zip](https://raw.githubusercontent.com/devildog5x5/InPmnt/cursor/ourcircle-family-shield-4df6/patches/FamilyShieldPro.zip) — unzip into Hostinger `public_html`.  
+**robots.txt:** [download](https://raw.githubusercontent.com/devildog5x5/InPmnt/cursor/ourcircle-family-shield-4df6/patches/robots.txt)  
+**sitemap.xml:** [download](https://raw.githubusercontent.com/devildog5x5/InPmnt/cursor/ourcircle-family-shield-4df6/patches/sitemap.xml)  
 **Do not** put this in an InPmnt folder or overwrite a live `.env`.
 
 You do not need Ubuntu, Nginx, systemd, or SSH.

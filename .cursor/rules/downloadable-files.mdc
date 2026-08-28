@@ -1,0 +1,10 @@
+# Downloadable files
+
+When the user asks for a file (zip, txt, xml, pdf, image, installer, or any other artifact they should take with them):
+
+1. Write a copy to `/opt/cursor/artifacts/<filename>` (this is what they can download in Cursor).
+2. Also commit a copy under repo-root `patches/<filename>` (same pattern as InPmnt-PHP.zip) and push.
+3. In the reply, give a clickable GitHub raw HTTPS URL and an HTML link to the artifacts path:
+   - `https://raw.githubusercontent.com/devildog5x5/InPmnt/<branch>/patches/<filename>`
+   - `<a href="/opt/cursor/artifacts/<filename>">Download <filename></a>`
+4. Do not only mention a VM path. If you built it, they must be able to download it in that same turn.
