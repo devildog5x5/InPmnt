@@ -553,7 +553,7 @@ index 7da32bd..5416708 100644
      context = ssl.create_default_context()
      if use_ssl or port == 465:
 diff --git a/app/routes.py b/app/routes.py
-index a9879c9..3accabd 100644
+index a9879c9..2727125 100644
 --- a/app/routes.py
 +++ b/app/routes.py
 @@ -7,6 +7,8 @@ from datetime import date, datetime, timedelta
@@ -660,6 +660,85 @@ index a9879c9..3accabd 100644
  @bp.get("/api/invoices/<int:invoice_id>")
  @login_required
  def api_invoice(invoice_id: int):
+@@ -810,12 +854,21 @@ def api_create_invoice():
+     return jsonify(data_out), 201
+ 
+ 
++def _json_truthy(value: Any) -> bool:
++    if value is True or value == 1:
++        return True
++    if isinstance(value, str) and value.strip().lower() in ("1", "true", "yes", "on"):
++        return True
++    return False
++
++
+ @bp.put("/api/invoices/<int:invoice_id>")
+ @login_required
+ def api_update_invoice(invoice_id: int):
+     data = request.get_json(force=True) or {}
+     now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+     wid = require_workspace_id()
++    want_send = _json_truthy(data.get("send"))
+     with db_session(db_path()) as conn:
+         existing = conn.execute(
+             "SELECT * FROM invoices WHERE id=? AND workspace_id=?",
+@@ -823,15 +876,36 @@ def api_update_invoice(invoice_id: int):
+         ).fetchone()
+         if not existing:
+             return jsonify({"error": "Not found"}), 404
++        title = data["title"] if "title" in data else existing["title"]
++        title = (title or "").strip()
++        if not title:
++            return jsonify({"error": "Title is required"}), 400
++        if "amount" in data:
++            try:
++                amount = float(data.get("amount") or 0)
++            except (TypeError, ValueError):
++                return jsonify({"error": "Invalid amount"}), 400
++        else:
++            amount = float(existing["amount"] or 0)
++        if amount <= 0:
++            return jsonify({"error": "Amount must be greater than zero"}), 400
++        paid = float(existing["amount_paid"] or 0)
++        if amount < paid:
++            return jsonify({"error": "Amount cannot be less than what is already paid"}), 400
++        status = data.get("status", existing["status"])
++        if status not in ("draft", "sent", "partial", "overdue", "paid"):
++            status = existing["status"]
+         fields = {
+-            "title": data.get("title", existing["title"]),
+-            "amount": float(data.get("amount", existing["amount"])),
++            "title": title,
++            "amount": amount,
+             "issue_date": data.get("issue_date", existing["issue_date"]),
+             "due_date": data.get("due_date", existing["due_date"]),
+-            "notes": data.get("notes", existing["notes"]),
++            "notes": (data["notes"] if "notes" in data else existing["notes"]) or "",
+             "client_id": int(data.get("client_id", existing["client_id"])),
+-            "status": data.get("status", existing["status"]),
++            "status": status,
+         }
++        if isinstance(fields["notes"], str):
++            fields["notes"] = fields["notes"].strip()
+         client = conn.execute(
+             "SELECT id FROM clients WHERE id=? AND workspace_id=?",
+             (fields["client_id"], wid),
+@@ -879,7 +953,15 @@ def api_update_invoice(invoice_id: int):
+             invoice_id,
+             workspace_id=wid,
+         )
++        emailed = False
++        if want_send:
++            err = email_invoice_to_client(conn, invoice_id, wid)
++            if err:
++                return err
++            emailed = True
+         out = invoice_detail(conn, invoice_id, wid)
++    if out:
++        out["emailed"] = emailed
+     return jsonify(out)
+ 
+ 
 diff --git a/deploy/backup-db.sh b/deploy/backup-db.sh
 old mode 100644
 new mode 100755
@@ -799,7 +878,7 @@ index 0000000..5ce4bce
 +echo "Reload Apache if needed: sudo systemctl reload apache2"
 +echo "Open: http://YOUR-SERVER/index.php"
 diff --git a/php/src/App.php b/php/src/App.php
-index 5ab2c2c..56e8b00 100644
+index 5ab2c2c..0e5e125 100644
 --- a/php/src/App.php
 +++ b/php/src/App.php
 @@ -209,6 +209,9 @@ final class App
@@ -812,7 +891,68 @@ index 5ab2c2c..56e8b00 100644
          if (preg_match('#^/api/invoices/(\d+)/send$#', $path, $m) && $method === 'POST') {
              $this->apiSendInvoice($wid, (int) $m[1]);
          }
-@@ -685,11 +688,30 @@ final class App
+@@ -638,14 +641,38 @@ final class App
+         if (!$existing) {
+             Http::json(['error' => 'Not found'], 404);
+         }
++        $wantSend = filter_var($data['send'] ?? false, FILTER_VALIDATE_BOOLEAN);
++        $title = array_key_exists('title', $data) ? trim((string) $data['title']) : (string) $existing['title'];
++        if ($title === '') {
++            Http::json(['error' => 'Title is required'], 400);
++        }
++        if (array_key_exists('amount', $data)) {
++            $amount = (float) $data['amount'];
++        } else {
++            $amount = (float) $existing['amount'];
++        }
++        if ($amount <= 0) {
++            Http::json(['error' => 'Amount must be greater than zero'], 400);
++        }
++        $paid = (float) ($existing['amount_paid'] ?? 0);
++        if ($amount < $paid) {
++            Http::json(['error' => 'Amount cannot be less than what is already paid'], 400);
++        }
++        $status = $data['status'] ?? $existing['status'];
++        if (!in_array($status, ['draft', 'sent', 'partial', 'overdue', 'paid'], true)) {
++            $status = $existing['status'];
++        }
++        $notes = array_key_exists('notes', $data)
++            ? trim((string) $data['notes'])
++            : (string) ($existing['notes'] ?? '');
+         $fields = [
+-            'title' => $data['title'] ?? $existing['title'],
+-            'amount' => (float) ($data['amount'] ?? $existing['amount']),
++            'title' => $title,
++            'amount' => $amount,
+             'issue_date' => $data['issue_date'] ?? $existing['issue_date'],
+             'due_date' => $data['due_date'] ?? $existing['due_date'],
+-            'notes' => $data['notes'] ?? $existing['notes'],
++            'notes' => $notes,
+             'client_id' => (int) ($data['client_id'] ?? $existing['client_id']),
+-            'status' => $data['status'] ?? $existing['status'],
++            'status' => $status,
+         ];
+         $c = $this->db->prepare('SELECT id FROM clients WHERE id=? AND workspace_id=?');
+         $c->execute([$fields['client_id'], $wid]);
+@@ -672,7 +699,16 @@ final class App
+         }
+         Db::refreshInvoiceStatus($this->db, $id);
+         Db::log($this->db, 'invoice', "Updated invoice {$existing['number']}", 'invoice', $id, $wid);
+-        Http::json($this->invoiceDetail($id, $wid));
++        $emailed = false;
++        if ($wantSend) {
++            $this->deliverInvoice($wid, $id);
++            $emailed = true;
++        }
++        $out = $this->invoiceDetail($id, $wid);
++        if (is_array($out)) {
++            $out['emailed'] = $emailed;
++        }
++        Http::json($out);
+     }
+ 
+     private function apiSendInvoice(int $wid, int $id): void
+@@ -685,11 +721,30 @@ final class App
          Http::json($out);
      }
  
@@ -845,7 +985,7 @@ index 5ab2c2c..56e8b00 100644
               FROM invoices i JOIN clients c ON c.id = i.client_id
               WHERE i.id=? AND i.workspace_id=?'
          );
-@@ -726,17 +748,20 @@ final class App
+@@ -726,17 +781,20 @@ final class App
              'business_name' => $settings['business_name'] ?? 'InPmnt',
          ];
          $subject = Db::renderVars($tmpl['subject'] ?? 'Invoice {{number}} from {{business_name}}', $ctx);
@@ -1788,10 +1928,10 @@ index 0000000..c435aa4
 +echo "Ubuntu permission check OK (dirs 755, files 644, scripts 755, logo readable)."
 diff --git a/scripts/pack_php_zip.py b/scripts/pack_php_zip.py
 new file mode 100644
-index 0000000..d43818d
+index 0000000..6025440
 --- /dev/null
 +++ b/scripts/pack_php_zip.py
-@@ -0,0 +1,116 @@
+@@ -0,0 +1,117 @@
 +#!/usr/bin/env python3
 +"""Pack InPmnt-PHP.zip with Unix modes (dirs 755, files 644, scripts 755)."""
 +from __future__ import annotations
@@ -1823,7 +1963,8 @@ index 0000000..d43818d
 +6. Settings → Email delivery → Send test email
 +
 +This zip includes branded invoice PDFs (company logo top-left letterhead),
-+invoice email on Send, SMTP fallback, and the invoice JPEG next to InvoicePdf.php.
++invoice email on Send, SMTP fallback, edit-after-create, Send now on the
++Invoices page, and the invoice JPEG next to InvoicePdf.php.
 +"""
 +
 +
@@ -1909,10 +2050,18 @@ index 0000000..d43818d
 +if __name__ == "__main__":
 +    main()
 diff --git a/static/css/app.css b/static/css/app.css
-index 26a763e..0bb4c4e 100644
+index 26a763e..4d12ad1 100644
 --- a/static/css/app.css
 +++ b/static/css/app.css
-@@ -636,6 +636,7 @@ td.mono, .mono {
+@@ -575,6 +575,7 @@ td.mono, .mono {
+ .modal-actions {
+   display: flex;
+   justify-content: flex-end;
++  flex-wrap: wrap;
+   gap: 10px;
+   margin-top: 18px;
+   padding-top: 16px;
+@@ -636,6 +637,7 @@ td.mono, .mono {
      align-items: stretch;
      gap: 14px;
    }
@@ -1920,7 +2069,7 @@ index 26a763e..0bb4c4e 100644
  }
  
  /* ---------- InPmnt extras ---------- */
-@@ -651,6 +652,54 @@ td.mono, .mono {
+@@ -651,6 +653,54 @@ td.mono, .mono {
    display: block;
  }
  
@@ -2056,10 +2205,88 @@ literal 0
 HcmV?d00001
 
 diff --git a/static/js/app.js b/static/js/app.js
-index 888328c..9a12f6a 100644
+index 888328c..e4db28b 100644
 --- a/static/js/app.js
 +++ b/static/js/app.js
-@@ -325,7 +325,8 @@ async function renderInvoices(filter = "all") {
+@@ -92,6 +92,20 @@ function empty(msg) {
+   return `<div class="empty">${msg}</div>`;
+ }
+ 
++function esc(s) {
++  return String(s ?? "")
++    .replace(/&/g, "&amp;")
++    .replace(/</g, "&lt;")
++    .replace(/>/g, "&gt;")
++    .replace(/"/g, "&quot;");
++}
++
++async function sendInvoiceNow(id) {
++  const res = await api(`/api/invoices/${id}/send`, { method: "POST", body: "{}" });
++  toast(res.emailed ? `Invoice emailed to ${res.client_email || "the client"}` : "Invoice sent");
++  return res;
++}
++
+ /* ---------- Dashboard ---------- */
+ async function renderDashboard() {
+   const data = await api("/api/dashboard");
+@@ -249,7 +263,7 @@ async function renderInvoices(filter = "all") {
+     ${topbar({
+       eyebrow: "Collections",
+       title: "Invoices",
+-      subtitle: "Track balances, schedule reminders, and record payments.",
++      subtitle: "Create a draft, edit it, then send now or send from this page.",
+       actions: `<button class="btn" id="btn-new-inv">New invoice</button>`,
+     })}
+     <div class="toolbar">
+@@ -286,13 +300,20 @@ async function renderInvoices(filter = "all") {
+                         <td>${badge(i.status)}</td>
+                         <td class="row-actions">
+                           ${
+-                            i.status !== "paid" && i.status !== "draft"
+-                              ? `<button class="btn sm secondary" data-pay="${i.id}">Pay</button>`
++                            i.status !== "paid"
++                              ? `<button class="btn sm secondary" data-edit-inv="${i.id}">Edit</button>`
+                               : ""
+                           }
+                           ${
+                             i.status === "draft"
+-                              ? `<button class="btn sm" data-send-inv="${i.id}">Send</button>`
++                              ? `<button class="btn sm" data-send-inv="${i.id}">Send now</button>`
++                              : i.status !== "paid"
++                                ? `<button class="btn sm secondary" data-send-inv="${i.id}">Email</button>`
++                                : ""
++                          }
++                          ${
++                            i.status !== "paid" && i.status !== "draft"
++                              ? `<button class="btn sm secondary" data-pay="${i.id}">Pay</button>`
+                               : ""
+                           }
+                         </td>
+@@ -311,13 +332,21 @@ async function renderInvoices(filter = "all") {
+   appEl.querySelectorAll("[data-pay]").forEach((btn) =>
+     btn.addEventListener("click", () => openPaymentModal(+btn.dataset.pay))
+   );
++  const byId = Object.fromEntries(invoices.map((i) => [String(i.id), i]));
++  appEl.querySelectorAll("[data-edit-inv]").forEach((btn) =>
++    btn.addEventListener("click", () => {
++      const inv = byId[btn.dataset.editInv];
++      if (inv) openInvoiceModal(inv, () => renderInvoices(filter));
++    })
++  );
+   appEl.querySelectorAll("[data-send-inv]").forEach((btn) =>
+     btn.addEventListener("click", async () => {
++      btn.disabled = true;
+       try {
+-        const res = await api(`/api/invoices/${btn.dataset.sendInv}/send`, { method: "POST", body: "{}" });
+-        toast(res.emailed ? `Invoice emailed to ${res.client_email || "the client"}` : "Invoice sent");
++        await sendInvoiceNow(+btn.dataset.sendInv);
+         renderInvoices(filter);
+       } catch (err) {
++        btn.disabled = false;
+         toast(err.message || "Send failed", "error");
+       }
+     })
+@@ -325,7 +354,8 @@ async function renderInvoices(filter = "all") {
  }
  
  async function renderInvoiceDetail(id) {
@@ -2069,10 +2296,13 @@ index 888328c..9a12f6a 100644
    appEl.innerHTML = `
      ${topbar({
        eyebrow: "Invoice",
-@@ -334,10 +335,24 @@ async function renderInvoiceDetail(id) {
+@@ -333,11 +363,26 @@ async function renderInvoiceDetail(id) {
+       subtitle: `${inv.title} · ${inv.client_name}`,
        actions: `
          <button class="btn secondary" data-go="#/invoices">Back</button>
-         ${inv.status === "draft" ? `<button class="btn" id="btn-send">Send invoice</button>` : `<button class="btn secondary" id="btn-send">Email invoice</button>`}
+-        ${inv.status === "draft" ? `<button class="btn" id="btn-send">Send invoice</button>` : `<button class="btn secondary" id="btn-send">Email invoice</button>`}
++        ${inv.status !== "paid" ? `<button class="btn secondary" id="btn-edit">Edit</button>` : ""}
++        ${inv.status === "draft" ? `<button class="btn" id="btn-send">Send now</button>` : `<button class="btn secondary" id="btn-send">Email invoice</button>`}
 +        <a class="btn secondary" href="/api/invoices/${id}/pdf">Download PDF</a>
          ${inv.status !== "paid" && inv.status !== "draft" ? `<button class="btn" id="btn-pay">Record payment</button>` : ""}
          ${inv.status === "overdue" || inv.status === "partial" ? `<button class="btn danger" id="btn-final">Final notice</button>` : ""}
@@ -2094,7 +2324,156 @@ index 888328c..9a12f6a 100644
      <div class="grid-kpi">
        <div class="kpi"><div class="kpi-label">Amount</div><div class="kpi-value">${money(inv.amount)}</div></div>
        <div class="kpi"><div class="kpi-label">Paid</div><div class="kpi-value">${money(inv.amount_paid)}</div></div>
-@@ -642,7 +657,7 @@ async function renderTemplates() {
+@@ -400,12 +445,17 @@ async function renderInvoiceDetail(id) {
+     </div>
+   `;
+   wireCommon(appEl);
+-  appEl.querySelector("#btn-send")?.addEventListener("click", async () => {
++  appEl.querySelector("#btn-edit")?.addEventListener("click", () =>
++    openInvoiceModal(inv, () => renderInvoiceDetail(id))
++  );
++  appEl.querySelector("#btn-send")?.addEventListener("click", async (e) => {
++    const btn = e.currentTarget;
++    btn.disabled = true;
+     try {
+-      const res = await api(`/api/invoices/${id}/send`, { method: "POST", body: "{}" });
+-      toast(res.emailed ? `Invoice emailed to ${res.client_email || "the client"}` : "Invoice sent");
++      await sendInvoiceNow(id);
+       renderInvoiceDetail(id);
+     } catch (err) {
++      btn.disabled = false;
+       toast(err.message || "Send failed", "error");
+     }
+   });
+@@ -421,50 +471,109 @@ async function renderInvoiceDetail(id) {
+   });
+ }
+ 
+-async function openInvoiceModal() {
++async function openInvoiceModal(existing = null, after = null) {
+   const clients = await api("/api/clients");
+   const today = new Date().toISOString().slice(0, 10);
+-  const due = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);
++  const defaultDue = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);
++  const isEdit = Boolean(existing && existing.id);
++  const isDraft = !isEdit || existing.status === "draft";
++  const saveLabel = isEdit ? "Save" : "Save draft";
++  const sendLabel = isEdit && !isDraft ? "Save & email" : "Send now";
++  const lead = isEdit
++    ? isDraft
++      ? "Update this invoice, then send now or send it from the Invoices page."
++      : "Save changes for the next PDF, or save and email the updated invoice."
++    : "Save as a draft and send later from Invoices, or send now to email the client a PDF.";
++  const issueVal = existing?.issue_date ? String(existing.issue_date).slice(0, 10) : today;
++  const dueVal = existing?.due_date ? String(existing.due_date).slice(0, 10) : defaultDue;
++  const selectedClient = existing ? String(existing.client_id) : "";
+   openModal({
+-    title: "New invoice",
+-    lead: "Create an invoice. Send now emails the client and schedules reminders.",
++    title: isEdit ? `Edit ${esc(existing.number)}` : "New invoice",
++    lead,
+     body: `
+       <form id="inv-form" class="form-grid">
+         <div class="field"><label>Client</label>
+           <select name="client_id" required>
+             <option value="">Select client…</option>
+-            ${clients.map((c) => `<option value="${c.id}">${c.name}${c.company ? ` · ${c.company}` : ""}</option>`).join("")}
++            ${clients
++              .map(
++                (c) =>
++                  `<option value="${c.id}" ${String(c.id) === selectedClient ? "selected" : ""}>${esc(c.name)}${
++                    c.company ? ` · ${esc(c.company)}` : ""
++                  }</option>`
++              )
++              .join("")}
+           </select>
+         </div>
+-        <div class="field"><label>Amount</label><input name="amount" type="number" min="0.01" step="0.01" required placeholder="0.00" /></div>
+-        <div class="field full"><label>Title / description</label><input name="title" required placeholder="Job or service description" /></div>
+-        <div class="field"><label>Issue date</label><input name="issue_date" type="date" value="${today}" /></div>
+-        <div class="field"><label>Due date</label><input name="due_date" type="date" value="${due}" /></div>
+-        <div class="field"><label>Status</label>
+-          <select name="status"><option value="draft">Save as draft</option><option value="sent">Email to client now</option></select>
++        <div class="field"><label>Amount</label>
++          <input name="amount" type="number" min="0.01" step="0.01" required placeholder="0.00"
++            value="${existing ? esc(existing.amount) : ""}" />
++        </div>
++        <div class="field full"><label>Title / description</label>
++          <input name="title" required placeholder="Job or service description" value="${esc(existing?.title || "")}" />
++        </div>
++        <div class="field"><label>Issue date</label><input name="issue_date" type="date" value="${issueVal}" /></div>
++        <div class="field"><label>Due date</label><input name="due_date" type="date" value="${dueVal}" /></div>
++        <div class="field full"><label>Notes</label>
++          <input name="notes" placeholder="Optional" value="${esc(existing?.notes || "")}" />
+         </div>
+-        <div class="field"><label>Notes</label><input name="notes" placeholder="Optional" /></div>
++        <p class="field full muted" style="margin:0">Need to email later? Save the draft, then use <strong>Send now</strong> on the Invoices page.</p>
+         <div class="modal-actions field full">
+           <button type="button" class="btn secondary" id="m-cancel">Cancel</button>
+-          <button type="submit" class="btn">Create</button>
++          <button type="submit" class="btn secondary" id="m-save" data-intent="save">${saveLabel}</button>
++          <button type="submit" class="btn" id="m-send" data-intent="send">${sendLabel}</button>
+         </div>
+       </form>
+     `,
+     onMount: (modal) => {
+       modal.querySelector("#m-cancel").onclick = closeModal;
++      let intent = "save";
++      modal.querySelectorAll("[data-intent]").forEach((btn) => {
++        btn.addEventListener("click", () => {
++          intent = btn.dataset.intent;
++        });
++      });
+       modal.querySelector("#inv-form").onsubmit = async (e) => {
+         e.preventDefault();
+         const fd = new FormData(e.target);
+         const payload = Object.fromEntries(fd.entries());
+         payload.client_id = +payload.client_id;
+         payload.amount = +payload.amount;
++        const sendNow = intent === "send";
++        const saveBtn = modal.querySelector("#m-save");
++        const sendBtn = modal.querySelector("#m-send");
++        saveBtn.disabled = true;
++        sendBtn.disabled = true;
+         try {
+-          const inv = await api("/api/invoices", { method: "POST", body: JSON.stringify(payload) });
+-          closeModal();
+-          toast(inv.emailed ? `Emailed ${inv.number} to ${inv.client_email || "the client"}` : `Created ${inv.number}`);
+-          location.hash = `#/invoices/${inv.id}`;
++          let inv;
++          if (isEdit) {
++            payload.send = sendNow;
++            inv = await api(`/api/invoices/${existing.id}`, {
++              method: "PUT",
++              body: JSON.stringify(payload),
++            });
++            closeModal();
++            toast(
++              inv.emailed
++                ? `Saved and emailed ${inv.number} to ${inv.client_email || "the client"}`
++                : `Saved ${inv.number}`
++            );
++          } else {
++            payload.status = sendNow ? "sent" : "draft";
++            inv = await api("/api/invoices", { method: "POST", body: JSON.stringify(payload) });
++            closeModal();
++            toast(
++              inv.emailed
++                ? `Emailed ${inv.number} to ${inv.client_email || "the client"}`
++                : `Saved ${inv.number} as a draft — send it from Invoices when ready`
++            );
++          }
++          if (typeof after === "function") after(inv);
++          else location.hash = `#/invoices/${inv.id}`;
+         } catch (err) {
+-          toast(err.message || "Could not create invoice", "error");
++          saveBtn.disabled = false;
++          sendBtn.disabled = false;
++          toast(err.message || (isEdit ? "Could not save invoice" : "Could not create invoice"), "error");
+         }
+       };
+     },
+@@ -642,7 +751,7 @@ async function renderTemplates() {
      ${topbar({
        eyebrow: "Workspace",
        title: "Message templates",
@@ -2202,7 +2581,7 @@ index 0000000..413c214
 +if __name__ == "__main__":
 +    unittest.main()
 diff --git a/tests/test_invoice_send.py b/tests/test_invoice_send.py
-index 7b6856c..57eca11 100644
+index 7b6856c..65560c9 100644
 --- a/tests/test_invoice_send.py
 +++ b/tests/test_invoice_send.py
 @@ -105,6 +105,12 @@ class InvoiceSendTests(unittest.TestCase):
@@ -2236,6 +2615,67 @@ index 7b6856c..57eca11 100644
  
      def test_missing_client_email_blocks_send(self) -> None:
          no_mail = self.client.post("/api/clients", json={"name": "No Email Co"})
+@@ -139,6 +156,60 @@ class InvoiceSendTests(unittest.TestCase):
+         still = self.client.get(f"/api/invoices/{inv['id']}").get_json()
+         self.assertEqual(still["status"], "draft")
+ 
++    def test_update_draft_then_send(self) -> None:
++        inv = self._create_draft()
++        res = self.client.put(
++            f"/api/invoices/{inv['id']}",
++            json={
++                "title": "Spring cleanup + mulch",
++                "amount": 275,
++                "notes": "Updated after walkthrough",
++            },
++        )
++        self.assertEqual(res.status_code, 200, res.get_json())
++        body = res.get_json()
++        self.assertEqual(body["title"], "Spring cleanup + mulch")
++        self.assertEqual(body["amount"], 275)
++        self.assertEqual(body["notes"], "Updated after walkthrough")
++        self.assertEqual(body["status"], "draft")
++        self.assertFalse(body.get("emailed"))
++
++        with patch("app.routes.send_email", return_value={"provider": "smtp", "id": None}) as send:
++            sent = self.client.post(f"/api/invoices/{inv['id']}/send", json={})
++            self.assertEqual(sent.status_code, 200, sent.get_json())
++            out = sent.get_json()
++            self.assertTrue(out["emailed"])
++            self.assertEqual(out["status"], "sent")
++            self.assertIn("Spring cleanup + mulch", send.call_args.kwargs["body"])
++            self.assertIn("$275.00", send.call_args.kwargs["body"])
++
++    def test_update_with_send_emails_and_marks_sent(self) -> None:
++        inv = self._create_draft()
++        with patch("app.routes.send_email", return_value={"provider": "smtp", "id": None}) as send:
++            res = self.client.put(
++                f"/api/invoices/{inv['id']}",
++                json={"title": "Patio reset", "amount": 400, "send": True},
++            )
++            self.assertEqual(res.status_code, 200, res.get_json())
++            body = res.get_json()
++            self.assertTrue(body["emailed"])
++            self.assertEqual(body["status"], "sent")
++            self.assertEqual(body["title"], "Patio reset")
++            send.assert_called_once()
++            self.assertIn("Patio reset", send.call_args.kwargs["body"])
++            self.assertIn("$400.00", send.call_args.kwargs["body"])
++
++    def test_update_rejects_empty_title_and_zero_amount(self) -> None:
++        inv = self._create_draft()
++        bad_title = self.client.put(f"/api/invoices/{inv['id']}", json={"title": "   "})
++        self.assertEqual(bad_title.status_code, 400)
++        bad_amt = self.client.put(f"/api/invoices/{inv['id']}", json={"amount": 0})
++        self.assertEqual(bad_amt.status_code, 400)
++        still = self.client.get(f"/api/invoices/{inv['id']}").get_json()
++        self.assertEqual(still["title"], "Spring cleanup")
++        self.assertEqual(still["amount"], 250)
++        self.assertEqual(still["status"], "draft")
++
+     def test_invoice_template_is_present(self) -> None:
+         res = self.client.get("/api/templates")
+         self.assertEqual(res.status_code, 200)
 diff --git a/tests/test_ubuntu_perms.py b/tests/test_ubuntu_perms.py
 new file mode 100644
 index 0000000..d4e38a9

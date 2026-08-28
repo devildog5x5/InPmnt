@@ -344,7 +344,8 @@ async function renderInvoices(filter = "all") {
       btn.disabled = true;
       try {
         await sendInvoiceNow(+btn.dataset.sendInv);
-        renderInvoices(filter);
+        // Leave the draft filter so the newly sent invoice stays visible.
+        renderInvoices(filter === "draft" ? "all" : filter);
       } catch (err) {
         btn.disabled = false;
         toast(err.message || "Send failed", "error");
