@@ -1,0 +1,42 @@
+---
+description: Always verify Linux/Ubuntu file permissions (Apache www-data) before finishing PHP, static, patch, or zip work.
+alwaysApply: true
+---
+
+# Always check Ubuntu / Linux permissions
+
+Before you finish any change that touches **PHP**, **static assets**, **patches**, **Hostinger drops**, or **release zips**, check permissions the way Ubuntu Apache (`www-data`) sees them. Do not skip this because the files look fine on the agent VM.
+
+## Required layout
+
+| Path | Mode | Why |
+|------|------|-----|
+| Directories | `755` | Apache must traverse (`+x`) or the site is **403** |
+| PHP / JS / CSS / images | `644` | Apache must read; Hostinger **500s** on world-writable (`777`) PHP |
+| Shell scripts (`*.sh`) | `755` | `sudo bash fix-ubuntu-perms.sh` |
+| `data/` | `775` | SQLite + WAL; `755` owned by `ubuntu` → HTTP **500** |
+| `data/*.db` | `664` | www-data must write |
+| `.env` | `640` | readable by the app user, not world-readable |
+| Document root | **not** `700` | `umask 077 mkdir` → **403 Forbidden** |
+
+**Never** “fix” Ubuntu with `chmod -R 777`.
+
+## What to run
+
+```bash
+bash scripts/check-ubuntu-perms.sh
+```
+
+That script must pass. It checks the working tree, the invoice logo (`static/img/inpmnt-logo-invoice.jpg` world-readable), and `patches/inpmnt-hostinger-changed.tar.gz` (dirs `755`, files `644`, scripts `755`).
+
+On a real Ubuntu Apache docroot after unzip:
+
+```bash
+sudo bash /var/www/html/fix-ubuntu-perms.sh
+```
+
+## Packaging
+
+- Hostinger tarballs: `umask 022`, `chmod` 755/644 (then `755` on `*.sh`), `tar --numeric-owner --owner=0 --group=0`.
+- After regenerating patches, re-run `scripts/check-ubuntu-perms.sh`.
+- Windows `Compress-Archive` zips can extract as `777` or unreadable on Ubuntu — do not ship those without a Unix-mode packer or the fix script.

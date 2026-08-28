@@ -39,11 +39,21 @@ git show HEAD:php/.env.example > "$stage/.env.example"
 git show HEAD:static/js/app.js > "$stage/static/js/app.js"
 git show HEAD:static/css/app.css > "$stage/static/css/app.css"
 git show HEAD:static/img/inpmnt-logo-invoice.jpg > "$stage/static/img/inpmnt-logo-invoice.jpg"
-git show HEAD:php/src/inpmnt-logo-invoice.jpg > "$stage/src/inpmnt-logo-invoice.jpg"
+if git cat-file -e HEAD:php/src/inpmnt-logo-invoice.jpg 2>/dev/null; then
+  git show HEAD:php/src/inpmnt-logo-invoice.jpg > "$stage/src/inpmnt-logo-invoice.jpg"
+fi
+if git cat-file -e HEAD:php/fix-ubuntu-perms.sh 2>/dev/null; then
+  git show HEAD:php/fix-ubuntu-perms.sh > "$stage/fix-ubuntu-perms.sh"
+fi
 find "$stage" -type d -exec chmod 755 {} \;
 find "$stage" -type f -exec chmod 644 {} \;
+if [[ -f "$stage/fix-ubuntu-perms.sh" ]]; then
+  chmod 755 "$stage/fix-ubuntu-perms.sh"
+fi
 ( cd "$stage" && tar --numeric-owner --owner=0 --group=0 --format=ustar --sort=name \
     -czf "$Root/patches/inpmnt-hostinger-changed.tar.gz" . )
+
+python3 "$Root/scripts/pack_php_zip.py"
 
 zip_stage="$(mktemp -d)"
 mkdir -p "$zip_stage/inpmnt-ubuntu-patches"
@@ -52,6 +62,7 @@ cp "$Root/patches/001-mail-smtp-fallback.patch" \
    "$Root/patches/003-invoice-pdf.patch" \
    "$Root/patches/inpmnt-mail-invoice-ubuntu.patch" \
    "$Root/patches/inpmnt-hostinger-changed.tar.gz" \
+   "$Root/patches/InPmnt-PHP.zip" \
    "$Root/patches/README.md" \
    "$zip_stage/inpmnt-ubuntu-patches/"
 chmod 644 "$zip_stage/inpmnt-ubuntu-patches"/*
@@ -63,4 +74,11 @@ chmod 644 "$zip_stage/inpmnt-ubuntu-patches"/*
 
 chmod 644 patches/*.patch patches/*.tar.gz patches/*.zip patches/README.md
 chmod 755 patches/make-ubuntu-archives.sh
+if [[ -f php/fix-ubuntu-perms.sh ]]; then
+  chmod 755 php/fix-ubuntu-perms.sh
+fi
+if [[ -f scripts/check-ubuntu-perms.sh ]]; then
+  chmod 755 scripts/check-ubuntu-perms.sh
+  bash scripts/check-ubuntu-perms.sh
+fi
 echo "Wrote patches/ (mail $mail_commit invoice $invoice_commit)"

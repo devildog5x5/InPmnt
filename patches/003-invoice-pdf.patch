@@ -12,13 +12,14 @@ index 356e813..5130b20 100644
          0,
 diff --git a/app/invoice_pdf.py b/app/invoice_pdf.py
 new file mode 100644
-index 0000000..fe2cb93
+index 0000000..2f8d0e8
 --- /dev/null
 +++ b/app/invoice_pdf.py
-@@ -0,0 +1,401 @@
+@@ -0,0 +1,402 @@
 +"""Professional one-page invoice PDF (Helvetica + optional JPEG logo). No extra deps."""
 +from __future__ import annotations
 +
++import os
 +from pathlib import Path
 +from typing import Any
 +
@@ -80,7 +81,7 @@ index 0000000..fe2cb93
 +
 +def logo_path() -> Path | None:
 +    for p in _logo_candidates():
-+        if p.is_file():
++        if p.is_file() and os.access(p, os.R_OK):
 +            return p
 +    return None
 +
@@ -101,21 +102,24 @@ index 0000000..fe2cb93
 +    return out
 +
 +
-+def _jpeg_size(jpeg: bytes) -> tuple[int, int]:
-+    i = 2
-+    n = len(jpeg)
++def _jpeg_size(data: bytes) -> tuple[int, int]:
++    """Read SOF width/height from a baseline or progressive JPEG."""
++    i = 0
++    n = len(data)
 +    while i < n - 8:
-+        if jpeg[i] != 0xFF:
-+            break
-+        marker = jpeg[i + 1]
-+        if marker in (0xC0, 0xC1, 0xC2):
-+            h = int.from_bytes(jpeg[i + 5 : i + 7], "big")
-+            w = int.from_bytes(jpeg[i + 7 : i + 9], "big")
-+            return (w or 160, h or 160)
-+        seglen = int.from_bytes(jpeg[i + 2 : i + 4], "big")
-+        if seglen < 2:
-+            break
-+        i += 2 + seglen
++        if data[i] != 0xFF:
++            i += 1
++            continue
++        marker = data[i + 1]
++        if marker in (0xD8, 0xD9, 0x01) or 0xD0 <= marker <= 0xD7:
++            i += 2
++            continue
++        seglen = (data[i + 2] << 8) | data[i + 3]
++        if marker in (0xC0, 0xC1, 0xC2, 0xC3):
++            height = (data[i + 5] << 8) | data[i + 6]
++            width = (data[i + 7] << 8) | data[i + 8]
++            return width, height
++        i += 2 + max(seglen, 0)
 +    return 160, 160
 +
 +
@@ -138,7 +142,7 @@ index 0000000..fe2cb93
 +def logo_jpeg() -> tuple[bytes, int, int] | None:
 +    """Return (jpeg_bytes, width, height) for the InPmnt mark, or None."""
 +    for p in _logo_candidates():
-+        if not p.is_file():
++        if not p.is_file() or not os.access(p, os.R_OK):
 +            continue
 +        suffix = p.suffix.lower()
 +        if suffix in {".jpg", ".jpeg"}:
@@ -151,9 +155,13 @@ index 0000000..fe2cb93
 +            if converted:
 +                w, h = _jpeg_size(converted)
 +                return converted, w, h
++            sibling = p.with_name("inpmnt-logo-invoice.jpg")
++            if sibling.is_file() and os.access(sibling, os.R_OK):
++                raw = sibling.read_bytes()
++                if raw.startswith(b"\xff\xd8"):
++                    w, h = _jpeg_size(raw)
++                    return raw, w, h
 +    return None
-+
-+
 +def _money(n: float) -> str:
 +    return f"${n:,.2f}"
 +
@@ -255,41 +263,41 @@ index 0000000..fe2cb93
 +    website = str(data.get("website") or "")
 +    currency = str(data.get("currency") or "USD")
 +
-+    # Header
-+    fill_rect(0, H - 118, W, 118, "101920")
-+    fill_rect(0, H - 122, W, 4, "1a8a84")
++    # Letterhead: teal rule + company logo top-left on white (not a dark bar).
++    fill_rect(0, H - 8, W, 8, "0d6b66")
 +    jpeg = b""
 +    img_w = img_h = 0
++    logo_pt = 88.0
++    logo_x = 40.0
++    logo_y = 680.0  # 88pt tall → top at 768, 16pt under the teal rule
 +    logo = logo_jpeg()
 +    if logo:
 +        jpeg, img_w, img_h = logo
-+        ops.append("q 64 0 0 64 36 692 cm /Im1 Do Q")
-+    text(112 if jpeg else 48, 748, "InPmnt", size=16, bold=True, color="ffffff")
-+    text(112 if jpeg else 48, 730, "Get paid without the chase.", size=8, color="8a99a8")
-+    text_right(564, 748, "INVOICE", size=22, bold=True, color="5ee0d8")
-+    text_right(564, 728, number, size=12, bold=True, color="ffffff")
-+    text_right(564, 712, status, size=8, bold=True, color="1a8a84")
-+
-+    # Parties
-+    y_from = 650
-+    text(48, y_from, "FROM", size=8, bold=True, color="667888")
-+    text(320, y_from, "BILL TO", size=8, bold=True, color="667888")
-+    y_from -= 16
-+    y_to = y_from
-+    text(48, y_from, biz, size=12, bold=True)
-+    text(320, y_to, client, size=12, bold=True)
-+    y_from -= 14
-+    y_to -= 14
++        ops.append(f"q {logo_pt:.2f} 0 0 {logo_pt:.2f} {logo_x:.2f} {logo_y:.2f} cm /Im1 Do Q")
++    text_x = (logo_x + logo_pt + 16) if jpeg else 48.0
++    text(text_x, 752, biz, size=16, bold=True)
++    y_info = 732
 +    for line in (owner, biz_email, biz_phone, website):
 +        if line:
-+            text(48, y_from, line, size=9, color="2a3a48")
-+            y_from -= 12
++            text(text_x, y_info, line, size=9, color="2a3a48")
++            y_info -= 12
++    text_right(564, 752, "INVOICE", size=22, bold=True, color="0d6b66")
++    text_right(564, 732, number, size=12, bold=True)
++    text_right(564, 716, status, size=8, bold=True, color="1a8a84")
++    hline(40, 664, 532, "e2e8ee", 1.0)
++
++    # BILL TO — FROM is the letterhead (logo + business name)
++    y_to = 640
++    text(48, y_to, "BILL TO", size=8, bold=True, color="667888")
++    y_to -= 16
++    text(48, y_to, client, size=12, bold=True)
++    y_to -= 14
 +    if company:
-+        text(320, y_to, company, size=9, color="2a3a48")
++        text(48, y_to, company, size=9, color="2a3a48")
 +        y_to -= 12
 +    for line in (client_email, client_phone):
 +        if line:
-+            text(320, y_to, line, size=9, color="2a3a48")
++            text(48, y_to, line, size=9, color="2a3a48")
 +            y_to -= 12
 +
 +    # Meta strip
@@ -366,19 +374,12 @@ index 0000000..fe2cb93
 +            f"/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length {len(jpeg)} >>\n"
 +            f"stream\n".encode("ascii")
 +            + jpeg
-+            + b"\nendstream"
++            + b"endstream"
 +        )
 +        stream_num = 7
 +    else:
 +        stream_num = 6
-+    add(
-+        f"<< /Length {len(content_b)} >>\nstream\n".encode("ascii") + content_b + b"\nendstream"
-+    )
-+
-+    # Object numbers: 1 catalog, 2 pages, 3 page, 4 F1, 5 F2, [6 image], stream
-+    # If no jpeg, page Contents should be 6. Fix page object if no jpeg — already handled.
-+    # If jpeg, Contents 7 0 R — but we added catalog, pages, page, f1, f2, image, stream = 7. Good.
-+    # If no jpeg, objects: catalog, pages, page, f1, f2, stream = 6. Page says Contents 6. Good.
++    add(f"<< /Length {len(content_b)} >>\nstream\n".encode("ascii") + content_b + b"endstream")
 +
 +    out = bytearray(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
 +    offsets = [0]
@@ -386,7 +387,7 @@ index 0000000..fe2cb93
 +        offsets.append(len(out))
 +        out += f"{i} 0 obj\n".encode("ascii")
 +        out += obj
-+        if not obj.endswith(b"endstream"):
++        if not obj.endswith(b"\n"):
 +            out += b"\n"
 +        out += b"endobj\n"
 +    xref = len(out)
@@ -659,11 +660,79 @@ index a9879c9..3accabd 100644
  @bp.get("/api/invoices/<int:invoice_id>")
  @login_required
  def api_invoice(invoice_id: int):
+diff --git a/deploy/backup-db.sh b/deploy/backup-db.sh
+old mode 100644
+new mode 100755
+diff --git a/deploy/setup-vps.sh b/deploy/setup-vps.sh
+old mode 100644
+new mode 100755
+index cb9361f..9a29220
+--- a/deploy/setup-vps.sh
++++ b/deploy/setup-vps.sh
+@@ -37,6 +37,9 @@ if [[ ! -f .env ]]; then
+ fi
+ 
+ chown -R www-data:www-data "$APP_DIR"
++find "$APP_DIR" -type d -exec chmod 755 {} \;
++find "$APP_DIR" -type f -exec chmod 644 {} \;
++chmod 755 "$APP_DIR/docker-entrypoint.sh" "$APP_DIR/deploy/"*.sh 2>/dev/null || true
+ 
+ cp deploy/inpmnt.service /etc/systemd/system/inpmnt.service
+ sed "s/YOUR_DOMAIN/${DOMAIN}/g" deploy/nginx.inpmnt.conf > /etc/nginx/sites-available/inpmnt
+diff --git a/docker-entrypoint.sh b/docker-entrypoint.sh
+old mode 100644
+new mode 100755
 diff --git a/php/bootstrap.php b/php/bootstrap.php
-index da43bef..75acea1 100644
+index da43bef..19a80cb 100644
 --- a/php/bootstrap.php
 +++ b/php/bootstrap.php
-@@ -6,6 +6,7 @@ require $root . '/src/Env.php';
+@@ -1,11 +1,52 @@
+ <?php
+ declare(strict_types=1);
+ 
+-$root = dirname(__DIR__);
++function inpmnt_normalize_ubuntu_perms(string $root): void
++{
++    $data = $root . '/data';
++    if (!is_dir($data)) {
++        @mkdir($data, 0775, true);
++    }
++    if (is_dir($data)) {
++        @chmod($data, 0775);
++    }
++    foreach ([glob($root . '/*.php') ?: [], glob($root . '/src/*.php') ?: [], glob($root . '/views/*.php') ?: []] as $files) {
++        foreach ($files as $path) {
++            if (!is_file($path)) {
++                continue;
++            }
++            if ((fileperms($path) & 0002) === 0002) {
++                @chmod($path, 0644);
++            }
++        }
++    }
++    foreach (['/static/img/inpmnt-logo-invoice.jpg', '/static/img/inpmnt-icon.png'] as $rel) {
++        $logo = $root . $rel;
++        if (is_file($logo) && !is_readable($logo)) {
++            @chmod($logo, 0644);
++        }
++    }
++    $env = $root . '/.env';
++    if (is_file($env)) {
++        @chmod($env, 0640);
++    }
++}
++
++$root = __DIR__;
++if (!is_file($root . '/src/Env.php')) {
++    $alt = dirname(__DIR__);
++    if (is_file($alt . '/src/Env.php')) {
++        $root = $alt;
++    }
++}
++
++inpmnt_normalize_ubuntu_perms($root);
++
+ require $root . '/src/Env.php';
  require $root . '/src/Http.php';
  require $root . '/src/Db.php';
  require $root . '/src/Mail.php';
@@ -671,6 +740,64 @@ index da43bef..75acea1 100644
  require $root . '/src/Billing.php';
  require $root . '/src/Workspace.php';
  require $root . '/src/App.php';
+diff --git a/php/fix-ubuntu-perms.sh b/php/fix-ubuntu-perms.sh
+new file mode 100755
+index 0000000..5ce4bce
+--- /dev/null
++++ b/php/fix-ubuntu-perms.sh
+@@ -0,0 +1,52 @@
++#!/bin/bash
++# Ubuntu Apache: unzip then run this as root from the document root.
++#   sudo bash /var/www/html/fix-ubuntu-perms.sh
++#
++# Verified layout on Ubuntu 24.04 / Apache 2.4.58 as www-data:
++#   dirs 755, files 644, data/ 775 → homepage works, SQLite can create
++#   document root 700 owned by ubuntu → 403 Forbidden
++#   chmod -R 777 → not required (and Hostinger can 500 on 777 PHP)
++set -euo pipefail
++ROOT="$(cd "$(dirname "$0")" && pwd)"
++USER_NAME="${1:-www-data}"
++GROUP_NAME="${2:-www-data}"
++
++if [ "$(id -u)" -ne 0 ]; then
++  echo "Run with sudo: sudo bash $0"
++  exit 1
++fi
++
++mkdir -p "$ROOT/data" "$ROOT/static/img"
++chown -R "$USER_NAME:$GROUP_NAME" "$ROOT"
++find "$ROOT" -type d -exec chmod 755 {} \;
++find "$ROOT" -type f -exec chmod 644 {} \;
++chmod 775 "$ROOT/data"
++if [ -f "$ROOT/.env" ]; then
++  chmod 640 "$ROOT/.env"
++fi
++if [ -f "$ROOT/fix-ubuntu-perms.sh" ]; then
++  chmod 755 "$ROOT/fix-ubuntu-perms.sh"
++fi
++# Invoice letterhead JPEG must be world-readable or the PDF has no logo.
++if [ -f "$ROOT/static/img/inpmnt-logo-invoice.jpg" ]; then
++  chmod 644 "$ROOT/static/img/inpmnt-logo-invoice.jpg"
++fi
++if [ -f "$ROOT/src/inpmnt-logo-invoice.jpg" ]; then
++  chmod 644 "$ROOT/src/inpmnt-logo-invoice.jpg"
++fi
++if [ -f "$ROOT/static/img/inpmnt-icon.png" ]; then
++  chmod 644 "$ROOT/static/img/inpmnt-icon.png"
++fi
++if compgen -G "$ROOT/data/*.db" >/dev/null; then
++  chmod 664 "$ROOT/data/"*.db
++  chown "$USER_NAME:$GROUP_NAME" "$ROOT/data/"*.db
++fi
++
++echo "OK: $ROOT"
++echo "  owner  $USER_NAME:$GROUP_NAME"
++echo "  dirs   755"
++echo "  files  644  (PHP is not 777)"
++echo "  data/  775  (SQLite + WAL)"
++echo "  logo   static/img/inpmnt-logo-invoice.jpg 644"
++echo "Reload Apache if needed: sudo systemctl reload apache2"
++echo "Open: http://YOUR-SERVER/index.php"
 diff --git a/php/src/App.php b/php/src/App.php
 index 5ab2c2c..56e8b00 100644
 --- a/php/src/App.php
@@ -744,10 +871,20 @@ index 5ab2c2c..56e8b00 100644
                  Http::json(['error' => $e->getMessage()], 502);
              }
 diff --git a/php/src/Db.php b/php/src/Db.php
-index dddd223..0ce4d3c 100644
+index dddd223..878ef35 100644
 --- a/php/src/Db.php
 +++ b/php/src/Db.php
-@@ -160,7 +160,7 @@ final class Db
+@@ -22,6 +22,9 @@ final class Db
+         if (!is_dir($dir)) {
+             mkdir($dir, 0775, true);
+         }
++        if (is_dir($dir)) {
++            @chmod($dir, 0775);
++        }
+         $pdo = new PDO('sqlite:' . $path, null, null, [
+             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+@@ -160,7 +163,7 @@ final class Db
      {
          return [
              ['Invoice', 'email', 'Invoice {{number}} from {{business_name}}',
@@ -780,10 +917,10 @@ index b065039..96a216f 100644
          http_response_code($status);
 diff --git a/php/src/InvoicePdf.php b/php/src/InvoicePdf.php
 new file mode 100644
-index 0000000..c79198f
+index 0000000..dfa3bd1
 --- /dev/null
 +++ b/php/src/InvoicePdf.php
-@@ -0,0 +1,410 @@
+@@ -0,0 +1,417 @@
 +<?php
 +declare(strict_types=1);
 +
@@ -836,44 +973,44 @@ index 0000000..c79198f
 +        $website = (string) ($data['website'] ?? '');
 +        $currency = (string) ($data['currency'] ?? 'USD');
 +
-+        $fill(0, $H - 118, $W, 118, '101920');
-+        $fill(0, $H - 122, $W, 4, '1a8a84');
++        $fill(0, $H - 8, $W, 8, '0d6b66');
 +
 +        $jpeg = self::logoJpeg();
 +        $imgW = 160;
 +        $imgH = 160;
++        $logoPt = 88.0;
++        $logoX = 40.0;
++        $logoY = 680.0;
 +        if ($jpeg !== null) {
 +            [$imgW, $imgH] = self::jpegSize($jpeg);
-+            $ops[] = 'q 64 0 0 64 36 692 cm /Im1 Do Q';
++            $ops[] = sprintf('q %.2f 0 0 %.2f %.2f %.2f cm /Im1 Do Q', $logoPt, $logoPt, $logoX, $logoY);
 +        }
-+        $text($jpeg !== null ? 112.0 : 48.0, 748, 'InPmnt', 16, true, 'ffffff');
-+        $text($jpeg !== null ? 112.0 : 48.0, 730, 'Get paid without the chase.', 8, false, '8a99a8');
-+        $textRight(564, 748, 'INVOICE', 22, true, '5ee0d8');
-+        $textRight(564, 728, $number, 12, true, 'ffffff');
-+        $textRight(564, 712, $status, 8, true, '1a8a84');
-+
-+        $yFrom = 650.0;
-+        $text(48, $yFrom, 'FROM', 8, true, '667888');
-+        $text(320, $yFrom, 'BILL TO', 8, true, '667888');
-+        $yFrom -= 16;
-+        $yTo = $yFrom;
-+        $text(48, $yFrom, $biz, 12, true);
-+        $text(320, $yTo, $client, 12, true);
-+        $yFrom -= 14;
-+        $yTo -= 14;
++        $textX = $jpeg !== null ? ($logoX + $logoPt + 16) : 48.0;
++        $text($textX, 752, $biz, 16, true);
++        $yInfo = 732.0;
 +        foreach ([$owner, $bizEmail, $bizPhone, $website] as $line) {
 +            if ($line !== '') {
-+                $text(48, $yFrom, $line, 9, false, '2a3a48');
-+                $yFrom -= 12;
++                $text($textX, $yInfo, $line, 9, false, '2a3a48');
++                $yInfo -= 12;
 +            }
 +        }
++        $textRight(564, 752, 'INVOICE', 22, true, '0d6b66');
++        $textRight(564, 732, $number, 12, true);
++        $textRight(564, 716, $status, 8, true, '1a8a84');
++        $fill(40, 664, 532, 1.0, 'e2e8ee');
++
++        $yTo = 640.0;
++        $text(48, $yTo, 'BILL TO', 8, true, '667888');
++        $yTo -= 16;
++        $text(48, $yTo, $client, 12, true);
++        $yTo -= 14;
 +        if ($company !== '') {
-+            $text(320, $yTo, $company, 9, false, '2a3a48');
++            $text(48, $yTo, $company, 9, false, '2a3a48');
 +            $yTo -= 12;
 +        }
 +        foreach ([$clientEmail, $clientPhone] as $line) {
 +            if ($line !== '') {
-+                $text(320, $yTo, $line, 9, false, '2a3a48');
++                $text(48, $yTo, $line, 9, false, '2a3a48');
 +                $yTo -= 12;
 +            }
 +        }
@@ -936,9 +1073,9 @@ index 0000000..c79198f
 +        if ($jpeg !== null) {
 +            $objects[] = '<< /Type /XObject /Subtype /Image /Width ' . $imgW . ' /Height ' . $imgH
 +                . ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' . strlen($jpeg)
-+                . " >>\nstream\n" . $jpeg . "\nendstream";
++                . " >>\nstream\n" . $jpeg . 'endstream';
 +        }
-+        $objects[] = '<< /Length ' . strlen($contentB) . " >>\nstream\n" . $contentB . "\nendstream";
++        $objects[] = '<< /Length ' . strlen($contentB) . " >>\nstream\n" . $contentB . 'endstream';
 +
 +        $out = "%PDF-1.4\n%\xE2\xE3\xCF\xD3\n";
 +        $offsets = [0];
@@ -946,7 +1083,7 @@ index 0000000..c79198f
 +            $offsets[] = strlen($out);
 +            $n = $i + 1;
 +            $out .= "{$n} 0 obj\n" . $obj;
-+            if (!str_ends_with($obj, 'endstream')) {
++            if (!str_ends_with($obj, "\n")) {
 +                $out .= "\n";
 +            }
 +            $out .= "endobj\n";
@@ -1039,7 +1176,7 @@ index 0000000..c79198f
 +    public static function logoPath(): ?string
 +    {
 +        foreach (self::logoCandidates() as $p) {
-+            if (is_file($p)) {
++            if (is_file($p) && is_readable($p)) {
 +                return $p;
 +            }
 +        }
@@ -1049,7 +1186,7 @@ index 0000000..c79198f
 +    private static function logoJpeg(): ?string
 +    {
 +        foreach (self::logoCandidates() as $p) {
-+            if (!is_file($p)) {
++            if (!is_file($p) || !is_readable($p)) {
 +                continue;
 +            }
 +            $raw = file_get_contents($p);
@@ -1061,6 +1198,13 @@ index 0000000..c79198f
 +                $jpeg = self::pngToJpeg($raw);
 +                if ($jpeg !== null) {
 +                    return $jpeg;
++                }
++                $sibling = dirname($p) . '/inpmnt-logo-invoice.jpg';
++                if (is_file($sibling) && is_readable($sibling)) {
++                    $alt = file_get_contents($sibling);
++                    if (is_string($alt) && str_starts_with($alt, "\xFF\xD8")) {
++                        return $alt;
++                    }
 +                }
 +                continue;
 +            }
@@ -1500,6 +1644,337 @@ zqROM+|KDGdB~nZBk;*bQX{YCqNnuM?<W_ECUjX;P(wM61qxpY!-v2*{UQYZMlH3|R
 literal 0
 HcmV?d00001
 
+diff --git a/scripts/check-ubuntu-perms.sh b/scripts/check-ubuntu-perms.sh
+new file mode 100755
+index 0000000..c435aa4
+--- /dev/null
++++ b/scripts/check-ubuntu-perms.sh
+@@ -0,0 +1,136 @@
++#!/usr/bin/env bash
++# Fail if Linux/Ubuntu modes are wrong for Apache (www-data).
++# Dirs 755, files 644, scripts 755, invoice logo world-readable.
++set -euo pipefail
++
++Root="$(cd "$(dirname "$0")/.." && pwd)"
++cd "$Root"
++fail=0
++
++note() { echo "PERM $*" >&2; fail=1; }
++
++mode_of() { stat -c '%a' "$1"; }
++
++# World-readable: other-read bit (004).
++world_readable() {
++  local m
++  m=$(stat -c '%a' "$1")
++  local last="${m: -1}"
++  [[ "$last" == "4" || "$last" == "5" || "$last" == "6" || "$last" == "7" ]]
++}
++
++check_tree() {
++  local base="$1"
++  [[ -d "$base" ]] || return 0
++  while IFS= read -r -d '' d; do
++    local m
++    m=$(mode_of "$d")
++    if [[ "$d" == */data && ( "$m" == "755" || "$m" == "775" ) ]]; then
++      continue
++    fi
++    if [[ "$m" != "755" ]]; then
++      note "DIR $d is $m, want 755"
++    fi
++  done < <(find "$base" -type d -print0)
++
++  while IFS= read -r -d '' f; do
++    case "$f" in
++      *.db|*/.env) continue ;;
++    esac
++    local m want="644"
++    m=$(mode_of "$f")
++    if [[ "$f" == *.sh ]]; then
++      want="755"
++    fi
++    if [[ "$m" != "$want" ]]; then
++      note "FILE $f is $m, want $want"
++    fi
++  done < <(find "$base" -type f -print0)
++}
++
++check_tree php
++check_tree static
++check_tree scripts
++check_tree patches
++
++for sh in deploy/setup-vps.sh deploy/backup-db.sh docker-entrypoint.sh patches/make-ubuntu-archives.sh php/fix-ubuntu-perms.sh scripts/check-ubuntu-perms.sh; do
++  if [[ -f "$sh" ]]; then
++    m=$(mode_of "$sh")
++    if [[ "$m" != "755" ]]; then
++      note "$sh is $m, want 755"
++    fi
++  fi
++done
++
++logo="static/img/inpmnt-logo-invoice.jpg"
++if [[ ! -f "$logo" ]]; then
++  note "missing $logo (invoice PDF has no company logo)"
++elif ! world_readable "$logo"; then
++  note "$logo is $(mode_of "$logo") — www-data cannot read it (want 644)"
++fi
++
++icon="static/img/inpmnt-icon.png"
++if [[ -f "$icon" ]] && ! world_readable "$icon"; then
++  note "$icon is $(mode_of "$icon") — www-data cannot read it (want 644)"
++fi
++
++# PHP must not be world-writable (Hostinger 500 on 777).
++while IFS= read -r -d '' f; do
++  m=$(mode_of "$f")
++  last="${m: -1}"
++  if [[ "$last" == "2" || "$last" == "3" || "$last" == "6" || "$last" == "7" ]]; then
++    note "PHP $f is world-writable ($m) — set 644"
++  fi
++done < <(find php -name '*.php' -type f -print0)
++
++tar="patches/inpmnt-hostinger-changed.tar.gz"
++if [[ -f "$tar" ]]; then
++  python3 - "$tar" <<'PY' || fail=1
++import sys
++import tarfile
++
++path = sys.argv[1]
++needed = {
++    "./static/img/inpmnt-logo-invoice.jpg",
++    "./src/inpmnt-logo-invoice.jpg",
++    "./src/InvoicePdf.php",
++    "./static/js/app.js",
++    "./static/css/app.css",
++    "./fix-ubuntu-perms.sh",
++}
++found = set()
++bad = False
++with tarfile.open(path, "r:gz") as tf:
++    for m in tf.getmembers():
++        name = m.name if m.name.startswith("./") else "./" + m.name.lstrip("/")
++        found.add(name)
++        mode = m.mode & 0o777
++        if m.isdir():
++            if mode != 0o755:
++                print(f"PERM TAR DIR {m.name} is {mode:03o}, want 755", file=sys.stderr)
++                bad = True
++            continue
++        if m.isfile():
++            want = 0o755 if m.name.endswith(".sh") else 0o644
++            if mode != want:
++                print(f"PERM TAR FILE {m.name} is {mode:03o}, want {want:03o}", file=sys.stderr)
++                bad = True
++missing = needed - found
++# tar may store without ./
++if missing:
++    found2 = {n[2:] if n.startswith("./") else n for n in found}
++    missing = {n for n in needed if n not in found and n[2:] not in found2}
++if missing:
++    print("PERM TAR missing: " + ", ".join(sorted(missing)), file=sys.stderr)
++    bad = True
++sys.exit(1 if bad else 0)
++PY
++else
++  note "missing $tar"
++fi
++
++if [[ "$fail" -ne 0 ]]; then
++  echo "Ubuntu permission check FAILED." >&2
++  exit 1
++fi
++echo "Ubuntu permission check OK (dirs 755, files 644, scripts 755, logo readable)."
+diff --git a/scripts/pack_php_zip.py b/scripts/pack_php_zip.py
+new file mode 100644
+index 0000000..d43818d
+--- /dev/null
++++ b/scripts/pack_php_zip.py
+@@ -0,0 +1,116 @@
++#!/usr/bin/env python3
++"""Pack InPmnt-PHP.zip with Unix modes (dirs 755, files 644, scripts 755)."""
++from __future__ import annotations
++
++import os
++import stat
++import zipfile
++from datetime import datetime
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parent.parent
++OUT = ROOT / "patches" / "InPmnt-PHP.zip"
++
++SKIP_NAMES = {".env", ".DS_Store"}
++SKIP_SUFFIXES = {".db"}
++
++HOSTINGER_TXT = """InPmnt PHP — Hostinger / Ubuntu Apache
++========================================
++Unzip ALL of these files into public_html (or /var/www/html). Do not overwrite a live .env.
++
++1. Copy .env.example to .env and set APP_SECRET and BASE_URL=https://yourdomain.com
++2. Email: SMTP_HOST=smtp.hostinger.com SMTP_PORT=465 SMTP_SSL=1
++   SMTP_USER and MAIL_FROM = your Hostinger mailbox, plus SMTP_PASSWORD.
++3. hPanel → PHP 8.2+ and pdo_sqlite
++4. Ubuntu Apache (not Hostinger File Manager):
++     sudo bash fix-ubuntu-perms.sh
++   dirs 755, files 644, data/ 775, logo 644. Never chmod -R 777.
++5. Open https://yourdomain.com → Sign up
++6. Settings → Email delivery → Send test email
++
++This zip includes branded invoice PDFs (company logo top-left letterhead),
++invoice email on Send, SMTP fallback, and the invoice JPEG next to InvoicePdf.php.
++"""
++
++
++def unix_attr(mode: int, *, directory: bool) -> int:
++    kind = stat.S_IFDIR if directory else stat.S_IFREG
++    return (kind | (mode & 0o777)) << 16
++
++
++def zipinfo(arcname: str, mode: int, *, directory: bool = False) -> zipfile.ZipInfo:
++    name = arcname.replace("\\", "/")
++    if directory and not name.endswith("/"):
++        name += "/"
++    info = zipfile.ZipInfo(name)
++    info.date_time = datetime.now().timetuple()[:6]
++    info.create_system = 3  # Unix
++    info.external_attr = unix_attr(mode, directory=directory)
++    info.compress_type = zipfile.ZIP_DEFLATED if not directory else zipfile.ZIP_STORED
++    return info
++
++
++def should_skip(path: Path) -> bool:
++    if path.name in SKIP_NAMES:
++        return True
++    if path.suffix in SKIP_SUFFIXES:
++        return True
++    return False
++
++
++def file_mode(path: Path) -> int:
++    if path.suffix == ".sh" or path.name.endswith(".sh"):
++        return 0o755
++    return 0o644
++
++
++def add_tree(zf: zipfile.ZipFile, src: Path, prefix: str, skip_rel_roots: tuple[str, ...] = ()) -> None:
++    dirs_added: set[str] = set()
++
++    def ensure_dirs(arc: str) -> None:
++        parts = Path(arc).parts
++        acc = []
++        for p in parts[:-1]:
++            acc.append(p)
++            d = "/".join(acc)
++            if d in dirs_added:
++                continue
++            zf.writestr(zipinfo(d, 0o755, directory=True), b"")
++            dirs_added.add(d)
++
++    if prefix:
++        zf.writestr(zipinfo(prefix.rstrip("/"), 0o755, directory=True), b"")
++        dirs_added.add(prefix.rstrip("/"))
++
++    for path in sorted(src.rglob("*")):
++        if should_skip(path):
++            continue
++        rel = path.relative_to(src).as_posix()
++        if skip_rel_roots and path.relative_to(src).parts and path.relative_to(src).parts[0] in skip_rel_roots:
++            continue
++        arc = f"{prefix}{rel}" if prefix else rel
++        if path.is_dir():
++            if arc not in dirs_added:
++                zf.writestr(zipinfo(arc, 0o755, directory=True), b"")
++                dirs_added.add(arc.rstrip("/"))
++            continue
++        ensure_dirs(arc)
++        zf.writestr(zipinfo(arc, file_mode(path)), path.read_bytes())
++
++
++def main() -> None:
++    OUT.parent.mkdir(parents=True, exist_ok=True)
++    if OUT.exists():
++        OUT.unlink()
++    php = ROOT / "php"
++    static = ROOT / "static"
++    with zipfile.ZipFile(OUT, "w") as zf:
++        add_tree(zf, php, "", skip_rel_roots=("static",))
++        add_tree(zf, static, "static/")
++        zf.writestr(zipinfo("HOSTINGER.txt", 0o644), HOSTINGER_TXT.encode("utf-8"))
++    os.chmod(OUT, 0o644)
++    print(f"Wrote {OUT} ({OUT.stat().st_size} bytes)")
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/static/css/app.css b/static/css/app.css
+index 26a763e..0bb4c4e 100644
+--- a/static/css/app.css
++++ b/static/css/app.css
+@@ -636,6 +636,7 @@ td.mono, .mono {
+     align-items: stretch;
+     gap: 14px;
+   }
++  .invoice-letterhead { flex-wrap: wrap; }
+ }
+ 
+ /* ---------- InPmnt extras ---------- */
+@@ -651,6 +652,54 @@ td.mono, .mono {
+   display: block;
+ }
+ 
++.invoice-sheet {
++  background: #fff;
++  border: 1px solid var(--line);
++  border-radius: 14px;
++  margin-bottom: 16px;
++  overflow: hidden;
++}
++.invoice-sheet::before {
++  content: "";
++  display: block;
++  height: 6px;
++  background: var(--brand);
++}
++.invoice-letterhead {
++  display: flex;
++  align-items: center;
++  gap: 16px;
++  padding: 18px 20px 16px;
++}
++.invoice-logo {
++  width: 88px;
++  height: 88px;
++  border-radius: 12px;
++  object-fit: cover;
++  background: #000;
++  flex-shrink: 0;
++}
++.invoice-letterhead-copy { flex: 1; min-width: 0; }
++.invoice-biz {
++  font-family: var(--font-display);
++  font-size: 1.25rem;
++  font-weight: 700;
++  letter-spacing: -0.03em;
++}
++.invoice-biz-meta {
++  color: var(--muted);
++  font-size: 0.85rem;
++  margin-top: 4px;
++}
++.invoice-letterhead-right { text-align: right; }
++.invoice-word {
++  font-family: var(--font-display);
++  font-size: 1.35rem;
++  font-weight: 700;
++  color: var(--brand);
++  letter-spacing: 0.04em;
++}
++
+ .toolbar {
+   display: flex;
+   justify-content: space-between;
 diff --git a/static/img/inpmnt-logo-invoice.jpg b/static/img/inpmnt-logo-invoice.jpg
 new file mode 100644
 index 0000000000000000000000000000000000000000..85db2bd097c87e7d39eb23158325ebbf60d83ae3
@@ -1581,10 +2056,20 @@ literal 0
 HcmV?d00001
 
 diff --git a/static/js/app.js b/static/js/app.js
-index 888328c..592a225 100644
+index 888328c..9a12f6a 100644
 --- a/static/js/app.js
 +++ b/static/js/app.js
-@@ -334,6 +334,7 @@ async function renderInvoiceDetail(id) {
+@@ -325,7 +325,8 @@ async function renderInvoices(filter = "all") {
+ }
+ 
+ async function renderInvoiceDetail(id) {
+-  const inv = await api(`/api/invoices/${id}`);
++  const [inv, s] = await Promise.all([api(`/api/invoices/${id}`), api("/api/settings")]);
++  const bizMeta = [s.owner_name, s.email, s.phone].filter(Boolean).join(" · ");
+   appEl.innerHTML = `
+     ${topbar({
+       eyebrow: "Invoice",
+@@ -334,10 +335,24 @@ async function renderInvoiceDetail(id) {
        actions: `
          <button class="btn secondary" data-go="#/invoices">Back</button>
          ${inv.status === "draft" ? `<button class="btn" id="btn-send">Send invoice</button>` : `<button class="btn secondary" id="btn-send">Email invoice</button>`}
@@ -1592,7 +2077,24 @@ index 888328c..592a225 100644
          ${inv.status !== "paid" && inv.status !== "draft" ? `<button class="btn" id="btn-pay">Record payment</button>` : ""}
          ${inv.status === "overdue" || inv.status === "partial" ? `<button class="btn danger" id="btn-final">Final notice</button>` : ""}
        `,
-@@ -642,7 +643,7 @@ async function renderTemplates() {
+     })}
++    <div class="invoice-sheet">
++      <div class="invoice-letterhead">
++        <img class="invoice-logo" src="/static/img/inpmnt-icon.png" alt="Company logo" />
++        <div class="invoice-letterhead-copy">
++          <div class="invoice-biz">${s.business_name || "InPmnt"}</div>
++          ${bizMeta ? `<div class="invoice-biz-meta">${bizMeta}</div>` : ""}
++        </div>
++        <div class="invoice-letterhead-right">
++          <div class="invoice-word">INVOICE</div>
++          <div class="mono">${inv.number}</div>
++        </div>
++      </div>
++    </div>
+     <div class="grid-kpi">
+       <div class="kpi"><div class="kpi-label">Amount</div><div class="kpi-value">${money(inv.amount)}</div></div>
+       <div class="kpi"><div class="kpi-label">Paid</div><div class="kpi-value">${money(inv.amount_paid)}</div></div>
+@@ -642,7 +657,7 @@ async function renderTemplates() {
      ${topbar({
        eyebrow: "Workspace",
        title: "Message templates",
@@ -1603,10 +2105,10 @@ index 888328c..592a225 100644
        ${templates
 diff --git a/tests/test_invoice_pdf.py b/tests/test_invoice_pdf.py
 new file mode 100644
-index 0000000..69d8b03
+index 0000000..413c214
 --- /dev/null
 +++ b/tests/test_invoice_pdf.py
-@@ -0,0 +1,86 @@
+@@ -0,0 +1,92 @@
 +"""Professional invoice PDF generator."""
 +from __future__ import annotations
 +
@@ -1661,6 +2163,12 @@ index 0000000..69d8b03
 +        self.assertTrue(logo_path() is not None)
 +        self.assertIn(b"/Im1", pdf)
 +        self.assertIn(b"/DCTDecode", pdf)
++        # Company logo sits top-left on the letterhead (88pt at x=40, y=680), not the old 52pt dark-header slot.
++        self.assertIn(b"q 88.00 0 0 88.00 40.00 680.00 cm /Im1 Do Q", pdf)
++        self.assertNotIn(b"q 52 0 0 52 40 698", pdf)
++        self.assertIn(b"/Width 160", pdf)
++        self.assertIn(b"/Height 160", pdf)
++        self.assertNotIn(b"endstreamendobj", pdf)
 +
 +    def test_logo_from_png_when_jpeg_missing(self) -> None:
 +        from unittest.mock import patch
@@ -1728,3 +2236,98 @@ index 7b6856c..57eca11 100644
  
      def test_missing_client_email_blocks_send(self) -> None:
          no_mail = self.client.post("/api/clients", json={"name": "No Email Co"})
+diff --git a/tests/test_ubuntu_perms.py b/tests/test_ubuntu_perms.py
+new file mode 100644
+index 0000000..d4e38a9
+--- /dev/null
++++ b/tests/test_ubuntu_perms.py
+@@ -0,0 +1,89 @@
++"""Ubuntu/Apache modes: dirs 755, files 644, invoice logo world-readable."""
++from __future__ import annotations
++
++import os
++import tarfile
++import unittest
++import zipfile
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parent.parent
++TAR = ROOT / "patches" / "inpmnt-hostinger-changed.tar.gz"
++PHP_ZIP = ROOT / "patches" / "InPmnt-PHP.zip"
++LOGO = ROOT / "static" / "img" / "inpmnt-logo-invoice.jpg"
++
++
++def _mode(path: Path) -> int:
++    return path.stat().st_mode & 0o777
++
++
++class UbuntuPermsTests(unittest.TestCase):
++    def test_logo_world_readable(self) -> None:
++        self.assertTrue(LOGO.is_file(), "invoice logo JPEG missing")
++        self.assertTrue(os.access(LOGO, os.R_OK))
++        self.assertEqual(_mode(LOGO), 0o644)
++
++    def test_php_and_scripts_modes(self) -> None:
++        pdf = ROOT / "php" / "src" / "InvoicePdf.php"
++        self.assertEqual(_mode(pdf), 0o644)
++        self.assertFalse(_mode(pdf) & 0o002, "PHP must not be world-writable")
++        for rel in (
++            "php/fix-ubuntu-perms.sh",
++            "scripts/check-ubuntu-perms.sh",
++            "patches/make-ubuntu-archives.sh",
++            "deploy/setup-vps.sh",
++            "docker-entrypoint.sh",
++        ):
++            path = ROOT / rel
++            self.assertTrue(path.is_file(), rel)
++            self.assertEqual(_mode(path), 0o755, rel)
++
++    def test_hostinger_tarball_modes(self) -> None:
++        self.assertTrue(TAR.is_file(), "regenerate with bash patches/make-ubuntu-archives.sh")
++        names: set[str] = set()
++        with tarfile.open(TAR, "r:gz") as tf:
++            for member in tf.getmembers():
++                names.add(member.name.lstrip("./"))
++                mode = member.mode & 0o777
++                if member.isdir():
++                    self.assertEqual(mode, 0o755, member.name)
++                elif member.isfile():
++                    want = 0o755 if member.name.endswith(".sh") else 0o644
++                    self.assertEqual(mode, want, f"{member.name} {mode:03o}")
++        for needed in (
++            "static/img/inpmnt-logo-invoice.jpg",
++            "src/inpmnt-logo-invoice.jpg",
++            "src/InvoicePdf.php",
++            "fix-ubuntu-perms.sh",
++        ):
++            self.assertIn(needed, names)
++
++    def test_php_zip_unix_modes(self) -> None:
++        self.assertTrue(PHP_ZIP.is_file(), "run python3 scripts/pack_php_zip.py")
++        names: set[str] = set()
++        with zipfile.ZipFile(PHP_ZIP) as zf:
++            for info in zf.infolist():
++                name = info.filename.rstrip("/")
++                names.add(name)
++                mode = (info.external_attr >> 16) & 0o777
++                if info.is_dir() or info.filename.endswith("/"):
++                    self.assertEqual(mode, 0o755, info.filename)
++                    continue
++                want = 0o755 if name.endswith(".sh") else 0o644
++                self.assertEqual(mode, want, f"{name} {mode:03o}")
++        for needed in (
++            "index.php",
++            "bootstrap.php",
++            "fix-ubuntu-perms.sh",
++            "src/InvoicePdf.php",
++            "src/inpmnt-logo-invoice.jpg",
++            "static/img/inpmnt-logo-invoice.jpg",
++            "static/img/inpmnt-icon.png",
++            "static/js/app.js",
++            "HOSTINGER.txt",
++        ):
++            self.assertIn(needed, names)
++
++
++if __name__ == "__main__":
++    unittest.main()

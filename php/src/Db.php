@@ -22,6 +22,9 @@ final class Db
         if (!is_dir($dir)) {
             mkdir($dir, 0775, true);
         }
+        if (is_dir($dir)) {
+            @chmod($dir, 0775);
+        }
         $pdo = new PDO('sqlite:' . $path, null, null, [
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,

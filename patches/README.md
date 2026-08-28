@@ -9,9 +9,12 @@ These are the mail + invoice-send + invoice-PDF changes, split so you can apply 
 | `003-invoice-pdf.patch` | Professional PDF invoice in the email body **and** as an attachment, plus Download PDF (apply after 002) |
 | `inpmnt-mail-invoice-ubuntu.patch` | 001 + 002 + 003 in one patch |
 | `inpmnt-hostinger-changed.tar.gz` | Drop-in PHP/static files for `public_html` (does **not** overwrite `.env`) |
-| `inpmnt-ubuntu-patches.zip` | **Download this** — all of the above in one zip |
+| `inpmnt-ubuntu-patches.zip` | Incremental patches + Hostinger changed-files tarball |
+| **`InPmnt-PHP.zip`** | **Full `public_html` drop** (all current PHP + static, Unix 755/644) |
 
-Do **not** overwrite a live `.env`. GitHub shows `.patch` as text; always hand the user the **zip** (repo + Cursor artifact download) unless they ask for the diff in chat.
+Do **not** overwrite a live `.env`. GitHub shows `.patch` as text; always hand the user the **zip**.
+
+**Latest full build (Hostinger / Ubuntu):** unzip `InPmnt-PHP.zip` into `public_html`, then on Ubuntu Apache run `sudo bash fix-ubuntu-perms.sh`.
 
 ## Hostinger (`public_html`)
 
@@ -23,7 +26,14 @@ find src static -type f -exec chmod 644 {} \;
 # bootstrap.php lands in public_html/ — keep your live .env
 ```
 
-The tarball includes `src/InvoicePdf.php`, `src/inpmnt-logo-invoice.jpg`, and `static/img/inpmnt-logo-invoice.jpg`. Copy **both** the PHP file and the JPEG — if the JPEG is missing, invoices have no logo in the header. The generator will also use your existing `static/img/inpmnt-icon.png` if the JPEG is not there.
+The tarball includes `src/InvoicePdf.php`, `src/inpmnt-logo-invoice.jpg`, `static/img/inpmnt-logo-invoice.jpg`, and `fix-ubuntu-perms.sh`. Copy the PHP file **and** the JPEG — if the JPEG is missing, the generator falls back to `static/img/inpmnt-icon.png`.
+
+On **Ubuntu Apache**, after unzip/tar:
+
+```bash
+sudo bash fix-ubuntu-perms.sh
+# dirs 755, files 644, data/ 775, logo 644 — never chmod -R 777
+```
 
 ## Ubuntu VPS (git clone)
 
