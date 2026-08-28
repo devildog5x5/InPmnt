@@ -35,8 +35,8 @@ Unzip ALL of these files into public_html (or /var/www/html). Do not overwrite a
 
 This zip includes branded invoice PDFs (company logo top-left letterhead),
 invoice email on Send, reminder and final-notice emails with the invoice PDF
-attached, SMTP fallback, edit-after-create, Send now on the Invoices page,
-and the invoice JPEG next to InvoicePdf.php.
+attached, SMTP fallback, Edit invoice on dashboard/list/detail (including
+after send), Send now on the Invoices page, and cache-busted app.js.
 """
 
 

@@ -213,6 +213,23 @@ class InvoiceSendTests(unittest.TestCase):
         self.assertEqual(still["amount"], 250)
         self.assertEqual(still["status"], "draft")
 
+    def test_update_sent_invoice_without_emailing(self) -> None:
+        inv = self._create_draft()
+        with patch("app.routes.send_email", return_value={"provider": "smtp", "id": None}):
+            sent = self.client.post(f"/api/invoices/{inv['id']}/send", json={})
+            self.assertEqual(sent.status_code, 200, sent.get_json())
+        res = self.client.put(
+            f"/api/invoices/{inv['id']}",
+            json={"title": "Spring cleanup (corrected)", "amount": 275, "notes": "Scope change"},
+        )
+        self.assertEqual(res.status_code, 200, res.get_json())
+        body = res.get_json()
+        self.assertEqual(body["title"], "Spring cleanup (corrected)")
+        self.assertEqual(body["amount"], 275)
+        self.assertEqual(body["notes"], "Scope change")
+        self.assertEqual(body["status"], "sent")
+        self.assertFalse(body.get("emailed"))
+
     def test_update_paid_invoice_title(self) -> None:
         inv = self._create_draft()
         with patch("app.routes.send_email", return_value={"provider": "smtp", "id": None}):

@@ -70,6 +70,28 @@ index faf59ad..2872d6f 100644
  
  Stripe webhook: `https://yourdomain.com/api/billing/webhook`  
  SQLite is created at `data/inpmnt.db` (blocked from the web).
+diff --git a/app/__init__.py b/app/__init__.py
+index 8d3f59b..cd76123 100644
+--- a/app/__init__.py
++++ b/app/__init__.py
+@@ -45,4 +45,17 @@ def create_app() -> Flask:
+ 
+     init_db(app.config["DATABASE"])
+     app.register_blueprint(bp)
++
++    @app.context_processor
++    def _asset_versions():
++        static = Path(app.static_folder or "")
++
++        def asset_v(name: str) -> int:
++            try:
++                return int((static / name).stat().st_mtime)
++            except OSError:
++                return 0
++
++        return {"asset_v": asset_v}
++
+     return app
 diff --git a/app/database.py b/app/database.py
 index 38975aa..5130b20 100644
 --- a/app/database.py
@@ -1587,10 +1609,10 @@ index b8e523b..dd89514 100644
 +RewriteRule ^ app.php [QSA,L]
 diff --git a/php/app.php b/php/app.php
 new file mode 100644
-index 0000000..926a7a7
+index 0000000..c3ff389
 --- /dev/null
 +++ b/php/app.php
-@@ -0,0 +1,30 @@
+@@ -0,0 +1,34 @@
 +<?php
 +declare(strict_types=1);
 +
@@ -1613,7 +1635,11 @@ index 0000000..926a7a7
 +                'webp' => 'image/webp',
 +            ];
 +            header('Content-Type: ' . ($types[$ext] ?? 'application/octet-stream'));
-+            header('Cache-Control: public, max-age=86400');
++            if (in_array($ext, ['js', 'css'], true)) {
++                header('Cache-Control: public, max-age=60, must-revalidate');
++            } else {
++                header('Cache-Control: public, max-age=86400');
++            }
 +            readfile($file);
 +            exit;
 +        }
@@ -2507,7 +2533,7 @@ index 84a6b08..a5f7441 100644
  
      public static function truthy(string $key): bool
 diff --git a/php/src/Http.php b/php/src/Http.php
-index b065039..96a216f 100644
+index b065039..f728b17 100644
 --- a/php/src/Http.php
 +++ b/php/src/Http.php
 @@ -11,6 +11,17 @@ final class Http
@@ -2528,6 +2554,31 @@ index b065039..96a216f 100644
      public static function redirect(string $url, int $status = 302): never
      {
          http_response_code($status);
+@@ -49,6 +60,24 @@ final class Http
+         return htmlspecialchars((string) $s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+     }
+ 
++    /** Cache-busted public asset URL so Hostinger/LiteSpeed does not keep an old app.js. */
++    public static function assetUrl(string $rel): string
++    {
++        $rel = ltrim($rel, '/');
++        if (!str_starts_with($rel, 'static/')) {
++            $rel = 'static/' . $rel;
++        }
++        $phpDir = dirname(__DIR__);
++        $mtime = time();
++        foreach ([$phpDir . '/' . $rel, dirname($phpDir) . '/' . $rel] as $file) {
++            if (is_file($file)) {
++                $mtime = (int) filemtime($file);
++                break;
++            }
++        }
++        return '/' . $rel . '?v=' . $mtime;
++    }
++
+     public static function safeNext(?string $raw): ?string
+     {
+         if ($raw === null) {
 diff --git a/php/src/InvoicePdf.php b/php/src/InvoicePdf.php
 new file mode 100644
 index 0000000..3929d0a
@@ -3575,6 +3626,66 @@ zqROM+|KDGdB~nZBk;*bQX{YCqNnuM?<W_ECUjX;P(wM61qxpY!-v2*{UQYZMlH3|R
 literal 0
 HcmV?d00001
 
+diff --git a/php/views/app.php b/php/views/app.php
+index bf5ec4b..5236bff 100644
+--- a/php/views/app.php
++++ b/php/views/app.php
+@@ -8,7 +8,7 @@
+   <link rel="preconnect" href="https://fonts.googleapis.com" />
+   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&display=swap" rel="stylesheet" />
+-  <link rel="stylesheet" href="/static/css/app.css" />
++  <link rel="stylesheet" href="<?= Http::assetUrl('css/app.css') ?>" />
+ </head>
+ <body>
+   <div class="app-shell">
+@@ -77,6 +77,6 @@
+       logoutUrl: "/logout"
+     };
+   </script>
+-  <script type="module" src="/static/js/app.js"></script>
++  <script type="module" src="<?= Http::assetUrl('js/app.js') ?>"></script>
+ </body>
+ </html>
+diff --git a/php/views/landing.php b/php/views/landing.php
+index 568d7d9..9d7b954 100644
+--- a/php/views/landing.php
++++ b/php/views/landing.php
+@@ -9,7 +9,7 @@
+   <link rel="preconnect" href="https://fonts.googleapis.com" />
+   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&display=swap" rel="stylesheet" />
+-  <link rel="stylesheet" href="/static/css/app.css" />
++  <link rel="stylesheet" href="<?= Http::assetUrl('css/app.css') ?>" />
+ </head>
+ <body class="landing">
+   <nav class="landing-nav">
+diff --git a/php/views/login.php b/php/views/login.php
+index 9352604..4773521 100644
+--- a/php/views/login.php
++++ b/php/views/login.php
+@@ -8,7 +8,7 @@
+   <link rel="preconnect" href="https://fonts.googleapis.com" />
+   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&display=swap" rel="stylesheet" />
+-  <link rel="stylesheet" href="/static/css/app.css" />
++  <link rel="stylesheet" href="<?= Http::assetUrl('css/app.css') ?>" />
+ </head>
+ <body>
+   <div class="auth-page">
+diff --git a/php/views/signup.php b/php/views/signup.php
+index f0245e7..ff32e73 100644
+--- a/php/views/signup.php
++++ b/php/views/signup.php
+@@ -8,7 +8,7 @@
+   <link rel="preconnect" href="https://fonts.googleapis.com" />
+   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&display=swap" rel="stylesheet" />
+-  <link rel="stylesheet" href="/static/css/app.css" />
++  <link rel="stylesheet" href="<?= Http::assetUrl('css/app.css') ?>" />
+ </head>
+ <body>
+   <div class="auth-page">
 diff --git a/scripts/check-ubuntu-perms.sh b/scripts/check-ubuntu-perms.sh
 new file mode 100755
 index 0000000..c435aa4
@@ -3719,7 +3830,7 @@ index 0000000..c435aa4
 +echo "Ubuntu permission check OK (dirs 755, files 644, scripts 755, logo readable)."
 diff --git a/scripts/pack_php_zip.py b/scripts/pack_php_zip.py
 new file mode 100644
-index 0000000..fb9d534
+index 0000000..6304f21
 --- /dev/null
 +++ b/scripts/pack_php_zip.py
 @@ -0,0 +1,123 @@
@@ -3760,8 +3871,8 @@ index 0000000..fb9d534
 +
 +This zip includes branded invoice PDFs (company logo top-left letterhead),
 +invoice email on Send, reminder and final-notice emails with the invoice PDF
-+attached, SMTP fallback, edit-after-create, Send now on the Invoices page,
-+and the invoice JPEG next to InvoicePdf.php.
++attached, SMTP fallback, Edit invoice on dashboard/list/detail (including
++after send), Send now on the Invoices page, and cache-busted app.js.
 +"""
 +
 +
@@ -3847,7 +3958,7 @@ index 0000000..fb9d534
 +if __name__ == "__main__":
 +    main()
 diff --git a/static/css/app.css b/static/css/app.css
-index e1dba86..64c6bad 100644
+index e1dba86..75cde84 100644
 --- a/static/css/app.css
 +++ b/static/css/app.css
 @@ -530,7 +530,11 @@ td.mono, .mono {
@@ -3900,7 +4011,7 @@ index e1dba86..64c6bad 100644
  }
  
  /* ---------- InPmnt extras ---------- */
-@@ -647,6 +667,54 @@ td.mono, .mono {
+@@ -647,6 +667,107 @@ td.mono, .mono {
    display: block;
  }
  
@@ -3951,6 +4062,59 @@ index e1dba86..64c6bad 100644
 +  color: var(--brand);
 +  letter-spacing: 0.04em;
 +}
++
++.invoice-edit-bar {
++  display: flex;
++  flex-wrap: wrap;
++  align-items: center;
++  gap: 12px;
++  padding: 14px 20px 18px;
++  border-top: 1px solid var(--line);
++}
++button.edit-field {
++  display: flex;
++  justify-content: space-between;
++  align-items: center;
++  gap: 10px;
++  width: 100%;
++  margin: 0;
++  text-align: left;
++  background: var(--surface-2);
++  color: var(--ink);
++  border: 1px dashed var(--line-strong);
++  border-radius: 10px;
++  padding: 10px 12px;
++  font: inherit;
++  font-weight: 500;
++  box-shadow: none;
++  cursor: pointer;
++}
++button.edit-field:hover {
++  background: var(--brand-soft);
++  border-color: var(--brand);
++  transform: none;
++  box-shadow: none;
++}
++.edit-hint {
++  color: var(--brand-dark);
++  font-size: 0.75rem;
++  font-weight: 700;
++  letter-spacing: 0.04em;
++  text-transform: uppercase;
++  flex-shrink: 0;
++}
++.kpi[data-edit-inv] { cursor: pointer; }
++.kpi[data-edit-inv]:hover { border-color: var(--brand); }
++
++th.col-actions, td.col-actions {
++  position: sticky;
++  right: 0;
++  min-width: 11rem;
++  box-shadow: -10px 0 10px -10px rgba(15, 23, 32, 0.18);
++}
++th.col-actions { background: var(--surface-2); }
++td.col-actions { background: #fff; }
++tbody tr:hover td.col-actions { background: #f4faf9; }
 +
  .toolbar {
    display: flex;
@@ -4036,7 +4200,7 @@ literal 0
 HcmV?d00001
 
 diff --git a/static/js/app.js b/static/js/app.js
-index ed9785a..1c13b38 100644
+index ed9785a..337114a 100644
 --- a/static/js/app.js
 +++ b/static/js/app.js
 @@ -11,24 +11,40 @@ const fmtDate = (d) => {
@@ -4113,7 +4277,30 @@ index ed9785a..1c13b38 100644
  /* ---------- Dashboard ---------- */
  async function renderDashboard() {
    const data = await api("/api/dashboard");
-@@ -222,9 +259,13 @@ async function renderDashboard() {
+@@ -145,7 +182,13 @@ async function renderDashboard() {
+                     ${open_invoices
+                       .map(
+                         (i) => `<tr>
+-                          <td class="mono">${i.number}<span class="cell-sub">${i.title}</span></td>
++                          <td class="mono">
++                            <a href="#/invoices/${i.id}">${i.number}</a>
++                            <span class="cell-sub">${i.title}</span>
++                            <div class="row-actions" style="margin-top:8px">
++                              <button type="button" class="btn sm" data-edit-inv="${i.id}">Edit invoice</button>
++                            </div>
++                          </td>
+                           <td>${i.client_name}</td>
+                           <td>${fmtDate(i.due_date)}</td>
+                           <td class="mono">${money(i.balance)}</td>
+@@ -190,6 +233,7 @@ async function renderDashboard() {
+                 <p>${r.subject || "Payment reminder"}</p>
+                 <div class="row-actions">
+                   <button class="btn sm" data-send-reminder="${r.id}">Send now</button>
++                  <button type="button" class="btn sm" data-edit-inv="${r.invoice_id}">Edit invoice</button>
+                   <button class="btn secondary sm" data-go="#/invoices/${r.invoice_id}">Invoice</button>
+                 </div>
+               </div>`
+@@ -222,9 +266,13 @@ async function renderDashboard() {
  
    appEl.querySelector("#btn-new-inv")?.addEventListener("click", () => openInvoiceModal());
    appEl.querySelector("#btn-send-due")?.addEventListener("click", async () => {
@@ -4130,7 +4317,7 @@ index ed9785a..1c13b38 100644
    });
    wireCommon(appEl);
  }
-@@ -240,14 +281,23 @@ function agingRow(label, value, max, cls) {
+@@ -240,14 +288,23 @@ function agingRow(label, value, max, cls) {
  
  /* ---------- Invoices ---------- */
  async function renderInvoices(filter = "all") {
@@ -4144,7 +4331,7 @@ index ed9785a..1c13b38 100644
        eyebrow: "Collections",
        title: "Invoices",
 -      subtitle: "Track balances, schedule reminders, and record payments.",
-+      subtitle: "Create a draft, edit it, then send now or send from this page.",
++      subtitle: "Open any invoice and press Edit invoice — drafts, sent, and paid can all be changed.",
        actions: `<button class="btn" id="btn-new-inv">New invoice</button>`,
      })}
 +    ${
@@ -4156,11 +4343,36 @@ index ed9785a..1c13b38 100644
      <div class="toolbar">
        <div class="filters">
          <select id="status-filter">
-@@ -281,14 +331,15 @@ async function renderInvoices(filter = "all") {
+@@ -265,30 +322,36 @@ async function renderInvoices(filter = "all") {
+                 <thead>
+                   <tr>
+                     <th>Number</th><th>Client</th><th>Issue</th><th>Due</th>
+-                    <th>Amount</th><th>Balance</th><th>Status</th><th></th>
++                    <th>Amount</th><th>Balance</th><th>Status</th><th class="col-actions">Actions</th>
+                   </tr>
+                 </thead>
+                 <tbody>
+                   ${invoices
+                     .map(
+                       (i) => `<tr>
+-                        <td class="mono"><a href="#/invoices/${i.id}">${i.number}</a>
+-                          <span class="cell-sub">${i.title}</span></td>
++                        <td class="mono">
++                          <a href="#/invoices/${i.id}">${i.number}</a>
++                          <span class="cell-sub">${esc(i.title || "")}</span>
++                          <div class="row-actions" style="margin-top:8px">
++                            <button type="button" class="btn sm" data-edit-inv="${i.id}">Edit invoice</button>
++                          </div>
++                        </td>
+                         <td>${i.client_name}</td>
+                         <td>${fmtDate(i.issue_date)}</td>
+                         <td>${fmtDate(i.due_date)}</td>
+                         <td class="mono">${money(i.amount)}</td>
                          <td class="mono">${money(i.balance)}</td>
                          <td>${badge(i.status)}</td>
-                         <td class="row-actions">
-+                          <button class="btn sm secondary" data-edit-inv="${i.id}">Edit</button>
+-                        <td class="row-actions">
++                        <td class="row-actions col-actions">
++                          <button type="button" class="btn sm" data-edit-inv="${i.id}">Edit invoice</button>
                            ${
 -                            i.status !== "paid" && i.status !== "draft"
 -                              ? `<button class="btn sm secondary" data-pay="${i.id}">Pay</button>`
@@ -4177,17 +4389,8 @@ index ed9785a..1c13b38 100644
                                : ""
                            }
                          </td>
-@@ -307,17 +358,31 @@ async function renderInvoices(filter = "all") {
-   appEl.querySelectorAll("[data-pay]").forEach((btn) =>
-     btn.addEventListener("click", () => openPaymentModal(+btn.dataset.pay))
+@@ -309,29 +372,55 @@ async function renderInvoices(filter = "all") {
    );
-+  const byId = Object.fromEntries(invoices.map((i) => [String(i.id), i]));
-+  appEl.querySelectorAll("[data-edit-inv]").forEach((btn) =>
-+    btn.addEventListener("click", () => {
-+      const inv = byId[btn.dataset.editInv];
-+      if (inv) openInvoiceModal(inv, () => renderInvoices(filter));
-+    })
-+  );
    appEl.querySelectorAll("[data-send-inv]").forEach((btn) =>
      btn.addEventListener("click", async () => {
 -      await api(`/api/invoices/${btn.dataset.sendInv}/send`, { method: "POST", body: "{}" });
@@ -4213,16 +4416,18 @@ index ed9785a..1c13b38 100644
    appEl.innerHTML = `
      ${topbar({
        eyebrow: "Invoice",
-@@ -325,11 +390,26 @@ async function renderInvoiceDetail(id) {
+       title: inv.number,
        subtitle: `${inv.title} · ${inv.client_name}`,
        actions: `
-         <button class="btn secondary" data-go="#/invoices">Back</button>
+-        <button class="btn secondary" data-go="#/invoices">Back</button>
 -        ${inv.status === "draft" ? `<button class="btn" id="btn-send">Mark sent</button>` : ""}
-+        <button class="btn secondary" id="btn-edit">Edit</button>
-+        ${inv.status === "draft" ? `<button class="btn" id="btn-send">Send now</button>` : `<button class="btn secondary" id="btn-send">Email invoice</button>`}
+-        ${inv.status !== "paid" && inv.status !== "draft" ? `<button class="btn" id="btn-pay">Record payment</button>` : ""}
++        <button type="button" class="btn" id="btn-edit" data-edit-inv="${inv.id}">Edit invoice</button>
++        ${inv.status === "draft" ? `<button class="btn secondary" id="btn-send">Send now</button>` : `<button class="btn secondary" id="btn-send">Email invoice</button>`}
 +        <a class="btn secondary" href="/api/invoices/${id}/pdf">Download PDF</a>
-         ${inv.status !== "paid" && inv.status !== "draft" ? `<button class="btn" id="btn-pay">Record payment</button>` : ""}
++        ${inv.status !== "paid" && inv.status !== "draft" ? `<button class="btn secondary" id="btn-pay">Record payment</button>` : ""}
          ${inv.status === "overdue" || inv.status === "partial" ? `<button class="btn danger" id="btn-final">Final notice</button>` : ""}
++        <button class="btn secondary" data-go="#/invoices">Back</button>
        `,
      })}
 +    <div class="invoice-sheet">
@@ -4237,11 +4442,68 @@ index ed9785a..1c13b38 100644
 +          <div class="mono">${inv.number}</div>
 +        </div>
 +      </div>
++      <div class="invoice-edit-bar">
++        <button type="button" class="btn" data-edit-inv="${inv.id}">Edit invoice</button>
++        <span class="muted">Change the client, amount, dates, title, or notes — including after it has been sent.</span>
++      </div>
 +    </div>
      <div class="grid-kpi">
-       <div class="kpi"><div class="kpi-label">Amount</div><div class="kpi-value">${money(inv.amount)}</div></div>
+-      <div class="kpi"><div class="kpi-label">Amount</div><div class="kpi-value">${money(inv.amount)}</div></div>
++      <div class="kpi" data-edit-inv="${inv.id}" role="button" tabindex="0"><div class="kpi-label">Amount</div><div class="kpi-value">${money(inv.amount)}</div></div>
        <div class="kpi"><div class="kpi-label">Paid</div><div class="kpi-value">${money(inv.amount_paid)}</div></div>
-@@ -386,51 +466,92 @@ async function renderInvoiceDetail(id) {
+       <div class="kpi ${inv.balance > 0 ? "alert" : ""}"><div class="kpi-label">Balance</div><div class="kpi-value">${money(inv.balance)}</div></div>
+       <div class="kpi"><div class="kpi-label">Status</div><div class="kpi-value" style="font-size:1.4rem;margin-top:14px">${badge(inv.status)}</div>
+@@ -339,13 +428,43 @@ async function renderInvoiceDetail(id) {
+     </div>
+     <div class="panel-grid">
+       <div class="panel">
+-        <div class="panel-header"><h2>Details</h2></div>
++        <div class="panel-header">
++          <h2>Details</h2>
++          <button type="button" class="btn" data-edit-inv="${inv.id}">Edit invoice</button>
++        </div>
+         <div class="form-grid">
+-          <div class="field"><label>Client</label><div>${inv.client_name}${inv.client_company ? ` · ${inv.client_company}` : ""}</div></div>
+-          <div class="field"><label>Contact</label><div>${inv.client_email || "—"}<span class="cell-sub">${inv.client_phone || ""}</span></div></div>
+-          <div class="field"><label>Issue date</label><div>${fmtDate(inv.issue_date)}</div></div>
+-          <div class="field"><label>Due date</label><div>${fmtDate(inv.due_date)}</div></div>
+-          <div class="field full"><label>Notes</label><div class="muted">${inv.notes || "—"}</div></div>
++          <div class="field"><label>Client</label>
++            <button type="button" class="edit-field" data-edit-inv="${inv.id}">
++              ${esc(inv.client_name || "")}${inv.client_company ? ` · ${esc(inv.client_company)}` : ""}
++              <span class="edit-hint">Change</span>
++            </button>
++          </div>
++          <div class="field"><label>Contact</label>
++            <button type="button" class="edit-field" data-edit-inv="${inv.id}">
++              ${esc(inv.client_email || "—")}<span class="cell-sub">${esc(inv.client_phone || "")}</span>
++              <span class="edit-hint">Change</span>
++            </button>
++          </div>
++          <div class="field"><label>Issue date</label>
++            <button type="button" class="edit-field" data-edit-inv="${inv.id}">
++              ${fmtDate(inv.issue_date)}<span class="edit-hint">Change</span>
++            </button>
++          </div>
++          <div class="field"><label>Due date</label>
++            <button type="button" class="edit-field" data-edit-inv="${inv.id}">
++              ${fmtDate(inv.due_date)}<span class="edit-hint">Change</span>
++            </button>
++          </div>
++          <div class="field full"><label>Title / description</label>
++            <button type="button" class="edit-field" data-edit-inv="${inv.id}">
++              ${esc(inv.title || "—")}<span class="edit-hint">Change</span>
++            </button>
++          </div>
++          <div class="field full"><label>Notes</label>
++            <button type="button" class="edit-field" data-edit-inv="${inv.id}">
++              ${esc(inv.notes || "—")}<span class="edit-hint">Change</span>
++            </button>
++          </div>
+         </div>
+       </div>
+       <div class="panel">
+@@ -386,51 +505,109 @@ async function renderInvoiceDetail(id) {
              </div>`
                  )
                  .join("")
@@ -4256,9 +4518,6 @@ index ed9785a..1c13b38 100644
 -    await api(`/api/invoices/${id}/send`, { method: "POST", body: "{}" });
 -    toast("Invoice sent — reminders scheduled");
 -    renderInvoiceDetail(id);
-+  appEl.querySelector("#btn-edit")?.addEventListener("click", () =>
-+    openInvoiceModal(inv, () => renderInvoiceDetail(id))
-+  );
 +  appEl.querySelector("#btn-send")?.addEventListener("click", async (e) => {
 +    const btn = e.currentTarget;
 +    btn.disabled = true;
@@ -4286,6 +4545,22 @@ index ed9785a..1c13b38 100644
  }
  
 -async function openInvoiceModal() {
++async function openInvoiceEditor(invoiceId) {
++  const id = Number(invoiceId);
++  if (!id) return;
++  try {
++    const inv = await api(`/api/invoices/${id}`);
++    if (!inv || !inv.id) throw new Error("Invoice not found");
++    await openInvoiceModal(inv, () => {
++      const path = (location.hash.replace(/^#/, "") || "/").split("?")[0];
++      if (path === `/invoices/${id}`) renderInvoiceDetail(id);
++      else route();
++    });
++  } catch (err) {
++    toast(err.message || "Could not open invoice for editing", "error");
++  }
++}
++
 +async function openInvoiceModal(existing = null, after = null) {
    const clients = await api("/api/clients");
    const today = new Date().toISOString().slice(0, 10);
@@ -4336,17 +4611,21 @@ index ed9785a..1c13b38 100644
 +        <div class="field"><label>Amount</label>
 +          <input name="amount" type="number" min="${minAmt}" step="0.01" required placeholder="0.00"
 +            value="${existing ? esc(existing.amount) : ""}" />
-+        </div>
-+        <div class="field full"><label>Title / description</label>
-+          <input name="title" required placeholder="Job or service description" value="${esc(existing?.title || "")}" />
          </div>
 -        <div class="field"><label>Notes</label><input name="notes" placeholder="Optional" /></div>
++        <div class="field full"><label>Title / description</label>
++          <input name="title" required placeholder="Job or service description" value="${esc(existing?.title || "")}" />
++        </div>
 +        <div class="field"><label>Issue date</label><input name="issue_date" type="date" value="${issueVal}" /></div>
 +        <div class="field"><label>Due date</label><input name="due_date" type="date" value="${dueVal}" /></div>
 +        <div class="field full"><label>Notes</label>
 +          <input name="notes" placeholder="Optional" value="${esc(existing?.notes || "")}" />
 +        </div>
-+        <p class="field full muted" style="margin:0">Need to email later? Save the draft, then use <strong>Send now</strong> on the Invoices page.</p>
++        ${
++          isEdit && !isDraft
++            ? `<p class="field full muted" style="margin:0">Save updates this invoice. <strong>Save &amp; email</strong> sends the new PDF to the client.</p>`
++            : `<p class="field full muted" style="margin:0">Need to email later? Save the draft, then use <strong>Send now</strong> on the Invoices page.</p>`
++        }
          <div class="modal-actions field full">
            <button type="button" class="btn secondary" id="m-cancel">Cancel</button>
 -          <button type="submit" class="btn">Create</button>
@@ -4355,7 +4634,7 @@ index ed9785a..1c13b38 100644
          </div>
        </form>
      `,
-@@ -442,10 +563,54 @@ async function openInvoiceModal() {
+@@ -442,10 +619,54 @@ async function openInvoiceModal() {
          const payload = Object.fromEntries(fd.entries());
          payload.client_id = +payload.client_id;
          payload.amount = +payload.amount;
@@ -4414,7 +4693,7 @@ index ed9785a..1c13b38 100644
        };
      },
    });
-@@ -487,13 +652,69 @@ function openPaymentModal(invoiceId, after) {
+@@ -487,13 +708,69 @@ function openPaymentModal(invoiceId, after) {
  }
  
  /* ---------- Clients ---------- */
@@ -4485,7 +4764,7 @@ index ed9785a..1c13b38 100644
        actions: `<button class="btn" id="btn-new-client">Add client</button>`,
      })}
      <div class="toolbar">
-@@ -507,20 +728,29 @@ async function renderClients() {
+@@ -507,20 +784,29 @@ async function renderClients() {
      const el = appEl.querySelector("#client-table");
      el.innerHTML = rows.length
        ? `<table>
@@ -4520,7 +4799,7 @@ index ed9785a..1c13b38 100644
    };
    paint(clients);
    appEl.querySelector("#client-q").oninput = (e) => {
-@@ -534,35 +764,7 @@ async function renderClients() {
+@@ -534,35 +820,7 @@ async function renderClients() {
        )
      );
    };
@@ -4557,7 +4836,15 @@ index ed9785a..1c13b38 100644
  }
  
  /* ---------- Reminders ---------- */
-@@ -604,9 +806,13 @@ async function renderReminders() {
+@@ -593,6 +851,7 @@ async function renderReminders() {
+                 ${(r.status === "pending" || r.status === "due")
+                   ? `<button class="btn sm" data-send-reminder="${r.id}">Send now</button>`
+                   : ""}
++                <button type="button" class="btn sm" data-edit-inv="${r.invoice_id}">Edit invoice</button>
+                 <button class="btn secondary sm" data-go="#/invoices/${r.invoice_id}">Open invoice</button>
+               </div>
+             </div>`
+@@ -604,9 +863,13 @@ async function renderReminders() {
      </div>
    `;
    appEl.querySelector("#btn-send-due").onclick = async () => {
@@ -4574,7 +4861,7 @@ index ed9785a..1c13b38 100644
    };
    wireCommon(appEl);
  }
-@@ -618,7 +824,7 @@ async function renderTemplates() {
+@@ -618,7 +881,7 @@ async function renderTemplates() {
      ${topbar({
        eyebrow: "Workspace",
        title: "Message templates",
@@ -4583,7 +4870,7 @@ index ed9785a..1c13b38 100644
      })}
      <div class="stack">
        ${templates
-@@ -673,7 +879,20 @@ async function renderTemplates() {
+@@ -673,7 +936,20 @@ async function renderTemplates() {
  
  /* ---------- Settings ---------- */
  async function renderSettings() {
@@ -4605,7 +4892,7 @@ index ed9785a..1c13b38 100644
    appEl.innerHTML = `
      ${topbar({
        eyebrow: "Workspace",
-@@ -695,6 +914,13 @@ async function renderSettings() {
+@@ -695,6 +971,13 @@ async function renderSettings() {
          ${billing.has_customer ? `<button class="btn ghost sm" id="btn-portal">Manage billing</button>` : ""}
        </div>
      </div>
@@ -4619,7 +4906,7 @@ index ed9785a..1c13b38 100644
      <form id="settings-form" class="panel form-grid">
        <div class="field"><label>Business name</label><input name="business_name" value="${s.business_name || ""}" required /></div>
        <div class="field"><label>Owner</label><input name="owner_name" value="${s.owner_name || ""}" required /></div>
-@@ -713,7 +939,7 @@ async function renderSettings() {
+@@ -713,7 +996,7 @@ async function renderSettings() {
        </div>
        <div class="field full">
          <p class="settings-note">
@@ -4628,7 +4915,7 @@ index ed9785a..1c13b38 100644
          </p>
        </div>
        <div class="field full actions">
-@@ -748,7 +974,19 @@ async function renderSettings() {
+@@ -748,7 +1031,19 @@ async function renderSettings() {
        const res = await api("/api/billing/portal", { method: "POST", body: "{}" });
        if (res.url) location.href = res.url;
      } catch (err) {
@@ -4649,7 +4936,7 @@ index ed9785a..1c13b38 100644
      }
    });
  }
-@@ -761,9 +999,13 @@ function wireCommon(root) {
+@@ -761,9 +1056,13 @@ function wireCommon(root) {
    });
    root.querySelectorAll("[data-send-reminder]").forEach((btn) => {
      btn.addEventListener("click", async () => {
@@ -4666,7 +4953,7 @@ index ed9785a..1c13b38 100644
      });
    });
  }
-@@ -784,7 +1026,7 @@ async function route() {
+@@ -784,11 +1083,17 @@ async function route() {
      else await renderDashboard();
    } catch (err) {
      console.error(err);
@@ -4675,6 +4962,76 @@ index ed9785a..1c13b38 100644
    }
  }
  
+ window.addEventListener("hashchange", route);
++appEl.addEventListener("click", (e) => {
++  const editBtn = e.target.closest("[data-edit-inv]");
++  if (!editBtn || !appEl.contains(editBtn)) return;
++  e.preventDefault();
++  openInvoiceEditor(editBtn.dataset.editInv);
++});
+ api("/api/me").then((me) => {
+   if (me.settings) {
+     document.getElementById("workspace-label").textContent =
+diff --git a/templates/app.html b/templates/app.html
+index d65c5f8..90a01ec 100644
+--- a/templates/app.html
++++ b/templates/app.html
+@@ -8,7 +8,7 @@
+   <link rel="preconnect" href="https://fonts.googleapis.com" />
+   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&display=swap" rel="stylesheet" />
+-  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}" />
++  <link rel="stylesheet" href="/static/css/app.css?v={{ asset_v('css/app.css') }}" />
+ </head>
+ <body>
+   <div class="app-shell">
+@@ -77,6 +77,6 @@
+       logoutUrl: {{ url_for('main.logout') | tojson }}
+     };
+   </script>
+-  <script type="module" src="{{ url_for('static', filename='js/app.js') }}"></script>
++  <script type="module" src="/static/js/app.js?v={{ asset_v('js/app.js') }}"></script>
+ </body>
+ </html>
+diff --git a/templates/landing.html b/templates/landing.html
+index 90e1958..6f90043 100644
+--- a/templates/landing.html
++++ b/templates/landing.html
+@@ -9,7 +9,7 @@
+   <link rel="preconnect" href="https://fonts.googleapis.com" />
+   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&display=swap" rel="stylesheet" />
+-  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}" />
++  <link rel="stylesheet" href="/static/css/app.css?v={{ asset_v('css/app.css') }}" />
+ </head>
+ <body class="landing">
+   <nav class="landing-nav">
+diff --git a/templates/login.html b/templates/login.html
+index 77a27db..9a34f59 100644
+--- a/templates/login.html
++++ b/templates/login.html
+@@ -8,7 +8,7 @@
+   <link rel="preconnect" href="https://fonts.googleapis.com" />
+   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&display=swap" rel="stylesheet" />
+-  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}" />
++  <link rel="stylesheet" href="/static/css/app.css?v={{ asset_v('css/app.css') }}" />
+ </head>
+ <body>
+   <div class="auth-page">
+diff --git a/templates/signup.html b/templates/signup.html
+index cb80459..464870a 100644
+--- a/templates/signup.html
++++ b/templates/signup.html
+@@ -8,7 +8,7 @@
+   <link rel="preconnect" href="https://fonts.googleapis.com" />
+   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&display=swap" rel="stylesheet" />
+-  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}" />
++  <link rel="stylesheet" href="/static/css/app.css?v={{ asset_v('css/app.css') }}" />
+ </head>
+ <body>
+   <div class="auth-page">
 diff --git a/tests/test_clients.py b/tests/test_clients.py
 new file mode 100644
 index 0000000..adcc47b
@@ -4831,6 +5188,51 @@ index 0000000..b6d4186
 +
 +if __name__ == "__main__":
 +    unittest.main()
+diff --git a/tests/test_invoice_edit_ui.py b/tests/test_invoice_edit_ui.py
+new file mode 100644
+index 0000000..9c1f161
+--- /dev/null
++++ b/tests/test_invoice_edit_ui.py
+@@ -0,0 +1,39 @@
++"""Edit invoice must be visible on dashboard, list, and invoice pages."""
++from __future__ import annotations
++
++import unittest
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parent.parent
++JS = (ROOT / "static" / "js" / "app.js").read_text(encoding="utf-8")
++CSS = (ROOT / "static" / "css" / "app.css").read_text(encoding="utf-8")
++
++
++class InvoiceEditUiTests(unittest.TestCase):
++    def test_edit_invoice_label_is_everywhere(self) -> None:
++        self.assertGreaterEqual(JS.count("Edit invoice"), 8)
++        self.assertIn("openInvoiceEditor", JS)
++        self.assertIn("invoice-edit-bar", JS)
++        self.assertIn('id="btn-edit"', JS)
++        self.assertIn('data-edit-inv="${i.id}"', JS)
++        self.assertIn('data-edit-inv="${inv.id}"', JS)
++        self.assertIn('data-edit-inv="${r.invoice_id}"', JS)
++
++    def test_details_fields_are_clickable(self) -> None:
++        self.assertIn("edit-field", JS)
++        self.assertIn("button.edit-field", CSS)
++        self.assertIn(".invoice-edit-bar", CSS)
++
++    def test_php_and_flask_cache_bust_app_js(self) -> None:
++        php_app = (ROOT / "php" / "views" / "app.php").read_text(encoding="utf-8")
++        flask_app = (ROOT / "templates" / "app.html").read_text(encoding="utf-8")
++        http = (ROOT / "php" / "src" / "Http.php").read_text(encoding="utf-8")
++        self.assertIn("Http::assetUrl('js/app.js')", php_app)
++        self.assertIn("Http::assetUrl('css/app.css')", php_app)
++        self.assertIn("function assetUrl", http)
++        self.assertIn("asset_v('js/app.js')", flask_app)
++        self.assertIn("asset_v('css/app.css')", flask_app)
++
++
++if __name__ == "__main__":
++    unittest.main()
 diff --git a/tests/test_invoice_pdf.py b/tests/test_invoice_pdf.py
 new file mode 100644
 index 0000000..386aeb6
@@ -4949,10 +5351,10 @@ index 0000000..386aeb6
 +    unittest.main()
 diff --git a/tests/test_invoice_send.py b/tests/test_invoice_send.py
 new file mode 100644
-index 0000000..91db083
+index 0000000..e8000e1
 --- /dev/null
 +++ b/tests/test_invoice_send.py
-@@ -0,0 +1,310 @@
+@@ -0,0 +1,327 @@
 +"""Sending the invoice itself emails the client (not just reminders)."""
 +from __future__ import annotations
 +
@@ -5167,6 +5569,23 @@ index 0000000..91db083
 +        self.assertEqual(still["title"], "Spring cleanup")
 +        self.assertEqual(still["amount"], 250)
 +        self.assertEqual(still["status"], "draft")
++
++    def test_update_sent_invoice_without_emailing(self) -> None:
++        inv = self._create_draft()
++        with patch("app.routes.send_email", return_value={"provider": "smtp", "id": None}):
++            sent = self.client.post(f"/api/invoices/{inv['id']}/send", json={})
++            self.assertEqual(sent.status_code, 200, sent.get_json())
++        res = self.client.put(
++            f"/api/invoices/{inv['id']}",
++            json={"title": "Spring cleanup (corrected)", "amount": 275, "notes": "Scope change"},
++        )
++        self.assertEqual(res.status_code, 200, res.get_json())
++        body = res.get_json()
++        self.assertEqual(body["title"], "Spring cleanup (corrected)")
++        self.assertEqual(body["amount"], 275)
++        self.assertEqual(body["notes"], "Scope change")
++        self.assertEqual(body["status"], "sent")
++        self.assertFalse(body.get("emailed"))
 +
 +    def test_update_paid_invoice_title(self) -> None:
 +        inv = self._create_draft()

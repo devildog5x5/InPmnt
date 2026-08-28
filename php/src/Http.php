@@ -60,6 +60,24 @@ final class Http
         return htmlspecialchars((string) $s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     }
 
+    /** Cache-busted public asset URL so Hostinger/LiteSpeed does not keep an old app.js. */
+    public static function assetUrl(string $rel): string
+    {
+        $rel = ltrim($rel, '/');
+        if (!str_starts_with($rel, 'static/')) {
+            $rel = 'static/' . $rel;
+        }
+        $phpDir = dirname(__DIR__);
+        $mtime = time();
+        foreach ([$phpDir . '/' . $rel, dirname($phpDir) . '/' . $rel] as $file) {
+            if (is_file($file)) {
+                $mtime = (int) filemtime($file);
+                break;
+            }
+        }
+        return '/' . $rel . '?v=' . $mtime;
+    }
+
     public static function safeNext(?string $raw): ?string
     {
         if ($raw === null) {

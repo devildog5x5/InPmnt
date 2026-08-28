@@ -45,4 +45,17 @@ def create_app() -> Flask:
 
     init_db(app.config["DATABASE"])
     app.register_blueprint(bp)
+
+    @app.context_processor
+    def _asset_versions():
+        static = Path(app.static_folder or "")
+
+        def asset_v(name: str) -> int:
+            try:
+                return int((static / name).stat().st_mtime)
+            except OSError:
+                return 0
+
+        return {"asset_v": asset_v}
+
     return app
