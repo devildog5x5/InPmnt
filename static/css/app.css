@@ -715,6 +715,59 @@ td.mono, .mono {
   letter-spacing: 0.04em;
 }
 
+.invoice-edit-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 20px 18px;
+  border-top: 1px solid var(--line);
+}
+button.edit-field {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin: 0;
+  text-align: left;
+  background: var(--surface-2);
+  color: var(--ink);
+  border: 1px dashed var(--line-strong);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font: inherit;
+  font-weight: 500;
+  box-shadow: none;
+  cursor: pointer;
+}
+button.edit-field:hover {
+  background: var(--brand-soft);
+  border-color: var(--brand);
+  transform: none;
+  box-shadow: none;
+}
+.edit-hint {
+  color: var(--brand-dark);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+.kpi[data-edit-inv] { cursor: pointer; }
+.kpi[data-edit-inv]:hover { border-color: var(--brand); }
+
+th.col-actions, td.col-actions {
+  position: sticky;
+  right: 0;
+  min-width: 11rem;
+  box-shadow: -10px 0 10px -10px rgba(15, 23, 32, 0.18);
+}
+th.col-actions { background: var(--surface-2); }
+td.col-actions { background: #fff; }
+tbody tr:hover td.col-actions { background: #f4faf9; }
+
 .toolbar {
   display: flex;
   justify-content: space-between;

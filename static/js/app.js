@@ -182,7 +182,13 @@ async function renderDashboard() {
                     ${open_invoices
                       .map(
                         (i) => `<tr>
-                          <td class="mono">${i.number}<span class="cell-sub">${i.title}</span></td>
+                          <td class="mono">
+                            <a href="#/invoices/${i.id}">${i.number}</a>
+                            <span class="cell-sub">${i.title}</span>
+                            <div class="row-actions" style="margin-top:8px">
+                              <button type="button" class="btn sm" data-edit-inv="${i.id}">Edit invoice</button>
+                            </div>
+                          </td>
                           <td>${i.client_name}</td>
                           <td>${fmtDate(i.due_date)}</td>
                           <td class="mono">${money(i.balance)}</td>
@@ -227,6 +233,7 @@ async function renderDashboard() {
                 <p>${r.subject || "Payment reminder"}</p>
                 <div class="row-actions">
                   <button class="btn sm" data-send-reminder="${r.id}">Send now</button>
+                  <button type="button" class="btn sm" data-edit-inv="${r.invoice_id}">Edit invoice</button>
                   <button class="btn secondary sm" data-go="#/invoices/${r.invoice_id}">Invoice</button>
                 </div>
               </div>`
@@ -289,7 +296,7 @@ async function renderInvoices(filter = "all") {
     ${topbar({
       eyebrow: "Collections",
       title: "Invoices",
-      subtitle: "Create a draft, edit it, then send now or send from this page.",
+      subtitle: "Open any invoice and press Edit invoice — drafts, sent, and paid can all be changed.",
       actions: `<button class="btn" id="btn-new-inv">New invoice</button>`,
     })}
     ${
@@ -315,23 +322,28 @@ async function renderInvoices(filter = "all") {
                 <thead>
                   <tr>
                     <th>Number</th><th>Client</th><th>Issue</th><th>Due</th>
-                    <th>Amount</th><th>Balance</th><th>Status</th><th></th>
+                    <th>Amount</th><th>Balance</th><th>Status</th><th class="col-actions">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   ${invoices
                     .map(
                       (i) => `<tr>
-                        <td class="mono"><a href="#/invoices/${i.id}">${i.number}</a>
-                          <span class="cell-sub">${i.title}</span></td>
+                        <td class="mono">
+                          <a href="#/invoices/${i.id}">${i.number}</a>
+                          <span class="cell-sub">${esc(i.title || "")}</span>
+                          <div class="row-actions" style="margin-top:8px">
+                            <button type="button" class="btn sm" data-edit-inv="${i.id}">Edit invoice</button>
+                          </div>
+                        </td>
                         <td>${i.client_name}</td>
                         <td>${fmtDate(i.issue_date)}</td>
                         <td>${fmtDate(i.due_date)}</td>
                         <td class="mono">${money(i.amount)}</td>
                         <td class="mono">${money(i.balance)}</td>
                         <td>${badge(i.status)}</td>
-                        <td class="row-actions">
-                          <button class="btn sm secondary" data-edit-inv="${i.id}">Edit</button>
+                        <td class="row-actions col-actions">
+                          <button type="button" class="btn sm" data-edit-inv="${i.id}">Edit invoice</button>
                           ${
                             i.status === "draft"
                               ? `<button class="btn sm" data-send-inv="${i.id}">Send now</button>`
@@ -358,13 +370,6 @@ async function renderInvoices(filter = "all") {
   appEl.querySelectorAll("[data-pay]").forEach((btn) =>
     btn.addEventListener("click", () => openPaymentModal(+btn.dataset.pay))
   );
-  const byId = Object.fromEntries(invoices.map((i) => [String(i.id), i]));
-  appEl.querySelectorAll("[data-edit-inv]").forEach((btn) =>
-    btn.addEventListener("click", () => {
-      const inv = byId[btn.dataset.editInv];
-      if (inv) openInvoiceModal(inv, () => renderInvoices(filter));
-    })
-  );
   appEl.querySelectorAll("[data-send-inv]").forEach((btn) =>
     btn.addEventListener("click", async () => {
       btn.disabled = true;
@@ -389,12 +394,12 @@ async function renderInvoiceDetail(id) {
       title: inv.number,
       subtitle: `${inv.title} · ${inv.client_name}`,
       actions: `
-        <button class="btn secondary" data-go="#/invoices">Back</button>
-        <button class="btn secondary" id="btn-edit">Edit</button>
-        ${inv.status === "draft" ? `<button class="btn" id="btn-send">Send now</button>` : `<button class="btn secondary" id="btn-send">Email invoice</button>`}
+        <button type="button" class="btn" id="btn-edit" data-edit-inv="${inv.id}">Edit invoice</button>
+        ${inv.status === "draft" ? `<button class="btn secondary" id="btn-send">Send now</button>` : `<button class="btn secondary" id="btn-send">Email invoice</button>`}
         <a class="btn secondary" href="/api/invoices/${id}/pdf">Download PDF</a>
-        ${inv.status !== "paid" && inv.status !== "draft" ? `<button class="btn" id="btn-pay">Record payment</button>` : ""}
+        ${inv.status !== "paid" && inv.status !== "draft" ? `<button class="btn secondary" id="btn-pay">Record payment</button>` : ""}
         ${inv.status === "overdue" || inv.status === "partial" ? `<button class="btn danger" id="btn-final">Final notice</button>` : ""}
+        <button class="btn secondary" data-go="#/invoices">Back</button>
       `,
     })}
     <div class="invoice-sheet">
@@ -409,9 +414,13 @@ async function renderInvoiceDetail(id) {
           <div class="mono">${inv.number}</div>
         </div>
       </div>
+      <div class="invoice-edit-bar">
+        <button type="button" class="btn" data-edit-inv="${inv.id}">Edit invoice</button>
+        <span class="muted">Change the client, amount, dates, title, or notes — including after it has been sent.</span>
+      </div>
     </div>
     <div class="grid-kpi">
-      <div class="kpi"><div class="kpi-label">Amount</div><div class="kpi-value">${money(inv.amount)}</div></div>
+      <div class="kpi" data-edit-inv="${inv.id}" role="button" tabindex="0"><div class="kpi-label">Amount</div><div class="kpi-value">${money(inv.amount)}</div></div>
       <div class="kpi"><div class="kpi-label">Paid</div><div class="kpi-value">${money(inv.amount_paid)}</div></div>
       <div class="kpi ${inv.balance > 0 ? "alert" : ""}"><div class="kpi-label">Balance</div><div class="kpi-value">${money(inv.balance)}</div></div>
       <div class="kpi"><div class="kpi-label">Status</div><div class="kpi-value" style="font-size:1.4rem;margin-top:14px">${badge(inv.status)}</div>
@@ -419,13 +428,43 @@ async function renderInvoiceDetail(id) {
     </div>
     <div class="panel-grid">
       <div class="panel">
-        <div class="panel-header"><h2>Details</h2></div>
+        <div class="panel-header">
+          <h2>Details</h2>
+          <button type="button" class="btn" data-edit-inv="${inv.id}">Edit invoice</button>
+        </div>
         <div class="form-grid">
-          <div class="field"><label>Client</label><div>${inv.client_name}${inv.client_company ? ` · ${inv.client_company}` : ""}</div></div>
-          <div class="field"><label>Contact</label><div>${inv.client_email || "—"}<span class="cell-sub">${inv.client_phone || ""}</span></div></div>
-          <div class="field"><label>Issue date</label><div>${fmtDate(inv.issue_date)}</div></div>
-          <div class="field"><label>Due date</label><div>${fmtDate(inv.due_date)}</div></div>
-          <div class="field full"><label>Notes</label><div class="muted">${inv.notes || "—"}</div></div>
+          <div class="field"><label>Client</label>
+            <button type="button" class="edit-field" data-edit-inv="${inv.id}">
+              ${esc(inv.client_name || "")}${inv.client_company ? ` · ${esc(inv.client_company)}` : ""}
+              <span class="edit-hint">Change</span>
+            </button>
+          </div>
+          <div class="field"><label>Contact</label>
+            <button type="button" class="edit-field" data-edit-inv="${inv.id}">
+              ${esc(inv.client_email || "—")}<span class="cell-sub">${esc(inv.client_phone || "")}</span>
+              <span class="edit-hint">Change</span>
+            </button>
+          </div>
+          <div class="field"><label>Issue date</label>
+            <button type="button" class="edit-field" data-edit-inv="${inv.id}">
+              ${fmtDate(inv.issue_date)}<span class="edit-hint">Change</span>
+            </button>
+          </div>
+          <div class="field"><label>Due date</label>
+            <button type="button" class="edit-field" data-edit-inv="${inv.id}">
+              ${fmtDate(inv.due_date)}<span class="edit-hint">Change</span>
+            </button>
+          </div>
+          <div class="field full"><label>Title / description</label>
+            <button type="button" class="edit-field" data-edit-inv="${inv.id}">
+              ${esc(inv.title || "—")}<span class="edit-hint">Change</span>
+            </button>
+          </div>
+          <div class="field full"><label>Notes</label>
+            <button type="button" class="edit-field" data-edit-inv="${inv.id}">
+              ${esc(inv.notes || "—")}<span class="edit-hint">Change</span>
+            </button>
+          </div>
         </div>
       </div>
       <div class="panel">
@@ -472,9 +511,6 @@ async function renderInvoiceDetail(id) {
     </div>
   `;
   wireCommon(appEl);
-  appEl.querySelector("#btn-edit")?.addEventListener("click", () =>
-    openInvoiceModal(inv, () => renderInvoiceDetail(id))
-  );
   appEl.querySelector("#btn-send")?.addEventListener("click", async (e) => {
     const btn = e.currentTarget;
     btn.disabled = true;
@@ -496,6 +532,22 @@ async function renderInvoiceDetail(id) {
       toast(err.message || "Send failed", "error");
     }
   });
+}
+
+async function openInvoiceEditor(invoiceId) {
+  const id = Number(invoiceId);
+  if (!id) return;
+  try {
+    const inv = await api(`/api/invoices/${id}`);
+    if (!inv || !inv.id) throw new Error("Invoice not found");
+    await openInvoiceModal(inv, () => {
+      const path = (location.hash.replace(/^#/, "") || "/").split("?")[0];
+      if (path === `/invoices/${id}`) renderInvoiceDetail(id);
+      else route();
+    });
+  } catch (err) {
+    toast(err.message || "Could not open invoice for editing", "error");
+  }
 }
 
 async function openInvoiceModal(existing = null, after = null) {
@@ -547,7 +599,11 @@ async function openInvoiceModal(existing = null, after = null) {
         <div class="field full"><label>Notes</label>
           <input name="notes" placeholder="Optional" value="${esc(existing?.notes || "")}" />
         </div>
-        <p class="field full muted" style="margin:0">Need to email later? Save the draft, then use <strong>Send now</strong> on the Invoices page.</p>
+        ${
+          isEdit && !isDraft
+            ? `<p class="field full muted" style="margin:0">Save updates this invoice. <strong>Save &amp; email</strong> sends the new PDF to the client.</p>`
+            : `<p class="field full muted" style="margin:0">Need to email later? Save the draft, then use <strong>Send now</strong> on the Invoices page.</p>`
+        }
         <div class="modal-actions field full">
           <button type="button" class="btn secondary" id="m-cancel">Cancel</button>
           <button type="submit" class="btn secondary" id="m-save" data-intent="save">${saveLabel}</button>
@@ -795,6 +851,7 @@ async function renderReminders() {
                 ${(r.status === "pending" || r.status === "due")
                   ? `<button class="btn sm" data-send-reminder="${r.id}">Send now</button>`
                   : ""}
+                <button type="button" class="btn sm" data-edit-inv="${r.invoice_id}">Edit invoice</button>
                 <button class="btn secondary sm" data-go="#/invoices/${r.invoice_id}">Open invoice</button>
               </div>
             </div>`
@@ -1031,6 +1088,12 @@ async function route() {
 }
 
 window.addEventListener("hashchange", route);
+appEl.addEventListener("click", (e) => {
+  const editBtn = e.target.closest("[data-edit-inv]");
+  if (!editBtn || !appEl.contains(editBtn)) return;
+  e.preventDefault();
+  openInvoiceEditor(editBtn.dataset.editInv);
+});
 api("/api/me").then((me) => {
   if (me.settings) {
     document.getElementById("workspace-label").textContent =

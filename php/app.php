@@ -20,7 +20,11 @@ if (str_starts_with($path, '/static/')) {
                 'webp' => 'image/webp',
             ];
             header('Content-Type: ' . ($types[$ext] ?? 'application/octet-stream'));
-            header('Cache-Control: public, max-age=86400');
+            if (in_array($ext, ['js', 'css'], true)) {
+                header('Cache-Control: public, max-age=60, must-revalidate');
+            } else {
+                header('Cache-Control: public, max-age=86400');
+            }
             readfile($file);
             exit;
         }
