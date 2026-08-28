@@ -63,7 +63,8 @@ View::start($title, $site_home, 'index,follow', '/');
   <p>Credit unions and insurers: per-member partnership pricing. Churches, senior centers, and veterans groups: $299–$999/year.</p>
   <footer class="footer">
     OurCircle is built for families — including parents, adult children, and grandparents — who want a second set of eyes. We do not guarantee that a request is legitimate.
-    <span class="muted"> · <a href="<?= Http::e($site_home) ?>/robots.txt">robots.txt</a> · <a href="<?= Http::e($site_home) ?>/sitemap.xml">sitemap.xml</a></span>
+    <span class="muted"> · <?= Http::e(Product::label()) ?> · Hostinger PHP · not InPmnt
+     · <a href="<?= Http::e($site_home) ?>/robots.txt">robots.txt</a> · <a href="<?= Http::e($site_home) ?>/sitemap.xml">sitemap.xml</a></span>
   </footer>
 </div>
 </body></html>

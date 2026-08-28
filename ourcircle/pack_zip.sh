@@ -42,6 +42,31 @@ static_dst = stage / "static"
 if static_src.is_dir():
     shutil.copytree(static_src, static_dst, dirs_exist_ok=True)
 
+version = (root / "VERSION").read_text(encoding="utf-8").strip() or "0.0.0"
+shutil.copy2(root / "VERSION", stage / "VERSION")
+import subprocess
+git = ""
+try:
+    git = subprocess.check_output(
+        ["git", "-C", str(root.parent), "rev-parse", "--short", "HEAD"],
+        text=True,
+    ).strip()
+except Exception:
+    git = "unknown"
+from datetime import datetime, timezone
+stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+(stage / "BUILD.txt").write_text(
+    "Product: Family Shield Pro (OurCircle)\n"
+    f"Version: {version}\n"
+    "Channel: Hostinger-PHP\n"
+    "Site: https://familyshieldpro.com\n"
+    "Not: InPmnt\n"
+    f"Git: {git}\n"
+    f"Built: {stamp}\n"
+    "Unzip into public_html. Never chmod 777.\n",
+    encoding="utf-8",
+)
+
 uploads = stage / "data" / "uploads"
 uploads.mkdir(parents=True, exist_ok=True)
 (uploads / ".gitkeep").write_text("", encoding="utf-8")
@@ -63,11 +88,12 @@ for dirpath, _dns, filenames in os.walk(stage):
 
 outdir = staging_parent / "out"
 outdir.mkdir(parents=True, exist_ok=True)
-zip_path = outdir / "FamilyShieldPro.zip"
-if zip_path.exists():
-    zip_path.unlink()
+zip_alias = outdir / "FamilyShieldPro.zip"
+zip_versioned = outdir / f"FamilyShieldPro-{version}.zip"
+if zip_alias.exists():
+    zip_alias.unlink()
 
-with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+with zipfile.ZipFile(zip_alias, "w", compression=zipfile.ZIP_DEFLATED) as zf:
     # Files at zip root so unzip-in-public_html works (no extra folder).
     for dirpath, _dns, filenames in os.walk(stage):
         d = Path(dirpath)
@@ -86,33 +112,44 @@ with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
             zi.external_attr = (stat.S_IFREG | 0o644) << 16
             zi.compress_type = zipfile.ZIP_DEFLATED
             zf.writestr(zi, f.read_bytes())
+shutil.copy2(zip_alias, zip_versioned)
 
 artifacts.mkdir(parents=True, exist_ok=True)
-dest = artifacts / "FamilyShieldPro.zip"
-shutil.copy2(zip_path, dest)
 patches = root / "patches"
 patches.mkdir(parents=True, exist_ok=True)
 repo_patches = root.parent / "patches"
 repo_patches.mkdir(parents=True, exist_ok=True)
-shutil.copy2(zip_path, patches / "FamilyShieldPro.zip")
-shutil.copy2(zip_path, repo_patches / "FamilyShieldPro.zip")
-shutil.copy2(stage / "robots.txt", patches / "robots.txt")
-shutil.copy2(stage / "sitemap.xml", patches / "sitemap.xml")
-shutil.copy2(stage / "robots.txt", repo_patches / "robots.txt")
-shutil.copy2(stage / "sitemap.xml", repo_patches / "sitemap.xml")
-shutil.copy2(stage / "robots.txt", artifacts / "robots.txt")
-shutil.copy2(stage / "sitemap.xml", artifacts / "sitemap.xml")
-for p in (
-    dest,
+
+def publish(src: Path, *dests: Path) -> None:
+    for dest in dests:
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dest)
+        try:
+            dest.chmod(0o644)
+        except OSError:
+            pass
+
+publish(
+    zip_alias,
+    artifacts / "FamilyShieldPro.zip",
     patches / "FamilyShieldPro.zip",
     repo_patches / "FamilyShieldPro.zip",
-    artifacts / "robots.txt",
-    artifacts / "sitemap.xml",
-):
-    try:
-        p.chmod(0o644)
-    except OSError:
-        pass
-print(f"Built {dest} ({dest.stat().st_size} bytes)")
+)
+publish(
+    zip_versioned,
+    artifacts / zip_versioned.name,
+    patches / zip_versioned.name,
+    repo_patches / zip_versioned.name,
+)
+for name in ("robots.txt", "sitemap.xml"):
+    publish(
+        stage / name,
+        artifacts / name,
+        patches / name,
+        repo_patches / name,
+    )
+print(f"Built Family Shield Pro v{version} (not InPmnt)")
+print(f"  {artifacts / zip_versioned.name}")
+print(f"  {artifacts / 'FamilyShieldPro.zip'}")
 print("Unzip into public_html. Folders 755, data 775, files 644. Never 777.")
 PY

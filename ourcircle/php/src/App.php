@@ -27,7 +27,15 @@ final class App
         } elseif ($method === 'GET' && $path === '/sitemap.xml') {
             $this->sitemap();
         } elseif ($method === 'GET' && $path === '/healthz') {
-            Http::json(['ok' => true, 'service' => 'familyshieldpro']);
+            Http::json([
+                'ok' => true,
+                'service' => 'familyshieldpro',
+                'product' => Product::NAME,
+                'app' => Product::APP,
+                'version' => Product::version(),
+                'channel' => Product::CHANNEL,
+                'not' => 'InPmnt',
+            ]);
         } elseif ($method === 'GET' && $path === '/') {
             $this->landing();
         } elseif ($path === '/offers') {

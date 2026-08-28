@@ -25,6 +25,7 @@ require $root . '/src/Http.php';
 require $root . '/src/Db.php';
 require $root . '/src/Analyze.php';
 require $root . '/src/View.php';
+require $root . '/src/Product.php';
 require $root . '/src/App.php';
 
 Env::load($envPath);

@@ -132,7 +132,18 @@ def create_app() -> Flask:
 
     @app.get("/healthz")
     def healthz():
-        return {"ok": True, "service": "familyshieldpro"}
+        ver = "0.0.0"
+        vp = ROOT / "VERSION"
+        if vp.is_file():
+            ver = vp.read_text(encoding="utf-8").strip() or ver
+        return {
+            "ok": True,
+            "service": "familyshieldpro",
+            "product": "Family Shield Pro",
+            "app": "OurCircle",
+            "version": ver,
+            "not": "InPmnt",
+        }
 
     def current_user():
         uid = session.get("user_id")

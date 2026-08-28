@@ -50,13 +50,14 @@ If none hits the bar, change the offer before writing more product code.
 
 ## Downloads
 
-| File | Download |
-|---|---|
-| **FamilyShieldPro.zip** | https://raw.githubusercontent.com/devildog5x5/InPmnt/cursor/ourcircle-family-shield-4df6/patches/FamilyShieldPro.zip |
-| **robots.txt** | https://raw.githubusercontent.com/devildog5x5/InPmnt/cursor/ourcircle-family-shield-4df6/patches/robots.txt |
-| **sitemap.xml** | https://raw.githubusercontent.com/devildog5x5/InPmnt/cursor/ourcircle-family-shield-4df6/patches/sitemap.xml |
+| File | What it is | Download |
+|---|---|---|
+| **FamilyShieldPro-1.0.0.zip** | Identifiable Hostinger build (use this) | https://raw.githubusercontent.com/devildog5x5/InPmnt/cursor/ourcircle-family-shield-4df6/patches/FamilyShieldPro-1.0.0.zip |
+| **FamilyShieldPro.zip** | Same bytes, latest alias | https://raw.githubusercontent.com/devildog5x5/InPmnt/cursor/ourcircle-family-shield-4df6/patches/FamilyShieldPro.zip |
+| **robots.txt** | SEO | https://raw.githubusercontent.com/devildog5x5/InPmnt/cursor/ourcircle-family-shield-4df6/patches/robots.txt |
+| **sitemap.xml** | SEO | https://raw.githubusercontent.com/devildog5x5/InPmnt/cursor/ourcircle-family-shield-4df6/patches/sitemap.xml |
 
-Unzip the zip into Hostinger `public_html`. After the site is live, robots/sitemap are also at https://familyshieldpro.com/robots.txt and https://familyshieldpro.com/sitemap.xml.
+Product **Family Shield Pro v1.0.0** (OurCircle). Not InPmnt (InPmnt is still `VERSION` 1.4.x at repo root). Changelog: [CHANGELOG.md](CHANGELOG.md).
 
 ## Hostinger deploy (no VPS)
 

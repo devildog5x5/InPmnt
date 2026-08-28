@@ -31,7 +31,12 @@ $phone = Analyze::analyze('', '8005550100', '', $trusted);
 check((bool) array_filter($phone['matches'], fn ($m) => str_contains(strtolower($m), 'trusted list')), 'trusted phone');
 
 $empty = Analyze::analyze('');
-check($empty['level'] === Analyze::UNKNOWN, 'empty unknown');
+check(Analyze::analyze('')['level'] === Analyze::UNKNOWN, 'empty unknown');
+
+require $root . '/php/src/Product.php';
+check(Product::version() === '1.0.0', 'product version 1.0.0');
+check(Product::NAME === 'Family Shield Pro', 'product name');
+check(Product::APP === 'OurCircle', 'app name');
 
 $dir = sys_get_temp_dir() . '/ocphp-' . bin2hex(random_bytes(4));
 mkdir($dir, 0775, true);

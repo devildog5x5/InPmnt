@@ -1,7 +1,8 @@
 # Family Shield Pro — deploy (no VPS)
 
 **Site:** https://familyshieldpro.com  
-**Zip:** [FamilyShieldPro.zip](https://raw.githubusercontent.com/devildog5x5/InPmnt/cursor/ourcircle-family-shield-4df6/patches/FamilyShieldPro.zip) — unzip into Hostinger `public_html`.  
+**Zip (v1.0.0):** [FamilyShieldPro-1.0.0.zip](https://raw.githubusercontent.com/devildog5x5/InPmnt/cursor/ourcircle-family-shield-4df6/patches/FamilyShieldPro-1.0.0.zip) — unzip into Hostinger `public_html`.  
+**Latest alias:** [FamilyShieldPro.zip](https://raw.githubusercontent.com/devildog5x5/InPmnt/cursor/ourcircle-family-shield-4df6/patches/FamilyShieldPro.zip)  
 **robots.txt:** [download](https://raw.githubusercontent.com/devildog5x5/InPmnt/cursor/ourcircle-family-shield-4df6/patches/robots.txt)  
 **sitemap.xml:** [download](https://raw.githubusercontent.com/devildog5x5/InPmnt/cursor/ourcircle-family-shield-4df6/patches/sitemap.xml)  
 **Do not** put this in an InPmnt folder or overwrite a live `.env`.
