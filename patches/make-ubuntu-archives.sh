@@ -18,7 +18,7 @@ if [[ -z "$invoice_commit" ]]; then
   exit 1
 fi
 
-excl=(-- . ':(exclude)patches' ':(exclude)installers')
+excl=(-- . ':(exclude)patches' ':(exclude)installers' ':(exclude).cursor')
 git diff --no-ext-diff --binary "$base"..."$mail_commit" "${excl[@]}" > patches/001-mail-smtp-fallback.patch
 git diff --no-ext-diff --binary "$mail_commit"..."$invoice_commit" "${excl[@]}" > patches/002-invoice-send-email.patch
 git diff --no-ext-diff --binary "$invoice_commit"...HEAD "${excl[@]}" > patches/003-invoice-pdf.patch
