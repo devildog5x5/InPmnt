@@ -19,5 +19,6 @@ Copy .env.example to .env only if first visit did not create .env.
 Do not overwrite a live .env on later updates.
 Do not drop this into an InPmnt public_html.
 
-Product: Family Shield Pro (OurCircle) — see VERSION in this folder.
-Channel: Hostinger PHP. This is not the InPmnt invoice app.
+This zip already includes **robots.txt** and **sitemap.xml** at the top level (next to index.php).
+After unzip they become https://familyshieldpro.com/robots.txt and /sitemap.xml.
+Do not download those as separate GitHub links — they display as text, not a file.

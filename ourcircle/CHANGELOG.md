@@ -6,7 +6,6 @@ Not InPmnt. Version file: `ourcircle/VERSION` (independent of repo-root InPmnt `
 ## 1.0.0 — 2026-08-28
 
 - First Hostinger PHP drop (`FamilyShieldPro-1.0.0.zip`) — unzip into `public_html`, no VPS.
-- Preset permissions: dirs `755`, `data/` `775`, files `644`, live `.env` `640`. Never `777`.
-- `robots.txt` and `sitemap.xml` for https://familyshieldpro.com (`/`, `/signup`, `/login`, `/offers`).
+- `robots.txt` and `sitemap.xml` ship **inside that zip** (zip root, next to `index.php`). Do not fetch them as GitHub raw text.
 - Family circle, pause-and-verify checks, trusted list, “Please call me before I pay,” founding $49 reservation.
 - Logo always links to https://familyshieldpro.com.

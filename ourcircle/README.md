@@ -50,14 +50,18 @@ If none hits the bar, change the offer before writing more product code.
 
 ## Downloads
 
-| File | What it is | Download |
-|---|---|---|
-| **FamilyShieldPro-1.0.0.zip** | Identifiable Hostinger build (use this) | https://raw.githubusercontent.com/devildog5x5/InPmnt/cursor/ourcircle-family-shield-4df6/patches/FamilyShieldPro-1.0.0.zip |
-| **FamilyShieldPro.zip** | Same bytes, latest alias | https://raw.githubusercontent.com/devildog5x5/InPmnt/cursor/ourcircle-family-shield-4df6/patches/FamilyShieldPro.zip |
-| **robots.txt** | SEO | https://raw.githubusercontent.com/devildog5x5/InPmnt/cursor/ourcircle-family-shield-4df6/patches/robots.txt |
-| **sitemap.xml** | SEO | https://raw.githubusercontent.com/devildog5x5/InPmnt/cursor/ourcircle-family-shield-4df6/patches/sitemap.xml |
+One file. `robots.txt` and `sitemap.xml` are **inside** this zip (next to `index.php`). Do not use GitHub “raw” links for those — the browser shows the text instead of saving a file.
 
-Product **Family Shield Pro v1.0.0** (OurCircle). Not InPmnt (InPmnt is still `VERSION` 1.4.x at repo root). Changelog: [CHANGELOG.md](CHANGELOG.md).
+| File | What it is |
+|---|---|
+| **FamilyShieldPro-1.0.0.zip** | Hostinger drop: app + robots.txt + sitemap.xml + VERSION |
+
+<a href="/opt/cursor/artifacts/FamilyShieldPro-1.0.0.zip">Download FamilyShieldPro-1.0.0.zip</a>
+
+GitHub (use the **Download raw file** button, not the text view):  
+https://github.com/devildog5x5/InPmnt/blob/cursor/ourcircle-family-shield-4df6/patches/FamilyShieldPro-1.0.0.zip
+
+Product **Family Shield Pro v1.0.0** (OurCircle). Not InPmnt. Changelog: [CHANGELOG.md](CHANGELOG.md).
 
 ## Hostinger deploy (no VPS)
 
