@@ -14,7 +14,7 @@ These are the mail + invoice-send + invoice-PDF changes, split so you can apply 
 
 Do **not** overwrite a live `.env`. GitHub shows `.patch` as text; always hand the user the **zip**.
 
-**Latest full build (Hostinger / Ubuntu):** unzip `InPmnt-PHP.zip` into `public_html`, then on Ubuntu Apache run `sudo bash fix-ubuntu-perms.sh`.
+**Latest full build (Hostinger / Ubuntu):** unzip `InPmnt-PHP.zip` into `public_html`, then on Ubuntu Apache run `sudo bash fix-ubuntu-perms.sh`. If a WordPress page still appears, run `bash remove-wordpress.sh` and purge cache in hPanel.
 
 ## Hostinger (`public_html`)
 

@@ -103,7 +103,8 @@ InPmnt now ships a **PHP** build you can drop on Hostinger Web/Cloud (no VPS).
 2. In hPanel → **Files → File Manager** (or FTP), unzip **all files into `public_html`**.
 3. Copy `.env.example` → `.env`. Set `APP_SECRET` (long random string) and `BASE_URL=https://yourdomain.com`.
 4. hPanel → **Advanced → PHP Configuration**: PHP **8.2+**, enable **pdo_sqlite**.
-5. Open `https://yourdomain.com` and sign up.
+5. If this domain used to be WordPress: in `public_html` run `bash remove-wordpress.sh`, then hPanel → **Cache → Purge All**, and **delete the WordPress install** in hPanel so Hostinger does not restore it.
+6. Open `https://yourdomain.com` and sign up.
 
 ### Email on Hostinger
 
