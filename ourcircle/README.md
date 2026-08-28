@@ -48,6 +48,23 @@ Share `/offers` with real buyers. Count refundable reservations, not opinions:
 
 If none hits the bar, change the offer before writing more product code.
 
+## Ubuntu deploy
+
+Use the zip (easy to copy) or the tarball (keeps Unix modes). Full steps: **[DEPLOY.md](DEPLOY.md)**. Go-to-market: **[GO_TO_MARKET.md](GO_TO_MARKET.md)**.
+
+```bash
+sudo unzip -o FamilyShieldPro-Ubuntu.zip
+sudo bash deploy/setup-ubuntu.sh familyshieldpro.com
+sudo certbot --nginx -d familyshieldpro.com -d www.familyshieldpro.com
+```
+
+Permissions: directories `755`, files `644`, `data/` `775`, `.env` `640`. Never `chmod -R 777`. Rebuild the pack with `bash pack_ubuntu.sh`.
+
+Public SEO files (also served by the running app):
+
+- https://familyshieldpro.com/robots.txt
+- https://familyshieldpro.com/sitemap.xml
+
 ## Tests
 
 ```bash

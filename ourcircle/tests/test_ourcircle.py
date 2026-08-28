@@ -114,6 +114,27 @@ class AppTests(unittest.TestCase):
         self.assertEqual(inv.status_code, 200)
         self.assertIn(b"Invite created", inv.data)
 
+    def test_robots_and_sitemap_use_familyshieldpro(self) -> None:
+        robots = self.client.get("/robots.txt")
+        self.assertEqual(robots.status_code, 200)
+        text = robots.data.decode("utf-8")
+        self.assertIn("familyshieldpro.com", text)
+        self.assertIn("Sitemap: https://familyshieldpro.com/sitemap.xml", text)
+        self.assertIn("Disallow: /home", text)
+        self.assertIn("Disallow: /uploads", text)
+        self.assertIn("Allow: /signup", text)
+        sitemap = self.client.get("/sitemap.xml")
+        self.assertEqual(sitemap.status_code, 200)
+        xml = sitemap.data.decode("utf-8")
+        self.assertIn("https://familyshieldpro.com/", xml)
+        self.assertIn("https://familyshieldpro.com/signup", xml)
+        self.assertIn("https://familyshieldpro.com/login", xml)
+        self.assertIn("https://familyshieldpro.com/offers", xml)
+        self.assertNotIn("/home", xml)
+        health = self.client.get("/healthz")
+        self.assertEqual(health.status_code, 200)
+        self.assertTrue(health.get_json()["ok"])
+
 
 if __name__ == "__main__":
     unittest.main()

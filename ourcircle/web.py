@@ -35,6 +35,23 @@ from database import (
 ROOT = Path(__file__).resolve().parent
 UPLOADS = DATA / "uploads"
 ALLOWED_SHOT = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
+DEFAULT_SITE_URL = "https://familyshieldpro.com"
+PUBLIC_PATHS = ("/", "/signup", "/login", "/offers")
+PRIVATE_PREFIXES = (
+    "/home",
+    "/circle",
+    "/trusted",
+    "/checks",
+    "/uploads",
+    "/join",
+    "/billing",
+    "/report",
+    "/logout",
+)
+
+
+def site_url() -> str:
+    return (os.environ.get("OURCIRCLE_SITE_URL") or DEFAULT_SITE_URL).rstrip("/")
 
 PLANS = [
     {"id": "individual", "name": "Individual", "price": "$7.99/month", "detail": "One login, your trusted list, and checks."},
@@ -63,8 +80,59 @@ def create_app() -> Flask:
             "core_rule": CORE_RULE,
             "disclaimer": DISCLAIMER,
             "user_name": session.get("name"),
-            "site_home": (os.environ.get("OURCIRCLE_SITE_URL") or "https://familyshieldpro.com").rstrip("/"),
+            "site_home": site_url(),
         }
+
+    @app.get("/robots.txt")
+    def robots_txt():
+        lines = [
+            "User-agent: *",
+            "Allow: /",
+            "Allow: /signup",
+            "Allow: /login",
+            "Allow: /offers",
+        ]
+        for path in PRIVATE_PREFIXES:
+            lines.append(f"Disallow: {path}")
+        lines.extend(
+            [
+                "",
+                f"Host: {site_url().replace('https://', '').replace('http://', '')}",
+                f"Sitemap: {site_url()}/sitemap.xml",
+                "",
+            ]
+        )
+        return app.response_class("\n".join(lines), mimetype="text/plain; charset=utf-8")
+
+    @app.get("/sitemap.xml")
+    def sitemap_xml():
+        lastmod = now()[:10]
+        urls = []
+        for path in PUBLIC_PATHS:
+            loc = f"{site_url()}/" if path == "/" else f"{site_url()}{path}"
+            priority = "1.0" if path == "/" else ("0.9" if path == "/signup" else "0.8")
+            changefreq = "weekly" if path != "/login" else "monthly"
+            if path == "/login":
+                priority = "0.6"
+            urls.append(
+                "  <url>\n"
+                f"    <loc>{loc}</loc>\n"
+                f"    <lastmod>{lastmod}</lastmod>\n"
+                f"    <changefreq>{changefreq}</changefreq>\n"
+                f"    <priority>{priority}</priority>\n"
+                "  </url>"
+            )
+        body = (
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+            + "\n".join(urls)
+            + "\n</urlset>\n"
+        )
+        return app.response_class(body, mimetype="application/xml; charset=utf-8")
+
+    @app.get("/healthz")
+    def healthz():
+        return {"ok": True, "service": "familyshieldpro"}
 
     def current_user():
         uid = session.get("user_id")
