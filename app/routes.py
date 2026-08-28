@@ -662,6 +662,17 @@ def api_create_client():
 def api_update_client(client_id: int):
     data = request.get_json(force=True) or {}
     wid = require_workspace_id()
+
+    def text_field(key: str, current: Any) -> str | None:
+        if key not in data:
+            val = current
+        else:
+            val = data.get(key)
+        if val is None:
+            return None
+        s = str(val).strip()
+        return s or None
+
     with db_session(db_path()) as conn:
         existing = conn.execute(
             "SELECT * FROM clients WHERE id = ? AND workspace_id = ?",
@@ -669,7 +680,9 @@ def api_update_client(client_id: int):
         ).fetchone()
         if not existing:
             return jsonify({"error": "Not found"}), 404
-        name = (data.get("name") or existing["name"]).strip()
+        name = text_field("name", existing["name"]) or ""
+        if not name:
+            return jsonify({"error": "Name is required"}), 400
         conn.execute(
             """
             UPDATE clients SET name=?, company=?, email=?, phone=?, notes=?
@@ -677,10 +690,10 @@ def api_update_client(client_id: int):
             """,
             (
                 name,
-                (data.get("company") if "company" in data else existing["company"]),
-                (data.get("email") if "email" in data else existing["email"]),
-                (data.get("phone") if "phone" in data else existing["phone"]),
-                (data.get("notes") if "notes" in data else existing["notes"]),
+                text_field("company", existing["company"]),
+                text_field("email", existing["email"]),
+                text_field("phone", existing["phone"]),
+                text_field("notes", existing["notes"]),
                 client_id,
                 wid,
             ),
