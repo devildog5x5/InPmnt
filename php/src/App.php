@@ -641,14 +641,38 @@ final class App
         if (!$existing) {
             Http::json(['error' => 'Not found'], 404);
         }
+        $wantSend = filter_var($data['send'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        $title = array_key_exists('title', $data) ? trim((string) $data['title']) : (string) $existing['title'];
+        if ($title === '') {
+            Http::json(['error' => 'Title is required'], 400);
+        }
+        if (array_key_exists('amount', $data)) {
+            $amount = (float) $data['amount'];
+        } else {
+            $amount = (float) $existing['amount'];
+        }
+        if ($amount <= 0) {
+            Http::json(['error' => 'Amount must be greater than zero'], 400);
+        }
+        $paid = (float) ($existing['amount_paid'] ?? 0);
+        if ($amount < $paid) {
+            Http::json(['error' => 'Amount cannot be less than what is already paid'], 400);
+        }
+        $status = $data['status'] ?? $existing['status'];
+        if (!in_array($status, ['draft', 'sent', 'partial', 'overdue', 'paid'], true)) {
+            $status = $existing['status'];
+        }
+        $notes = array_key_exists('notes', $data)
+            ? trim((string) $data['notes'])
+            : (string) ($existing['notes'] ?? '');
         $fields = [
-            'title' => $data['title'] ?? $existing['title'],
-            'amount' => (float) ($data['amount'] ?? $existing['amount']),
+            'title' => $title,
+            'amount' => $amount,
             'issue_date' => $data['issue_date'] ?? $existing['issue_date'],
             'due_date' => $data['due_date'] ?? $existing['due_date'],
-            'notes' => $data['notes'] ?? $existing['notes'],
+            'notes' => $notes,
             'client_id' => (int) ($data['client_id'] ?? $existing['client_id']),
-            'status' => $data['status'] ?? $existing['status'],
+            'status' => $status,
         ];
         $c = $this->db->prepare('SELECT id FROM clients WHERE id=? AND workspace_id=?');
         $c->execute([$fields['client_id'], $wid]);
@@ -675,7 +699,16 @@ final class App
         }
         Db::refreshInvoiceStatus($this->db, $id);
         Db::log($this->db, 'invoice', "Updated invoice {$existing['number']}", 'invoice', $id, $wid);
-        Http::json($this->invoiceDetail($id, $wid));
+        $emailed = false;
+        if ($wantSend) {
+            $this->deliverInvoice($wid, $id);
+            $emailed = true;
+        }
+        $out = $this->invoiceDetail($id, $wid);
+        if (is_array($out)) {
+            $out['emailed'] = $emailed;
+        }
+        Http::json($out);
     }
 
     private function apiSendInvoice(int $wid, int $id): void

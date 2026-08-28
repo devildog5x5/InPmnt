@@ -854,12 +854,21 @@ def api_create_invoice():
     return jsonify(data_out), 201
 
 
+def _json_truthy(value: Any) -> bool:
+    if value is True or value == 1:
+        return True
+    if isinstance(value, str) and value.strip().lower() in ("1", "true", "yes", "on"):
+        return True
+    return False
+
+
 @bp.put("/api/invoices/<int:invoice_id>")
 @login_required
 def api_update_invoice(invoice_id: int):
     data = request.get_json(force=True) or {}
     now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
     wid = require_workspace_id()
+    want_send = _json_truthy(data.get("send"))
     with db_session(db_path()) as conn:
         existing = conn.execute(
             "SELECT * FROM invoices WHERE id=? AND workspace_id=?",
@@ -867,15 +876,36 @@ def api_update_invoice(invoice_id: int):
         ).fetchone()
         if not existing:
             return jsonify({"error": "Not found"}), 404
+        title = data["title"] if "title" in data else existing["title"]
+        title = (title or "").strip()
+        if not title:
+            return jsonify({"error": "Title is required"}), 400
+        if "amount" in data:
+            try:
+                amount = float(data.get("amount") or 0)
+            except (TypeError, ValueError):
+                return jsonify({"error": "Invalid amount"}), 400
+        else:
+            amount = float(existing["amount"] or 0)
+        if amount <= 0:
+            return jsonify({"error": "Amount must be greater than zero"}), 400
+        paid = float(existing["amount_paid"] or 0)
+        if amount < paid:
+            return jsonify({"error": "Amount cannot be less than what is already paid"}), 400
+        status = data.get("status", existing["status"])
+        if status not in ("draft", "sent", "partial", "overdue", "paid"):
+            status = existing["status"]
         fields = {
-            "title": data.get("title", existing["title"]),
-            "amount": float(data.get("amount", existing["amount"])),
+            "title": title,
+            "amount": amount,
             "issue_date": data.get("issue_date", existing["issue_date"]),
             "due_date": data.get("due_date", existing["due_date"]),
-            "notes": data.get("notes", existing["notes"]),
+            "notes": (data["notes"] if "notes" in data else existing["notes"]) or "",
             "client_id": int(data.get("client_id", existing["client_id"])),
-            "status": data.get("status", existing["status"]),
+            "status": status,
         }
+        if isinstance(fields["notes"], str):
+            fields["notes"] = fields["notes"].strip()
         client = conn.execute(
             "SELECT id FROM clients WHERE id=? AND workspace_id=?",
             (fields["client_id"], wid),
@@ -923,7 +953,15 @@ def api_update_invoice(invoice_id: int):
             invoice_id,
             workspace_id=wid,
         )
+        emailed = False
+        if want_send:
+            err = email_invoice_to_client(conn, invoice_id, wid)
+            if err:
+                return err
+            emailed = True
         out = invoice_detail(conn, invoice_id, wid)
+    if out:
+        out["emailed"] = emailed
     return jsonify(out)
 
 

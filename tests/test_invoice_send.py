@@ -156,6 +156,60 @@ class InvoiceSendTests(unittest.TestCase):
         still = self.client.get(f"/api/invoices/{inv['id']}").get_json()
         self.assertEqual(still["status"], "draft")
 
+    def test_update_draft_then_send(self) -> None:
+        inv = self._create_draft()
+        res = self.client.put(
+            f"/api/invoices/{inv['id']}",
+            json={
+                "title": "Spring cleanup + mulch",
+                "amount": 275,
+                "notes": "Updated after walkthrough",
+            },
+        )
+        self.assertEqual(res.status_code, 200, res.get_json())
+        body = res.get_json()
+        self.assertEqual(body["title"], "Spring cleanup + mulch")
+        self.assertEqual(body["amount"], 275)
+        self.assertEqual(body["notes"], "Updated after walkthrough")
+        self.assertEqual(body["status"], "draft")
+        self.assertFalse(body.get("emailed"))
+
+        with patch("app.routes.send_email", return_value={"provider": "smtp", "id": None}) as send:
+            sent = self.client.post(f"/api/invoices/{inv['id']}/send", json={})
+            self.assertEqual(sent.status_code, 200, sent.get_json())
+            out = sent.get_json()
+            self.assertTrue(out["emailed"])
+            self.assertEqual(out["status"], "sent")
+            self.assertIn("Spring cleanup + mulch", send.call_args.kwargs["body"])
+            self.assertIn("$275.00", send.call_args.kwargs["body"])
+
+    def test_update_with_send_emails_and_marks_sent(self) -> None:
+        inv = self._create_draft()
+        with patch("app.routes.send_email", return_value={"provider": "smtp", "id": None}) as send:
+            res = self.client.put(
+                f"/api/invoices/{inv['id']}",
+                json={"title": "Patio reset", "amount": 400, "send": True},
+            )
+            self.assertEqual(res.status_code, 200, res.get_json())
+            body = res.get_json()
+            self.assertTrue(body["emailed"])
+            self.assertEqual(body["status"], "sent")
+            self.assertEqual(body["title"], "Patio reset")
+            send.assert_called_once()
+            self.assertIn("Patio reset", send.call_args.kwargs["body"])
+            self.assertIn("$400.00", send.call_args.kwargs["body"])
+
+    def test_update_rejects_empty_title_and_zero_amount(self) -> None:
+        inv = self._create_draft()
+        bad_title = self.client.put(f"/api/invoices/{inv['id']}", json={"title": "   "})
+        self.assertEqual(bad_title.status_code, 400)
+        bad_amt = self.client.put(f"/api/invoices/{inv['id']}", json={"amount": 0})
+        self.assertEqual(bad_amt.status_code, 400)
+        still = self.client.get(f"/api/invoices/{inv['id']}").get_json()
+        self.assertEqual(still["title"], "Spring cleanup")
+        self.assertEqual(still["amount"], 250)
+        self.assertEqual(still["status"], "draft")
+
     def test_invoice_template_is_present(self) -> None:
         res = self.client.get("/api/templates")
         self.assertEqual(res.status_code, 200)

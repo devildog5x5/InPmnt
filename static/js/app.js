@@ -92,6 +92,20 @@ function empty(msg) {
   return `<div class="empty">${msg}</div>`;
 }
 
+function esc(s) {
+  return String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+async function sendInvoiceNow(id) {
+  const res = await api(`/api/invoices/${id}/send`, { method: "POST", body: "{}" });
+  toast(res.emailed ? `Invoice emailed to ${res.client_email || "the client"}` : "Invoice sent");
+  return res;
+}
+
 /* ---------- Dashboard ---------- */
 async function renderDashboard() {
   const data = await api("/api/dashboard");
@@ -249,7 +263,7 @@ async function renderInvoices(filter = "all") {
     ${topbar({
       eyebrow: "Collections",
       title: "Invoices",
-      subtitle: "Track balances, schedule reminders, and record payments.",
+      subtitle: "Create a draft, edit it, then send now or send from this page.",
       actions: `<button class="btn" id="btn-new-inv">New invoice</button>`,
     })}
     <div class="toolbar">
@@ -286,13 +300,20 @@ async function renderInvoices(filter = "all") {
                         <td>${badge(i.status)}</td>
                         <td class="row-actions">
                           ${
-                            i.status !== "paid" && i.status !== "draft"
-                              ? `<button class="btn sm secondary" data-pay="${i.id}">Pay</button>`
+                            i.status !== "paid"
+                              ? `<button class="btn sm secondary" data-edit-inv="${i.id}">Edit</button>`
                               : ""
                           }
                           ${
                             i.status === "draft"
-                              ? `<button class="btn sm" data-send-inv="${i.id}">Send</button>`
+                              ? `<button class="btn sm" data-send-inv="${i.id}">Send now</button>`
+                              : i.status !== "paid"
+                                ? `<button class="btn sm secondary" data-send-inv="${i.id}">Email</button>`
+                                : ""
+                          }
+                          ${
+                            i.status !== "paid" && i.status !== "draft"
+                              ? `<button class="btn sm secondary" data-pay="${i.id}">Pay</button>`
                               : ""
                           }
                         </td>
@@ -311,13 +332,21 @@ async function renderInvoices(filter = "all") {
   appEl.querySelectorAll("[data-pay]").forEach((btn) =>
     btn.addEventListener("click", () => openPaymentModal(+btn.dataset.pay))
   );
+  const byId = Object.fromEntries(invoices.map((i) => [String(i.id), i]));
+  appEl.querySelectorAll("[data-edit-inv]").forEach((btn) =>
+    btn.addEventListener("click", () => {
+      const inv = byId[btn.dataset.editInv];
+      if (inv) openInvoiceModal(inv, () => renderInvoices(filter));
+    })
+  );
   appEl.querySelectorAll("[data-send-inv]").forEach((btn) =>
     btn.addEventListener("click", async () => {
+      btn.disabled = true;
       try {
-        const res = await api(`/api/invoices/${btn.dataset.sendInv}/send`, { method: "POST", body: "{}" });
-        toast(res.emailed ? `Invoice emailed to ${res.client_email || "the client"}` : "Invoice sent");
+        await sendInvoiceNow(+btn.dataset.sendInv);
         renderInvoices(filter);
       } catch (err) {
+        btn.disabled = false;
         toast(err.message || "Send failed", "error");
       }
     })
@@ -334,7 +363,8 @@ async function renderInvoiceDetail(id) {
       subtitle: `${inv.title} · ${inv.client_name}`,
       actions: `
         <button class="btn secondary" data-go="#/invoices">Back</button>
-        ${inv.status === "draft" ? `<button class="btn" id="btn-send">Send invoice</button>` : `<button class="btn secondary" id="btn-send">Email invoice</button>`}
+        ${inv.status !== "paid" ? `<button class="btn secondary" id="btn-edit">Edit</button>` : ""}
+        ${inv.status === "draft" ? `<button class="btn" id="btn-send">Send now</button>` : `<button class="btn secondary" id="btn-send">Email invoice</button>`}
         <a class="btn secondary" href="/api/invoices/${id}/pdf">Download PDF</a>
         ${inv.status !== "paid" && inv.status !== "draft" ? `<button class="btn" id="btn-pay">Record payment</button>` : ""}
         ${inv.status === "overdue" || inv.status === "partial" ? `<button class="btn danger" id="btn-final">Final notice</button>` : ""}
@@ -415,12 +445,17 @@ async function renderInvoiceDetail(id) {
     </div>
   `;
   wireCommon(appEl);
-  appEl.querySelector("#btn-send")?.addEventListener("click", async () => {
+  appEl.querySelector("#btn-edit")?.addEventListener("click", () =>
+    openInvoiceModal(inv, () => renderInvoiceDetail(id))
+  );
+  appEl.querySelector("#btn-send")?.addEventListener("click", async (e) => {
+    const btn = e.currentTarget;
+    btn.disabled = true;
     try {
-      const res = await api(`/api/invoices/${id}/send`, { method: "POST", body: "{}" });
-      toast(res.emailed ? `Invoice emailed to ${res.client_email || "the client"}` : "Invoice sent");
+      await sendInvoiceNow(id);
       renderInvoiceDetail(id);
     } catch (err) {
+      btn.disabled = false;
       toast(err.message || "Send failed", "error");
     }
   });
@@ -436,50 +471,109 @@ async function renderInvoiceDetail(id) {
   });
 }
 
-async function openInvoiceModal() {
+async function openInvoiceModal(existing = null, after = null) {
   const clients = await api("/api/clients");
   const today = new Date().toISOString().slice(0, 10);
-  const due = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);
+  const defaultDue = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);
+  const isEdit = Boolean(existing && existing.id);
+  const isDraft = !isEdit || existing.status === "draft";
+  const saveLabel = isEdit ? "Save" : "Save draft";
+  const sendLabel = isEdit && !isDraft ? "Save & email" : "Send now";
+  const lead = isEdit
+    ? isDraft
+      ? "Update this invoice, then send now or send it from the Invoices page."
+      : "Save changes for the next PDF, or save and email the updated invoice."
+    : "Save as a draft and send later from Invoices, or send now to email the client a PDF.";
+  const issueVal = existing?.issue_date ? String(existing.issue_date).slice(0, 10) : today;
+  const dueVal = existing?.due_date ? String(existing.due_date).slice(0, 10) : defaultDue;
+  const selectedClient = existing ? String(existing.client_id) : "";
   openModal({
-    title: "New invoice",
-    lead: "Create an invoice. Send now emails the client and schedules reminders.",
+    title: isEdit ? `Edit ${esc(existing.number)}` : "New invoice",
+    lead,
     body: `
       <form id="inv-form" class="form-grid">
         <div class="field"><label>Client</label>
           <select name="client_id" required>
             <option value="">Select client…</option>
-            ${clients.map((c) => `<option value="${c.id}">${c.name}${c.company ? ` · ${c.company}` : ""}</option>`).join("")}
+            ${clients
+              .map(
+                (c) =>
+                  `<option value="${c.id}" ${String(c.id) === selectedClient ? "selected" : ""}>${esc(c.name)}${
+                    c.company ? ` · ${esc(c.company)}` : ""
+                  }</option>`
+              )
+              .join("")}
           </select>
         </div>
-        <div class="field"><label>Amount</label><input name="amount" type="number" min="0.01" step="0.01" required placeholder="0.00" /></div>
-        <div class="field full"><label>Title / description</label><input name="title" required placeholder="Job or service description" /></div>
-        <div class="field"><label>Issue date</label><input name="issue_date" type="date" value="${today}" /></div>
-        <div class="field"><label>Due date</label><input name="due_date" type="date" value="${due}" /></div>
-        <div class="field"><label>Status</label>
-          <select name="status"><option value="draft">Save as draft</option><option value="sent">Email to client now</option></select>
+        <div class="field"><label>Amount</label>
+          <input name="amount" type="number" min="0.01" step="0.01" required placeholder="0.00"
+            value="${existing ? esc(existing.amount) : ""}" />
         </div>
-        <div class="field"><label>Notes</label><input name="notes" placeholder="Optional" /></div>
+        <div class="field full"><label>Title / description</label>
+          <input name="title" required placeholder="Job or service description" value="${esc(existing?.title || "")}" />
+        </div>
+        <div class="field"><label>Issue date</label><input name="issue_date" type="date" value="${issueVal}" /></div>
+        <div class="field"><label>Due date</label><input name="due_date" type="date" value="${dueVal}" /></div>
+        <div class="field full"><label>Notes</label>
+          <input name="notes" placeholder="Optional" value="${esc(existing?.notes || "")}" />
+        </div>
+        <p class="field full muted" style="margin:0">Need to email later? Save the draft, then use <strong>Send now</strong> on the Invoices page.</p>
         <div class="modal-actions field full">
           <button type="button" class="btn secondary" id="m-cancel">Cancel</button>
-          <button type="submit" class="btn">Create</button>
+          <button type="submit" class="btn secondary" id="m-save" data-intent="save">${saveLabel}</button>
+          <button type="submit" class="btn" id="m-send" data-intent="send">${sendLabel}</button>
         </div>
       </form>
     `,
     onMount: (modal) => {
       modal.querySelector("#m-cancel").onclick = closeModal;
+      let intent = "save";
+      modal.querySelectorAll("[data-intent]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          intent = btn.dataset.intent;
+        });
+      });
       modal.querySelector("#inv-form").onsubmit = async (e) => {
         e.preventDefault();
         const fd = new FormData(e.target);
         const payload = Object.fromEntries(fd.entries());
         payload.client_id = +payload.client_id;
         payload.amount = +payload.amount;
+        const sendNow = intent === "send";
+        const saveBtn = modal.querySelector("#m-save");
+        const sendBtn = modal.querySelector("#m-send");
+        saveBtn.disabled = true;
+        sendBtn.disabled = true;
         try {
-          const inv = await api("/api/invoices", { method: "POST", body: JSON.stringify(payload) });
-          closeModal();
-          toast(inv.emailed ? `Emailed ${inv.number} to ${inv.client_email || "the client"}` : `Created ${inv.number}`);
-          location.hash = `#/invoices/${inv.id}`;
+          let inv;
+          if (isEdit) {
+            payload.send = sendNow;
+            inv = await api(`/api/invoices/${existing.id}`, {
+              method: "PUT",
+              body: JSON.stringify(payload),
+            });
+            closeModal();
+            toast(
+              inv.emailed
+                ? `Saved and emailed ${inv.number} to ${inv.client_email || "the client"}`
+                : `Saved ${inv.number}`
+            );
+          } else {
+            payload.status = sendNow ? "sent" : "draft";
+            inv = await api("/api/invoices", { method: "POST", body: JSON.stringify(payload) });
+            closeModal();
+            toast(
+              inv.emailed
+                ? `Emailed ${inv.number} to ${inv.client_email || "the client"}`
+                : `Saved ${inv.number} as a draft — send it from Invoices when ready`
+            );
+          }
+          if (typeof after === "function") after(inv);
+          else location.hash = `#/invoices/${inv.id}`;
         } catch (err) {
-          toast(err.message || "Could not create invoice", "error");
+          saveBtn.disabled = false;
+          sendBtn.disabled = false;
+          toast(err.message || (isEdit ? "Could not save invoice" : "Could not create invoice"), "error");
         }
       };
     },
