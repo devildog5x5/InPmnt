@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 import tempfile
 import unittest
+from datetime import date
 from unittest.mock import patch
 
 from app import create_app
@@ -238,6 +239,71 @@ class InvoiceSendTests(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         names = {t["name"] for t in res.get_json()}
         self.assertIn("Invoice", names)
+
+    def _assert_invoice_pdf_attached(self, send_mock, *, invoice_number: str) -> None:
+        kwargs = send_mock.call_args.kwargs
+        self.assertIn("PDF copy of this invoice is attached", kwargs["body"])
+        atts = kwargs.get("attachments") or []
+        self.assertEqual(len(atts), 1, "reminder/invoice emails must attach one PDF")
+        self.assertTrue(str(atts[0]["filename"]).endswith(".pdf"))
+        self.assertIn(invoice_number.replace("/", "_"), str(atts[0]["filename"]))
+        self.assertEqual(atts[0].get("mime"), "application/pdf")
+        self.assertTrue(atts[0]["content"].startswith(b"%PDF"))
+        self.assertIn(invoice_number.encode("ascii"), atts[0]["content"])
+
+    def _send_invoice(self, *, due_date: str | None = None) -> dict:
+        payload: dict = {
+            "client_id": self.client_id,
+            "title": "Spring cleanup",
+            "amount": 250,
+            "status": "sent",
+        }
+        if due_date:
+            payload["due_date"] = due_date
+        with patch("app.routes.send_email", return_value={"provider": "smtp", "id": None}):
+            res = self.client.post("/api/invoices", json=payload)
+        self.assertEqual(res.status_code, 201, res.get_json())
+        return res.get_json()
+
+    def test_send_reminder_attaches_invoice_pdf(self) -> None:
+        inv = self._send_invoice(due_date=date.today().isoformat())
+        queue = self.client.get("/api/reminders?status=queue").get_json()
+        self.assertTrue(queue)
+        rid = queue[0]["id"]
+        with patch("app.routes.send_email", return_value={"provider": "smtp", "id": None}) as send:
+            res = self.client.post(f"/api/reminders/{rid}/send", json={})
+            self.assertEqual(res.status_code, 200, res.get_json())
+            self.assertEqual(res.get_json()["status"], "sent")
+            send.assert_called_once()
+            self.assertEqual(send.call_args.kwargs["to"], "maya@client.example")
+            self._assert_invoice_pdf_attached(send, invoice_number=inv["number"])
+        self.assertIn("PDF copy of this invoice is attached", res.get_json()["body"])
+
+    def test_send_due_attaches_invoice_pdf(self) -> None:
+        inv = self._send_invoice(due_date=date.today().isoformat())
+        with patch("app.routes.send_email", return_value={"provider": "smtp", "id": None}) as send:
+            res = self.client.post("/api/reminders/send-due", json={})
+            self.assertEqual(res.status_code, 200, res.get_json())
+            self.assertGreaterEqual(res.get_json()["sent"], 1)
+            self.assertGreaterEqual(send.call_count, 1)
+            for call in send.call_args_list:
+                kwargs = call.kwargs
+                self.assertEqual(kwargs["to"], "maya@client.example")
+                self.assertIn("PDF copy of this invoice is attached", kwargs["body"])
+                atts = kwargs.get("attachments") or []
+                self.assertEqual(len(atts), 1)
+                self.assertTrue(str(atts[0]["filename"]).endswith(".pdf"))
+                self.assertTrue(atts[0]["content"].startswith(b"%PDF"))
+                self.assertIn(inv["number"].encode("ascii"), atts[0]["content"])
+
+    def test_final_notice_attaches_invoice_pdf(self) -> None:
+        inv = self._send_invoice()
+        with patch("app.routes.send_email", return_value={"provider": "smtp", "id": None}) as send:
+            res = self.client.post(f"/api/invoices/{inv['id']}/final-notice", json={})
+            self.assertEqual(res.status_code, 200, res.get_json())
+            send.assert_called_once()
+            self.assertEqual(send.call_args.kwargs["to"], "maya@client.example")
+            self._assert_invoice_pdf_attached(send, invoice_number=inv["number"])
 
 
 if __name__ == "__main__":

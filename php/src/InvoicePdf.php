@@ -223,6 +223,22 @@ final class InvoicePdf
         return rtrim($body) . "\n\nA PDF copy of this invoice is attached.\n";
     }
 
+    /**
+     * PDF attachment list for invoice / reminder / final-notice emails.
+     * @param array<string,mixed> $inv
+     * @param array<string,mixed>|null $settings
+     * @return list<array{filename:string,content:string,mime:string}>
+     */
+    public static function attachment(array $inv, ?array $settings): array
+    {
+        $pdf = self::build(self::payload($inv, $settings ?? []));
+        return [[
+            'filename' => self::filename((string) ($inv['number'] ?? 'invoice')),
+            'content' => $pdf,
+            'mime' => 'application/pdf',
+        ]];
+    }
+
     /** @return list<string> */
     public static function logoCandidates(): array
     {
