@@ -131,10 +131,10 @@ index 38975aa..5130b20 100644
      *,
 diff --git a/app/invoice_pdf.py b/app/invoice_pdf.py
 new file mode 100644
-index 0000000..2f8d0e8
+index 0000000..38fb7f9
 --- /dev/null
 +++ b/app/invoice_pdf.py
-@@ -0,0 +1,402 @@
+@@ -0,0 +1,415 @@
 +"""Professional one-page invoice PDF (Helvetica + optional JPEG logo). No extra deps."""
 +from __future__ import annotations
 +
@@ -298,6 +298,19 @@ index 0000000..2f8d0e8
 +    if "pdf copy of this invoice" in text.lower():
 +        return text
 +    return text.rstrip() + "\n\nA PDF copy of this invoice is attached.\n"
++
++
++def invoice_email_pdf_attachment(inv: Any, settings: Any | None) -> list[dict[str, Any]]:
++    """PDF attachment list for invoice / reminder / final-notice emails."""
++    data = _as_dict(inv)
++    pdf_bytes = build_invoice_pdf(invoice_pdf_payload(data, settings))
++    return [
++        {
++            "filename": pdf_filename(str(data.get("number") or "invoice")),
++            "content": pdf_bytes,
++            "mime": "application/pdf",
++        }
++    ]
 +
 +
 +def invoice_pdf_payload(inv: Any, settings: Any | None) -> dict[str, Any]:
@@ -792,7 +805,7 @@ index 3ab033a..9da0eb9 100644
                  smtp.ehlo()
              if user:
 diff --git a/app/routes.py b/app/routes.py
-index e2233bc..f0506d0 100644
+index e2233bc..9fcf206 100644
 --- a/app/routes.py
 +++ b/app/routes.py
 @@ -7,6 +7,8 @@ from datetime import date, datetime, timedelta
@@ -812,13 +825,14 @@ index e2233bc..f0506d0 100644
      session,
      url_for,
  )
-@@ -37,7 +40,13 @@ from .database import (
+@@ -37,7 +40,14 @@ from .database import (
      row_to_dict,
      rows_to_list,
  )
 -from .mail import mail_configured, send_email
 +from .invoice_pdf import (
 +    build_invoice_pdf,
++    invoice_email_pdf_attachment,
 +    invoice_pdf_payload,
 +    mention_attachment,
 +    pdf_filename,
@@ -827,7 +841,7 @@ index e2233bc..f0506d0 100644
  from .workspace import (
      assert_can_add_open_invoice,
      effective_plan,
-@@ -212,6 +221,145 @@ def invoice_balance(inv: dict[str, Any]) -> float:
+@@ -212,6 +222,157 @@ def invoice_balance(inv: dict[str, Any]) -> float:
      return round(float(inv["amount"]) - float(inv["amount_paid"]), 2)
  
  
@@ -861,21 +875,35 @@ index e2233bc..f0506d0 100644
 +    }
 +
 +
++_INVOICE_CLIENT_SQL = """
++        SELECT i.*, c.name AS client_name, c.email AS client_email,
++               c.company AS client_company, c.phone AS client_phone
++        FROM invoices i JOIN clients c ON c.id = i.client_id
++        WHERE i.id = ? AND i.workspace_id = ?
++        """
++
++
++def load_invoice_for_email(conn, invoice_id: int, wid: int):
++    """Invoice + client fields for PDF/email. Separate from reminder joins (id/status clash)."""
++    return conn.execute(_INVOICE_CLIENT_SQL, (invoice_id, wid)).fetchone()
++
++
++def reminder_email_pdf(conn, invoice_id: int, wid: int, body: str) -> tuple[list[dict[str, Any]], str]:
++    """PDF attachment list plus body that mentions the invoice file."""
++    inv = load_invoice_for_email(conn, invoice_id, wid)
++    if not inv:
++        raise RuntimeError("Invoice not found for reminder PDF")
++    settings = get_settings(conn, wid)
++    return invoice_email_pdf_attachment(inv, settings), mention_attachment(body)
++
++
 +def email_invoice_to_client(conn, invoice_id: int, wid: int, meta: dict[str, Any] | None = None):
 +    """Email the Invoice template. Drafts are marked sent and reminders scheduled.
 +
 +    Returns a Flask (response, status) tuple on error, or None on success.
 +    On success, meta (if provided) gets provider and to.
 +    """
-+    inv = conn.execute(
-+        """
-+        SELECT i.*, c.name AS client_name, c.email AS client_email,
-+               c.company AS client_company, c.phone AS client_phone
-+        FROM invoices i JOIN clients c ON c.id = i.client_id
-+        WHERE i.id = ? AND i.workspace_id = ?
-+        """,
-+        (invoice_id, wid),
-+    ).fetchone()
++    inv = load_invoice_for_email(conn, invoice_id, wid)
 +    if not inv:
 +        return jsonify({"error": "Not found"}), 404
 +
@@ -901,9 +929,7 @@ index e2233bc..f0506d0 100644
 +    body = mention_attachment(
 +        render_template_vars(tmpl["body"] if tmpl else DEFAULT_INVOICE_BODY, ctx)
 +    )
-+    pdf_bytes = build_invoice_pdf(invoice_pdf_payload(inv, settings))
-+    filename = pdf_filename(str(inv["number"] or "invoice"))
-+    attachments = [{"filename": filename, "content": pdf_bytes, "mime": "application/pdf"}]
++    attachments = invoice_email_pdf_attachment(inv, settings)
 +
 +    provider = "fake"
 +    if not mail_configured():
@@ -973,7 +999,7 @@ index e2233bc..f0506d0 100644
  def schedule_reminders_for_invoice(conn, invoice_id: int, due_date: str, force: bool = False) -> int:
      inv0 = conn.execute("SELECT workspace_id FROM invoices WHERE id = ?", (invoice_id,)).fetchone()
      if not inv0:
-@@ -259,6 +407,7 @@ def schedule_reminders_for_invoice(conn, invoice_id: int, due_date: str, force:
+@@ -259,6 +420,7 @@ def schedule_reminders_for_invoice(conn, invoice_id: int, due_date: str, force:
      ctx = {
          "number": inv["number"],
          "client_name": inv["client_name"],
@@ -981,7 +1007,7 @@ index e2233bc..f0506d0 100644
          "amount_due": money(invoice_balance(dict(inv))),
          "due_date": inv["due_date"],
          "status": inv["status"],
-@@ -513,6 +662,17 @@ def api_create_client():
+@@ -513,6 +675,17 @@ def api_create_client():
  def api_update_client(client_id: int):
      data = request.get_json(force=True) or {}
      wid = require_workspace_id()
@@ -999,7 +1025,7 @@ index e2233bc..f0506d0 100644
      with db_session(db_path()) as conn:
          existing = conn.execute(
              "SELECT * FROM clients WHERE id = ? AND workspace_id = ?",
-@@ -520,7 +680,9 @@ def api_update_client(client_id: int):
+@@ -520,7 +693,9 @@ def api_update_client(client_id: int):
          ).fetchone()
          if not existing:
              return jsonify({"error": "Not found"}), 404
@@ -1010,7 +1036,7 @@ index e2233bc..f0506d0 100644
          conn.execute(
              """
              UPDATE clients SET name=?, company=?, email=?, phone=?, notes=?
-@@ -528,10 +690,10 @@ def api_update_client(client_id: int):
+@@ -528,10 +703,10 @@ def api_update_client(client_id: int):
              """,
              (
                  name,
@@ -1025,7 +1051,7 @@ index e2233bc..f0506d0 100644
                  client_id,
                  wid,
              ),
-@@ -590,6 +752,33 @@ def api_invoices():
+@@ -590,6 +765,33 @@ def api_invoices():
      return jsonify(rows)
  
  
@@ -1059,7 +1085,7 @@ index e2233bc..f0506d0 100644
  @bp.get("/api/invoices/<int:invoice_id>")
  @login_required
  def api_invoice(invoice_id: int):
-@@ -626,6 +815,8 @@ def api_create_invoice():
+@@ -626,6 +828,8 @@ def api_create_invoice():
      status = data.get("status") or "draft"
      if status not in ("draft", "sent", "partial", "overdue", "paid"):
          status = "draft"
@@ -1068,7 +1094,7 @@ index e2233bc..f0506d0 100644
      now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
      wid = require_workspace_id()
  
-@@ -637,7 +828,7 @@ def api_create_invoice():
+@@ -637,7 +841,7 @@ def api_create_invoice():
          if not client:
              return jsonify({"error": "Client not found"}), 404
          settings = get_settings(conn, wid)
@@ -1077,7 +1103,7 @@ index e2233bc..f0506d0 100644
              blocked = assert_can_add_open_invoice(conn, wid, settings)
              if blocked:
                  return jsonify({"error": blocked}), 403
-@@ -658,28 +849,48 @@ def api_create_invoice():
+@@ -658,28 +862,48 @@ def api_create_invoice():
                  data.get("currency") or "USD",
                  issue,
                  due,
@@ -1128,7 +1154,7 @@ index e2233bc..f0506d0 100644
      with db_session(db_path()) as conn:
          existing = conn.execute(
              "SELECT * FROM invoices WHERE id=? AND workspace_id=?",
-@@ -687,15 +898,36 @@ def api_update_invoice(invoice_id: int):
+@@ -687,15 +911,36 @@ def api_update_invoice(invoice_id: int):
          ).fetchone()
          if not existing:
              return jsonify({"error": "Not found"}), 404
@@ -1169,7 +1195,7 @@ index e2233bc..f0506d0 100644
          client = conn.execute(
              "SELECT id FROM clients WHERE id=? AND workspace_id=?",
              (fields["client_id"], wid),
-@@ -743,46 +975,35 @@ def api_update_invoice(invoice_id: int):
+@@ -743,46 +988,35 @@ def api_update_invoice(invoice_id: int):
              invoice_id,
              workspace_id=wid,
          )
@@ -1235,7 +1261,7 @@ index e2233bc..f0506d0 100644
      return jsonify(out)
  
  
-@@ -890,7 +1111,8 @@ def _email_not_configured_response():
+@@ -890,7 +1124,8 @@ def _email_not_configured_response():
                      "Email is not configured. Set RESEND_API_KEY or "
                      "SMTP_HOST/SMTP_USER/MAIL_FROM in .env "
                      "(or ALLOW_FAKE_EMAIL=1 for local testing)."
@@ -1245,7 +1271,132 @@ index e2233bc..f0506d0 100644
              }
          ),
          503,
-@@ -1210,6 +1432,50 @@ def api_get_settings():
+@@ -980,6 +1215,10 @@ def api_send_reminder(reminder_id: int):
+                 (now, reminder_id),
+             )
+         elif channel == "email":
++            try:
++                attachments, body = reminder_email_pdf(conn, int(r["invoice_id"]), wid, r["body"] or "")
++            except Exception as exc:  # noqa: BLE001
++                return jsonify({"error": str(exc)}), 502
+             if not mail_configured():
+                 if not _allow_fake_email():
+                     return _email_not_configured_response()
+@@ -988,14 +1227,15 @@ def api_send_reminder(reminder_id: int):
+                     send_email(
+                         to=r["email"] or "",
+                         subject=r["subject"] or "",
+-                        body=r["body"] or "",
++                        body=body,
+                         from_name=settings["business_name"] if settings else None,
++                        attachments=attachments,
+                     )
+                 except Exception as exc:  # noqa: BLE001
+                     return jsonify({"error": str(exc)}), 502
+             conn.execute(
+-                "UPDATE reminders SET status='sent', sent_at=? WHERE id=?",
+-                (now, reminder_id),
++                "UPDATE reminders SET status='sent', sent_at=?, body=? WHERE id=?",
++                (now, body, reminder_id),
+             )
+             dest = r["email"]
+             log_activity(
+@@ -1024,8 +1264,8 @@ def api_send_due():
+         settings = get_settings(conn, wid)
+         rows = conn.execute(
+             """
+-            SELECT r.id, r.channel, r.subject, r.body, i.number, c.name AS client_name,
+-                   c.email, c.phone
++            SELECT r.id, r.invoice_id, r.channel, r.subject, r.body, i.number,
++                   c.name AS client_name, c.email, c.phone
+             FROM reminders r
+             JOIN invoices i ON i.id = r.invoice_id
+             JOIN clients c ON c.id = i.client_id
+@@ -1052,13 +1292,20 @@ def api_send_due():
+                     workspace_id=wid,
+                 )
+             elif channel == "email":
++                try:
++                    attachments, body = reminder_email_pdf(
++                        conn, int(r["invoice_id"]), wid, r["body"] or ""
++                    )
++                except Exception as exc:  # noqa: BLE001
++                    return jsonify({"error": str(exc), "sent": sent}), 502
+                 if mail_configured():
+                     try:
+                         send_email(
+                             to=r["email"] or "",
+                             subject=r["subject"] or "",
+-                            body=r["body"] or "",
++                            body=body,
+                             from_name=settings["business_name"] if settings else None,
++                            attachments=attachments,
+                         )
+                     except Exception as exc:  # noqa: BLE001
+                         return jsonify({"error": str(exc), "sent": sent}), 502
+@@ -1073,10 +1320,16 @@ def api_send_due():
+                 )
+             else:
+                 continue
+-            conn.execute(
+-                "UPDATE reminders SET status='sent', sent_at=? WHERE id=?",
+-                (now, r["id"]),
+-            )
++            if channel == "email":
++                conn.execute(
++                    "UPDATE reminders SET status='sent', sent_at=?, body=? WHERE id=?",
++                    (now, body, r["id"]),
++                )
++            else:
++                conn.execute(
++                    "UPDATE reminders SET status='sent', sent_at=? WHERE id=?",
++                    (now, r["id"]),
++                )
+             sent += 1
+     return jsonify({"sent": sent})
+ 
+@@ -1088,14 +1341,7 @@ def api_final_notice(invoice_id: int):
+     today = date.today().isoformat()
+     wid = require_workspace_id()
+     with db_session(db_path()) as conn:
+-        inv = conn.execute(
+-            """
+-            SELECT i.*, c.name AS client_name, c.email AS client_email
+-            FROM invoices i JOIN clients c ON c.id = i.client_id
+-            WHERE i.id = ? AND i.workspace_id = ?
+-            """,
+-            (invoice_id, wid),
+-        ).fetchone()
++        inv = load_invoice_for_email(conn, invoice_id, wid)
+         if not inv:
+             return jsonify({"error": "Not found"}), 404
+         settings = get_settings(conn, wid)
+@@ -1112,7 +1358,15 @@ def api_final_notice(invoice_id: int):
+             "business_name": settings["business_name"] if settings else "InPmnt",
+         }
+         subject = render_template_vars(tmpl["subject"] if tmpl else "Final notice", ctx)
+-        body = render_template_vars(tmpl["body"] if tmpl else "Final notice", ctx)
++        try:
++            attachments, body = reminder_email_pdf(
++                conn,
++                invoice_id,
++                wid,
++                render_template_vars(tmpl["body"] if tmpl else "Final notice", ctx),
++            )
++        except Exception as exc:  # noqa: BLE001
++            return jsonify({"error": str(exc)}), 502
+ 
+         if not mail_configured():
+             if not _allow_fake_email():
+@@ -1124,6 +1378,7 @@ def api_final_notice(invoice_id: int):
+                     subject=subject,
+                     body=body,
+                     from_name=settings["business_name"] if settings else None,
++                    attachments=attachments,
+                 )
+             except Exception as exc:  # noqa: BLE001
+                 return jsonify({"error": str(exc)}), 502
+@@ -1210,6 +1465,50 @@ def api_get_settings():
      return jsonify(settings)
  
  
@@ -1714,7 +1865,7 @@ index 0000000..cc2849f
 +echo "Then in hPanel: Cache → Purge All (and CDN purge if you use it)."
 +echo "Also: WordPress → Delete this installation so Hostinger does not restore it."
 diff --git a/php/src/App.php b/php/src/App.php
-index 3acd2be..b700672 100644
+index 3acd2be..1af6e99 100644
 --- a/php/src/App.php
 +++ b/php/src/App.php
 @@ -72,6 +72,10 @@ final class App
@@ -1883,7 +2034,7 @@ index 3acd2be..b700672 100644
          ];
          $c = $this->db->prepare('SELECT id FROM clients WHERE id=? AND workspace_id=?');
          $c->execute([$fields['client_id'], $wid]);
-@@ -655,34 +718,135 @@ final class App
+@@ -655,34 +718,126 @@ final class App
          }
          Db::refreshInvoiceStatus($this->db, $id);
          Db::log($this->db, 'invoice', "Updated invoice {$existing['number']}", 'invoice', $id, $wid);
@@ -1940,14 +2091,7 @@ index 3acd2be..b700672 100644
 +    private function deliverInvoice(int $wid, int $id): string
 +    {
 +        @set_time_limit(120);
-+        $st = $this->db->prepare(
-+            'SELECT i.*, c.name AS client_name, c.email AS client_email,
-+                    c.company AS client_company, c.phone AS client_phone
-+             FROM invoices i JOIN clients c ON c.id = i.client_id
-+             WHERE i.id=? AND i.workspace_id=?'
-+        );
-+        $st->execute([$id, $wid]);
-+        $inv = $st->fetch();
++        $inv = $this->loadInvoiceForEmail($wid, $id);
 +        if (!$inv) {
 +            Http::json(['error' => 'Not found'], 404);
 +        }
@@ -1988,9 +2132,7 @@ index 3acd2be..b700672 100644
 +            $tmpl['body'] ?? "Hi {{client_name}},\n\nInvoice {{number}} is ready for {{title}}.\n\nAmount due: {{amount_due}}\nDue date: {{due_date}}\n\nA PDF copy of this invoice is attached.\n\nPlease reply to this email if you have any questions.\n\nThanks,\n{{business_name}}",
 +            $ctx
 +        ));
-+        $pdf = InvoicePdf::build(InvoicePdf::payload($inv, $settings ?? []));
-+        $filename = InvoicePdf::filename((string) ($inv['number'] ?? 'invoice'));
-+        $attachments = [['filename' => $filename, 'content' => $pdf, 'mime' => 'application/pdf']];
++        $attachments = InvoicePdf::attachment($inv, $settings ?? []);
 +        $provider = 'fake';
 +        if (!Mailer::configured()) {
 +            if (!Env::truthy('ALLOW_FAKE_EMAIL')) {
@@ -2033,7 +2175,7 @@ index 3acd2be..b700672 100644
      }
  
      private function apiRecordPayment(int $wid, int $id): void
-@@ -737,9 +901,41 @@ final class App
+@@ -737,9 +892,41 @@ final class App
      {
          Http::json([
              'error' => 'Email is not configured. Set RESEND_API_KEY or SMTP_HOST/SMTP_USER/MAIL_FROM in .env (or ALLOW_FAKE_EMAIL=1 for local testing).',
@@ -2075,7 +2217,137 @@ index 3acd2be..b700672 100644
      private function apiReminders(int $wid): void
      {
          $today = date('Y-m-d');
-@@ -894,6 +1090,7 @@ final class App
+@@ -778,6 +965,33 @@ final class App
+         Http::json($rows);
+     }
+ 
++    /** @return array<string,mixed>|null */
++    private function loadInvoiceForEmail(int $wid, int $invoiceId): ?array
++    {
++        $st = $this->db->prepare(
++            'SELECT i.*, c.name AS client_name, c.email AS client_email,
++                    c.company AS client_company, c.phone AS client_phone
++             FROM invoices i JOIN clients c ON c.id = i.client_id
++             WHERE i.id=? AND i.workspace_id=?'
++        );
++        $st->execute([$invoiceId, $wid]);
++        $inv = $st->fetch();
++        return $inv ?: null;
++    }
++
++    /**
++     * @return array{0:list<array{filename:string,content:string,mime:string}>,1:string}
++     */
++    private function reminderEmailPdf(int $wid, int $invoiceId, string $body): array
++    {
++        $inv = $this->loadInvoiceForEmail($wid, $invoiceId);
++        if (!$inv) {
++            throw new RuntimeException('Invoice not found for reminder PDF');
++        }
++        $settings = Workspace::settings($this->db, $wid) ?? [];
++        return [InvoicePdf::attachment($inv, $settings), InvoicePdf::mentionAttachment($body)];
++    }
++
+     private function apiSendReminder(int $wid, int $id): void
+     {
+         $st = $this->db->prepare(
+@@ -805,18 +1019,31 @@ final class App
+             Db::log($this->db, 'reminder', "SMS stub (not wired yet) for {$r['number']} to " . ($r['phone'] ?: $r['client_name']), 'reminder', $id, $wid);
+             $this->db->prepare('UPDATE reminders SET status=?, sent_at=? WHERE id=?')->execute(['sent', $now, $id]);
+         } elseif ($channel === 'email') {
++            @set_time_limit(120);
++            try {
++                [$attachments, $body] = $this->reminderEmailPdf($wid, (int) $r['invoice_id'], (string) ($r['body'] ?? ''));
++            } catch (Throwable $e) {
++                Http::json(['error' => $e->getMessage()], 502);
++            }
+             if (!Mailer::configured()) {
+                 if (!Env::truthy('ALLOW_FAKE_EMAIL')) {
+                     $this->emailNotConfigured();
+                 }
+             } else {
+                 try {
+-                    Mailer::send((string) ($r['email'] ?? ''), (string) ($r['subject'] ?? ''), (string) ($r['body'] ?? ''), $settings['business_name'] ?? null);
++                    Mailer::send(
++                        (string) ($r['email'] ?? ''),
++                        (string) ($r['subject'] ?? ''),
++                        $body,
++                        $settings['business_name'] ?? null,
++                        $attachments
++                    );
+                 } catch (Throwable $e) {
+                     Http::json(['error' => $e->getMessage()], 502);
+                 }
+             }
+-            $this->db->prepare('UPDATE reminders SET status=?, sent_at=? WHERE id=?')->execute(['sent', $now, $id]);
++            $this->db->prepare('UPDATE reminders SET status=?, sent_at=?, body=? WHERE id=?')
++                ->execute(['sent', $now, $body, $id]);
+             Db::log($this->db, 'reminder', "Sent EMAIL reminder for {$r['number']} to " . ($r['email'] ?: $r['client_name']), 'reminder', $id, $wid);
+         } else {
+             Http::json(['error' => "Unknown channel: {$channel}"], 400);
+@@ -832,7 +1059,7 @@ final class App
+         $now = Db::now();
+         $settings = Workspace::settings($this->db, $wid);
+         $st = $this->db->prepare(
+-            "SELECT r.id, r.channel, r.subject, r.body, i.number, c.name AS client_name, c.email, c.phone
++            "SELECT r.id, r.invoice_id, r.channel, r.subject, r.body, i.number, c.name AS client_name, c.email, c.phone
+              FROM reminders r
+              JOIN invoices i ON i.id = r.invoice_id
+              JOIN clients c ON c.id = i.client_id
+@@ -858,9 +1085,21 @@ final class App
+                 }
+                 Db::log($this->db, 'reminder', "SMS stub (not wired yet) for {$r['number']} to " . ($r['phone'] ?: $r['client_name']), 'reminder', (int) $r['id'], $wid);
+             } elseif ($channel === 'email') {
++                @set_time_limit(120);
++                try {
++                    [$attachments, $body] = $this->reminderEmailPdf($wid, (int) $r['invoice_id'], (string) ($r['body'] ?? ''));
++                } catch (Throwable $e) {
++                    Http::json(['error' => $e->getMessage(), 'sent' => $sent], 502);
++                }
+                 if (Mailer::configured()) {
+                     try {
+-                        Mailer::send((string) ($r['email'] ?? ''), (string) ($r['subject'] ?? ''), (string) ($r['body'] ?? ''), $settings['business_name'] ?? null);
++                        Mailer::send(
++                            (string) ($r['email'] ?? ''),
++                            (string) ($r['subject'] ?? ''),
++                            $body,
++                            $settings['business_name'] ?? null,
++                            $attachments
++                        );
+                     } catch (Throwable $e) {
+                         Http::json(['error' => $e->getMessage(), 'sent' => $sent], 502);
+                     }
+@@ -869,7 +1108,12 @@ final class App
+             } else {
+                 continue;
+             }
+-            $this->db->prepare('UPDATE reminders SET status=?, sent_at=? WHERE id=?')->execute(['sent', $now, $r['id']]);
++            if ($channel === 'email') {
++                $this->db->prepare('UPDATE reminders SET status=?, sent_at=?, body=? WHERE id=?')
++                    ->execute(['sent', $now, $body, $r['id']]);
++            } else {
++                $this->db->prepare('UPDATE reminders SET status=?, sent_at=? WHERE id=?')->execute(['sent', $now, $r['id']]);
++            }
+             $sent++;
+         }
+         Http::json(['sent' => $sent]);
+@@ -877,13 +1121,8 @@ final class App
+ 
+     private function apiFinalNotice(int $wid, int $id): void
+     {
+-        $st = $this->db->prepare(
+-            'SELECT i.*, c.name AS client_name, c.email AS client_email
+-             FROM invoices i JOIN clients c ON c.id = i.client_id
+-             WHERE i.id = ? AND i.workspace_id = ?'
+-        );
+-        $st->execute([$id, $wid]);
+-        $inv = $st->fetch();
++        @set_time_limit(120);
++        $inv = $this->loadInvoiceForEmail($wid, $id);
+         if (!$inv) {
+             Http::json(['error' => 'Not found'], 404);
+         }
+@@ -894,20 +1133,35 @@ final class App
          $ctx = [
              'number' => $inv['number'],
              'client_name' => $inv['client_name'],
@@ -2083,6 +2355,36 @@ index 3acd2be..b700672 100644
              'amount_due' => Db::money(Db::invoiceBalance($inv)),
              'due_date' => $inv['due_date'],
              'status' => $inv['status'],
+             'business_name' => $settings['business_name'] ?? 'InPmnt',
+         ];
+         $subject = Db::renderVars($tmpl['subject'] ?? 'Final notice', $ctx);
+-        $body = Db::renderVars($tmpl['body'] ?? 'Final notice', $ctx);
++        try {
++            [$attachments, $body] = $this->reminderEmailPdf(
++                $wid,
++                $id,
++                Db::renderVars($tmpl['body'] ?? 'Final notice', $ctx)
++            );
++        } catch (Throwable $e) {
++            Http::json(['error' => $e->getMessage()], 502);
++        }
+         if (!Mailer::configured()) {
+             if (!Env::truthy('ALLOW_FAKE_EMAIL')) {
+                 $this->emailNotConfigured();
+             }
+         } else {
+             try {
+-                Mailer::send((string) ($inv['client_email'] ?? ''), $subject, $body, $settings['business_name'] ?? null);
++                Mailer::send(
++                    (string) ($inv['client_email'] ?? ''),
++                    $subject,
++                    $body,
++                    $settings['business_name'] ?? null,
++                    $attachments
++                );
+             } catch (Throwable $e) {
+                 Http::json(['error' => $e->getMessage()], 502);
+             }
 diff --git a/php/src/Db.php b/php/src/Db.php
 index bde9a3a..878ef35 100644
 --- a/php/src/Db.php
@@ -2228,10 +2530,10 @@ index b065039..96a216f 100644
          http_response_code($status);
 diff --git a/php/src/InvoicePdf.php b/php/src/InvoicePdf.php
 new file mode 100644
-index 0000000..dfa3bd1
+index 0000000..3929d0a
 --- /dev/null
 +++ b/php/src/InvoicePdf.php
-@@ -0,0 +1,417 @@
+@@ -0,0 +1,433 @@
 +<?php
 +declare(strict_types=1);
 +
@@ -2455,6 +2757,22 @@ index 0000000..dfa3bd1
 +            return $body;
 +        }
 +        return rtrim($body) . "\n\nA PDF copy of this invoice is attached.\n";
++    }
++
++    /**
++     * PDF attachment list for invoice / reminder / final-notice emails.
++     * @param array<string,mixed> $inv
++     * @param array<string,mixed>|null $settings
++     * @return list<array{filename:string,content:string,mime:string}>
++     */
++    public static function attachment(array $inv, ?array $settings): array
++    {
++        $pdf = self::build(self::payload($inv, $settings ?? []));
++        return [[
++            'filename' => self::filename((string) ($inv['number'] ?? 'invoice')),
++            'content' => $pdf,
++            'mime' => 'application/pdf',
++        ]];
 +    }
 +
 +    /** @return list<string> */
@@ -3401,10 +3719,10 @@ index 0000000..c435aa4
 +echo "Ubuntu permission check OK (dirs 755, files 644, scripts 755, logo readable)."
 diff --git a/scripts/pack_php_zip.py b/scripts/pack_php_zip.py
 new file mode 100644
-index 0000000..46646b0
+index 0000000..fb9d534
 --- /dev/null
 +++ b/scripts/pack_php_zip.py
-@@ -0,0 +1,122 @@
+@@ -0,0 +1,123 @@
 +#!/usr/bin/env python3
 +"""Pack InPmnt-PHP.zip with Unix modes (dirs 755, files 644, scripts 755)."""
 +from __future__ import annotations
@@ -3441,8 +3759,9 @@ index 0000000..46646b0
 +7. Settings → Email delivery → Send test email
 +
 +This zip includes branded invoice PDFs (company logo top-left letterhead),
-+invoice email on Send, SMTP fallback, edit-after-create, Send now on the
-+Invoices page, and the invoice JPEG next to InvoicePdf.php.
++invoice email on Send, reminder and final-notice emails with the invoice PDF
++attached, SMTP fallback, edit-after-create, Send now on the Invoices page,
++and the invoice JPEG next to InvoicePdf.php.
 +"""
 +
 +
@@ -4514,10 +4833,10 @@ index 0000000..b6d4186
 +    unittest.main()
 diff --git a/tests/test_invoice_pdf.py b/tests/test_invoice_pdf.py
 new file mode 100644
-index 0000000..413c214
+index 0000000..386aeb6
 --- /dev/null
 +++ b/tests/test_invoice_pdf.py
-@@ -0,0 +1,92 @@
+@@ -0,0 +1,110 @@
 +"""Professional invoice PDF generator."""
 +from __future__ import annotations
 +
@@ -4526,6 +4845,7 @@ index 0000000..413c214
 +
 +from app.invoice_pdf import (
 +    build_invoice_pdf,
++    invoice_email_pdf_attachment,
 +    invoice_pdf_payload,
 +    logo_path,
 +    mention_attachment,
@@ -4607,21 +4927,39 @@ index 0000000..413c214
 +        twice = mention_attachment(once)
 +        self.assertEqual(twice.count("PDF copy of this invoice is attached"), 1)
 +
++    def test_email_pdf_attachment_list(self) -> None:
++        atts = invoice_email_pdf_attachment(
++            {
++                "number": "INV-1042",
++                "amount": 100,
++                "amount_paid": 0,
++                "client_name": "Maya Chen",
++                "title": "Spring cleanup",
++            },
++            {"business_name": "Pat Co"},
++        )
++        self.assertEqual(len(atts), 1)
++        self.assertEqual(atts[0]["filename"], "INV-1042.pdf")
++        self.assertEqual(atts[0]["mime"], "application/pdf")
++        self.assertTrue(atts[0]["content"].startswith(b"%PDF"))
++        self.assertIn(b"INV-1042", atts[0]["content"])
++
 +
 +if __name__ == "__main__":
 +    unittest.main()
 diff --git a/tests/test_invoice_send.py b/tests/test_invoice_send.py
 new file mode 100644
-index 0000000..9369725
+index 0000000..91db083
 --- /dev/null
 +++ b/tests/test_invoice_send.py
-@@ -0,0 +1,244 @@
+@@ -0,0 +1,310 @@
 +"""Sending the invoice itself emails the client (not just reminders)."""
 +from __future__ import annotations
 +
 +import os
 +import tempfile
 +import unittest
++from datetime import date
 +from unittest.mock import patch
 +
 +from app import create_app
@@ -4856,6 +5194,71 @@ index 0000000..9369725
 +        self.assertEqual(res.status_code, 200)
 +        names = {t["name"] for t in res.get_json()}
 +        self.assertIn("Invoice", names)
++
++    def _assert_invoice_pdf_attached(self, send_mock, *, invoice_number: str) -> None:
++        kwargs = send_mock.call_args.kwargs
++        self.assertIn("PDF copy of this invoice is attached", kwargs["body"])
++        atts = kwargs.get("attachments") or []
++        self.assertEqual(len(atts), 1, "reminder/invoice emails must attach one PDF")
++        self.assertTrue(str(atts[0]["filename"]).endswith(".pdf"))
++        self.assertIn(invoice_number.replace("/", "_"), str(atts[0]["filename"]))
++        self.assertEqual(atts[0].get("mime"), "application/pdf")
++        self.assertTrue(atts[0]["content"].startswith(b"%PDF"))
++        self.assertIn(invoice_number.encode("ascii"), atts[0]["content"])
++
++    def _send_invoice(self, *, due_date: str | None = None) -> dict:
++        payload: dict = {
++            "client_id": self.client_id,
++            "title": "Spring cleanup",
++            "amount": 250,
++            "status": "sent",
++        }
++        if due_date:
++            payload["due_date"] = due_date
++        with patch("app.routes.send_email", return_value={"provider": "smtp", "id": None}):
++            res = self.client.post("/api/invoices", json=payload)
++        self.assertEqual(res.status_code, 201, res.get_json())
++        return res.get_json()
++
++    def test_send_reminder_attaches_invoice_pdf(self) -> None:
++        inv = self._send_invoice(due_date=date.today().isoformat())
++        queue = self.client.get("/api/reminders?status=queue").get_json()
++        self.assertTrue(queue)
++        rid = queue[0]["id"]
++        with patch("app.routes.send_email", return_value={"provider": "smtp", "id": None}) as send:
++            res = self.client.post(f"/api/reminders/{rid}/send", json={})
++            self.assertEqual(res.status_code, 200, res.get_json())
++            self.assertEqual(res.get_json()["status"], "sent")
++            send.assert_called_once()
++            self.assertEqual(send.call_args.kwargs["to"], "maya@client.example")
++            self._assert_invoice_pdf_attached(send, invoice_number=inv["number"])
++        self.assertIn("PDF copy of this invoice is attached", res.get_json()["body"])
++
++    def test_send_due_attaches_invoice_pdf(self) -> None:
++        inv = self._send_invoice(due_date=date.today().isoformat())
++        with patch("app.routes.send_email", return_value={"provider": "smtp", "id": None}) as send:
++            res = self.client.post("/api/reminders/send-due", json={})
++            self.assertEqual(res.status_code, 200, res.get_json())
++            self.assertGreaterEqual(res.get_json()["sent"], 1)
++            self.assertGreaterEqual(send.call_count, 1)
++            for call in send.call_args_list:
++                kwargs = call.kwargs
++                self.assertEqual(kwargs["to"], "maya@client.example")
++                self.assertIn("PDF copy of this invoice is attached", kwargs["body"])
++                atts = kwargs.get("attachments") or []
++                self.assertEqual(len(atts), 1)
++                self.assertTrue(str(atts[0]["filename"]).endswith(".pdf"))
++                self.assertTrue(atts[0]["content"].startswith(b"%PDF"))
++                self.assertIn(inv["number"].encode("ascii"), atts[0]["content"])
++
++    def test_final_notice_attaches_invoice_pdf(self) -> None:
++        inv = self._send_invoice()
++        with patch("app.routes.send_email", return_value={"provider": "smtp", "id": None}) as send:
++            res = self.client.post(f"/api/invoices/{inv['id']}/final-notice", json={})
++            self.assertEqual(res.status_code, 200, res.get_json())
++            send.assert_called_once()
++            self.assertEqual(send.call_args.kwargs["to"], "maya@client.example")
++            self._assert_invoice_pdf_attached(send, invoice_number=inv["number"])
 +
 +
 +if __name__ == "__main__":
