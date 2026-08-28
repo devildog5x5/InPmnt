@@ -21,4 +21,9 @@ php/data/*.db
 ourcircle/data/*.db
 ourcircle/data/uploads/*
 !ourcircle/data/uploads/.gitkeep
+ourcircle/php/.env
+ourcircle/php/data/*.db
+ourcircle/php/data/uploads/*
+!ourcircle/php/data/uploads/.gitkeep
+!ourcircle/php/data/uploads/.htaccess
 

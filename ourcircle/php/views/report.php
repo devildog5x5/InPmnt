@@ -1,0 +1,19 @@
+<?php
+View::appOpen(get_defined_vars());
+?>
+<div class="panel">
+  <h2>If you already sent money or shared information</h2>
+  <p>You are not alone, and speed helps. Work down this list. Do not send more money to “fix” the first payment.</p>
+  <ol class="list">
+    <li><strong>Call the bank or card issuer using the number on the back of the card or a paper statement</strong> — not a number from the scam. Ask to freeze the card and dispute the charge.</li>
+    <li><strong>If you wired money or used Zelle / crypto / gift cards</strong>, tell that provider immediately that it was fraud. Gift cards and crypto are often unrecoverable; still report them.</li>
+    <li><strong>Change passwords</strong> on email and the account that was named, from a device the caller never touched. Turn on two-factor authentication.</li>
+    <li><strong>Report to the FTC</strong> at <a href="https://reportfraud.ftc.gov" target="_blank" rel="noopener">ReportFraud.ftc.gov</a>.</li>
+    <li><strong>Internet crime</strong> (wires, crypto, phishing): <a href="https://www.ic3.gov" target="_blank" rel="noopener">IC3.gov</a>.</li>
+    <li><strong>Social Security or IRS impersonation</strong>: hang up, then use the numbers published on ssa.gov or irs.gov — never a callback from the message.</li>
+    <li><strong>Tell your circle</strong> so they do not fall for a follow-up “we can get your money back” pitch.</li>
+    <li>Consider a <strong>credit freeze</strong> at Equifax, Experian, and TransUnion if a Social Security number or ID was shared.</li>
+  </ol>
+  <p class="disclaimer">OurCircle is not a bank, law firm, or law-enforcement agency. We help you pause and point to official reporting doors.</p>
+</div>
+<?php View::appClose(); ?>

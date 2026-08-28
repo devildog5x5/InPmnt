@@ -1,0 +1,13 @@
+RewriteEngine On
+RewriteBase /
+
+# Never serve secrets, PHP sources, or the SQLite file
+RewriteRule ^(\.env|bootstrap\.php)$ - [F,L]
+RewriteRule ^(src|views|data)(/|$) - [F,L]
+RewriteRule \.db$ - [F,L]
+
+# Existing public files (CSS/JS/images, robots.txt, sitemap.xml) are served as-is
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteRule ^ - [L]
+
+RewriteRule ^ index.php [QSA,L]

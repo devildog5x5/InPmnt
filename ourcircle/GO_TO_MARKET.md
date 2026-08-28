@@ -35,7 +35,7 @@ Share `/offers` and the homepage. Count **refundable $49 founding holds**, not l
 
 | Day | Action | Done when |
 |---|---|---|
-| 0 | Ubuntu site live, HTTPS, `robots.txt` + `sitemap.xml` in Search Console | `https://familyshieldpro.com/healthz` returns ok |
+| 0 | Hostinger zip live in `public_html`, HTTPS, `robots.txt` + `sitemap.xml` in Search Console | Open https://familyshieldpro.com — no VPS |
 | 1 | 20 personal asks: siblings, church admin, one credit-union contact, two Facebook “aging parents” groups (value first) | 20 named conversations |
 | 2–3 | 60-second phone-camera demo: paste gift-card text → Pause → tap “Please call me before I pay” | Link in every DM |
 | 4–5 | One church bulletin / senior-center flyer: “$49 founding circle — we never say a request is safe” | Flyer in one real hallway |
