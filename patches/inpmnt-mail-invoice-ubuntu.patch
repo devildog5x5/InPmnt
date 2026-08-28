@@ -128,13 +128,14 @@ index 38975aa..5130b20 100644
      *,
 diff --git a/app/invoice_pdf.py b/app/invoice_pdf.py
 new file mode 100644
-index 0000000..1b07a42
+index 0000000..db265e8
 --- /dev/null
 +++ b/app/invoice_pdf.py
-@@ -0,0 +1,351 @@
+@@ -0,0 +1,352 @@
 +"""Professional one-page invoice PDF (Helvetica + optional JPEG logo). No extra deps."""
 +from __future__ import annotations
 +
++import os
 +from pathlib import Path
 +from typing import Any
 +
@@ -200,7 +201,7 @@ index 0000000..1b07a42
 +        root / "static" / "img" / "inpmnt-logo-invoice.jpg",
 +        root / "php" / "static" / "img" / "inpmnt-logo-invoice.jpg",
 +    ):
-+        if p.is_file():
++        if p.is_file() and os.access(p, os.R_OK):
 +            return p
 +    return None
 +
@@ -1127,6 +1128,28 @@ index 32f83a0..b20f09e 100644
  
  Do not upload into a subfolder unless that subfolder is the site document root.
  The SQLite database is created automatically at data/inpmnt.db (blocked from the web).
+diff --git a/deploy/backup-db.sh b/deploy/backup-db.sh
+old mode 100644
+new mode 100755
+diff --git a/deploy/setup-vps.sh b/deploy/setup-vps.sh
+old mode 100644
+new mode 100755
+index cb9361f..9a29220
+--- a/deploy/setup-vps.sh
++++ b/deploy/setup-vps.sh
+@@ -37,6 +37,9 @@ if [[ ! -f .env ]]; then
+ fi
+ 
+ chown -R www-data:www-data "$APP_DIR"
++find "$APP_DIR" -type d -exec chmod 755 {} \;
++find "$APP_DIR" -type f -exec chmod 644 {} \;
++chmod 755 "$APP_DIR/docker-entrypoint.sh" "$APP_DIR/deploy/"*.sh 2>/dev/null || true
+ 
+ cp deploy/inpmnt.service /etc/systemd/system/inpmnt.service
+ sed "s/YOUR_DOMAIN/${DOMAIN}/g" deploy/nginx.inpmnt.conf > /etc/nginx/sites-available/inpmnt
+diff --git a/docker-entrypoint.sh b/docker-entrypoint.sh
+old mode 100644
+new mode 100755
 diff --git a/php/.env.example b/php/.env.example
 index 487a386..015d305 100644
 --- a/php/.env.example
@@ -1167,10 +1190,56 @@ index 487a386..015d305 100644
  # Stripe (https://dashboard.stripe.com/apikeys)
  STRIPE_SECRET_KEY=sk_test_...
 diff --git a/php/bootstrap.php b/php/bootstrap.php
-index da43bef..75acea1 100644
+index da43bef..19a80cb 100644
 --- a/php/bootstrap.php
 +++ b/php/bootstrap.php
-@@ -6,6 +6,7 @@ require $root . '/src/Env.php';
+@@ -1,11 +1,52 @@
+ <?php
+ declare(strict_types=1);
+ 
+-$root = dirname(__DIR__);
++function inpmnt_normalize_ubuntu_perms(string $root): void
++{
++    $data = $root . '/data';
++    if (!is_dir($data)) {
++        @mkdir($data, 0775, true);
++    }
++    if (is_dir($data)) {
++        @chmod($data, 0775);
++    }
++    foreach ([glob($root . '/*.php') ?: [], glob($root . '/src/*.php') ?: [], glob($root . '/views/*.php') ?: []] as $files) {
++        foreach ($files as $path) {
++            if (!is_file($path)) {
++                continue;
++            }
++            if ((fileperms($path) & 0002) === 0002) {
++                @chmod($path, 0644);
++            }
++        }
++    }
++    foreach (['/static/img/inpmnt-logo-invoice.jpg', '/static/img/inpmnt-icon.png'] as $rel) {
++        $logo = $root . $rel;
++        if (is_file($logo) && !is_readable($logo)) {
++            @chmod($logo, 0644);
++        }
++    }
++    $env = $root . '/.env';
++    if (is_file($env)) {
++        @chmod($env, 0640);
++    }
++}
++
++$root = __DIR__;
++if (!is_file($root . '/src/Env.php')) {
++    $alt = dirname(__DIR__);
++    if (is_file($alt . '/src/Env.php')) {
++        $root = $alt;
++    }
++}
++
++inpmnt_normalize_ubuntu_perms($root);
++
+ require $root . '/src/Env.php';
  require $root . '/src/Http.php';
  require $root . '/src/Db.php';
  require $root . '/src/Mail.php';
@@ -1178,6 +1247,61 @@ index da43bef..75acea1 100644
  require $root . '/src/Billing.php';
  require $root . '/src/Workspace.php';
  require $root . '/src/App.php';
+diff --git a/php/fix-ubuntu-perms.sh b/php/fix-ubuntu-perms.sh
+new file mode 100755
+index 0000000..3979e6c
+--- /dev/null
++++ b/php/fix-ubuntu-perms.sh
+@@ -0,0 +1,49 @@
++#!/bin/bash
++# Ubuntu Apache: unzip then run this as root from the document root.
++#   sudo bash /var/www/html/fix-ubuntu-perms.sh
++#
++# Verified layout on Ubuntu 24.04 / Apache 2.4.58 as www-data:
++#   dirs 755, files 644, data/ 775 → homepage works, SQLite can create
++#   document root 700 owned by ubuntu → 403 Forbidden
++#   chmod -R 777 → not required (and Hostinger can 500 on 777 PHP)
++set -euo pipefail
++ROOT="$(cd "$(dirname "$0")" && pwd)"
++USER_NAME="${1:-www-data}"
++GROUP_NAME="${2:-www-data}"
++
++if [ "$(id -u)" -ne 0 ]; then
++  echo "Run with sudo: sudo bash $0"
++  exit 1
++fi
++
++mkdir -p "$ROOT/data" "$ROOT/static/img"
++chown -R "$USER_NAME:$GROUP_NAME" "$ROOT"
++find "$ROOT" -type d -exec chmod 755 {} \;
++find "$ROOT" -type f -exec chmod 644 {} \;
++chmod 775 "$ROOT/data"
++if [ -f "$ROOT/.env" ]; then
++  chmod 640 "$ROOT/.env"
++fi
++if [ -f "$ROOT/fix-ubuntu-perms.sh" ]; then
++  chmod 755 "$ROOT/fix-ubuntu-perms.sh"
++fi
++# Invoice letterhead JPEG must be world-readable or the PDF has no logo.
++if [ -f "$ROOT/static/img/inpmnt-logo-invoice.jpg" ]; then
++  chmod 644 "$ROOT/static/img/inpmnt-logo-invoice.jpg"
++fi
++if [ -f "$ROOT/static/img/inpmnt-icon.png" ]; then
++  chmod 644 "$ROOT/static/img/inpmnt-icon.png"
++fi
++if compgen -G "$ROOT/data/*.db" >/dev/null; then
++  chmod 664 "$ROOT/data/"*.db
++  chown "$USER_NAME:$GROUP_NAME" "$ROOT/data/"*.db
++fi
++
++echo "OK: $ROOT"
++echo "  owner  $USER_NAME:$GROUP_NAME"
++echo "  dirs   755"
++echo "  files  644  (PHP is not 777)"
++echo "  data/  775  (SQLite + WAL)"
++echo "  logo   static/img/inpmnt-logo-invoice.jpg 644"
++echo "Reload Apache if needed: sudo systemctl reload apache2"
++echo "Open: http://YOUR-SERVER/index.php"
 diff --git a/php/src/App.php b/php/src/App.php
 index 3acd2be..56e8b00 100644
 --- a/php/src/App.php
@@ -1435,10 +1559,20 @@ index 3acd2be..56e8b00 100644
              'due_date' => $inv['due_date'],
              'status' => $inv['status'],
 diff --git a/php/src/Db.php b/php/src/Db.php
-index bde9a3a..0ce4d3c 100644
+index bde9a3a..878ef35 100644
 --- a/php/src/Db.php
 +++ b/php/src/Db.php
-@@ -131,6 +131,7 @@ final class Db
+@@ -22,6 +22,9 @@ final class Db
+         if (!is_dir($dir)) {
+             mkdir($dir, 0775, true);
+         }
++        if (is_dir($dir)) {
++            @chmod($dir, 0775);
++        }
+         $pdo = new PDO('sqlite:' . $path, null, null, [
+             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+@@ -131,6 +134,7 @@ final class Db
          } else {
              self::ensureSystemAccounts($db);
          }
@@ -1446,7 +1580,7 @@ index bde9a3a..0ce4d3c 100644
      }
  
      public static function now(): string
-@@ -154,9 +155,12 @@ final class Db
+@@ -154,9 +158,12 @@ final class Db
          $st->execute([$wid, $kind, $message, $entityType, $entityId, self::now()]);
      }
  
@@ -1461,7 +1595,7 @@ index bde9a3a..0ce4d3c 100644
              ['Friendly nudge', 'email', 'Quick reminder about invoice {{number}}',
                  "Hi {{client_name}},\n\nJust a friendly reminder that invoice {{number}} for {{amount_due}} is due on {{due_date}}.\n\nYou can reply to this email if you have any questions.\n\nThanks,\n{{business_name}}", 1],
              ['Due today', 'email', 'Invoice {{number}} is due today',
-@@ -168,14 +172,37 @@ final class Db
+@@ -168,14 +175,37 @@ final class Db
              ['Final notice', 'email', 'Final notice: invoice {{number}}',
                  "Hi {{client_name}},\n\nThis is a final notice regarding unpaid invoice {{number}} ({{amount_due}}), originally due {{due_date}}.\n\nPlease remit payment promptly to avoid further collection steps.\n\n{{business_name}}", 0],
          ];
@@ -1569,7 +1703,7 @@ index b065039..96a216f 100644
          http_response_code($status);
 diff --git a/php/src/InvoicePdf.php b/php/src/InvoicePdf.php
 new file mode 100644
-index 0000000..20c2b72
+index 0000000..93930f0
 --- /dev/null
 +++ b/php/src/InvoicePdf.php
 @@ -0,0 +1,354 @@
@@ -1806,7 +1940,7 @@ index 0000000..20c2b72
 +            dirname($root) . '/static/img/inpmnt-logo-invoice.jpg',
 +        ];
 +        foreach ($cands as $p) {
-+            if (is_file($p)) {
++            if (is_file($p) && is_readable($p)) {
 +                return $p;
 +            }
 +        }
@@ -2374,6 +2508,147 @@ index 06bd0ec..e300bb4 100644
 +        return $fp;
      }
  }
+diff --git a/scripts/check-ubuntu-perms.sh b/scripts/check-ubuntu-perms.sh
+new file mode 100755
+index 0000000..038e744
+--- /dev/null
++++ b/scripts/check-ubuntu-perms.sh
+@@ -0,0 +1,135 @@
++#!/usr/bin/env bash
++# Fail if Linux/Ubuntu modes are wrong for Apache (www-data).
++# Dirs 755, files 644, scripts 755, invoice logo world-readable.
++set -euo pipefail
++
++Root="$(cd "$(dirname "$0")/.." && pwd)"
++cd "$Root"
++fail=0
++
++note() { echo "PERM $*" >&2; fail=1; }
++
++mode_of() { stat -c '%a' "$1"; }
++
++# World-readable: other-read bit (004).
++world_readable() {
++  local m
++  m=$(stat -c '%a' "$1")
++  local last="${m: -1}"
++  [[ "$last" == "4" || "$last" == "5" || "$last" == "6" || "$last" == "7" ]]
++}
++
++check_tree() {
++  local base="$1"
++  [[ -d "$base" ]] || return 0
++  while IFS= read -r -d '' d; do
++    local m
++    m=$(mode_of "$d")
++    if [[ "$d" == */data && ( "$m" == "755" || "$m" == "775" ) ]]; then
++      continue
++    fi
++    if [[ "$m" != "755" ]]; then
++      note "DIR $d is $m, want 755"
++    fi
++  done < <(find "$base" -type d -print0)
++
++  while IFS= read -r -d '' f; do
++    case "$f" in
++      *.db|*/.env) continue ;;
++    esac
++    local m want="644"
++    m=$(mode_of "$f")
++    if [[ "$f" == *.sh ]]; then
++      want="755"
++    fi
++    if [[ "$m" != "$want" ]]; then
++      note "FILE $f is $m, want $want"
++    fi
++  done < <(find "$base" -type f -print0)
++}
++
++check_tree php
++check_tree static
++check_tree scripts
++check_tree patches
++
++for sh in deploy/setup-vps.sh deploy/backup-db.sh docker-entrypoint.sh patches/make-ubuntu-archives.sh php/fix-ubuntu-perms.sh scripts/check-ubuntu-perms.sh; do
++  if [[ -f "$sh" ]]; then
++    m=$(mode_of "$sh")
++    if [[ "$m" != "755" ]]; then
++      note "$sh is $m, want 755"
++    fi
++  fi
++done
++
++logo="static/img/inpmnt-logo-invoice.jpg"
++if [[ ! -f "$logo" ]]; then
++  note "missing $logo (invoice PDF has no company logo)"
++elif ! world_readable "$logo"; then
++  note "$logo is $(mode_of "$logo") — www-data cannot read it (want 644)"
++fi
++
++icon="static/img/inpmnt-icon.png"
++if [[ -f "$icon" ]] && ! world_readable "$icon"; then
++  note "$icon is $(mode_of "$icon") — www-data cannot read it (want 644)"
++fi
++
++# PHP must not be world-writable (Hostinger 500 on 777).
++while IFS= read -r -d '' f; do
++  m=$(mode_of "$f")
++  last="${m: -1}"
++  if [[ "$last" == "2" || "$last" == "3" || "$last" == "6" || "$last" == "7" ]]; then
++    note "PHP $f is world-writable ($m) — set 644"
++  fi
++done < <(find php -name '*.php' -type f -print0)
++
++tar="patches/inpmnt-hostinger-changed.tar.gz"
++if [[ -f "$tar" ]]; then
++  python3 - "$tar" <<'PY' || fail=1
++import sys
++import tarfile
++
++path = sys.argv[1]
++needed = {
++    "./static/img/inpmnt-logo-invoice.jpg",
++    "./src/InvoicePdf.php",
++    "./static/js/app.js",
++    "./static/css/app.css",
++    "./fix-ubuntu-perms.sh",
++}
++found = set()
++bad = False
++with tarfile.open(path, "r:gz") as tf:
++    for m in tf.getmembers():
++        name = m.name if m.name.startswith("./") else "./" + m.name.lstrip("/")
++        found.add(name)
++        mode = m.mode & 0o777
++        if m.isdir():
++            if mode != 0o755:
++                print(f"PERM TAR DIR {m.name} is {mode:03o}, want 755", file=sys.stderr)
++                bad = True
++            continue
++        if m.isfile():
++            want = 0o755 if m.name.endswith(".sh") else 0o644
++            if mode != want:
++                print(f"PERM TAR FILE {m.name} is {mode:03o}, want {want:03o}", file=sys.stderr)
++                bad = True
++missing = needed - found
++# tar may store without ./
++if missing:
++    found2 = {n[2:] if n.startswith("./") else n for n in found}
++    missing = {n for n in needed if n not in found and n[2:] not in found2}
++if missing:
++    print("PERM TAR missing: " + ", ".join(sorted(missing)), file=sys.stderr)
++    bad = True
++sys.exit(1 if bad else 0)
++PY
++else
++  note "missing $tar"
++fi
++
++if [[ "$fail" -ne 0 ]]; then
++  echo "Ubuntu permission check FAILED." >&2
++  exit 1
++fi
++echo "Ubuntu permission check OK (dirs 755, files 644, scripts 755, logo readable)."
 diff --git a/static/css/app.css b/static/css/app.css
 index e1dba86..0bb4c4e 100644
 --- a/static/css/app.css
@@ -3354,3 +3629,69 @@ index 0000000..21de2b6
 +assert_true($st['provider'] === 'smtp', 'MAIL_PROVIDER=smtp forces smtp, got ' . $st['provider']);
 +
 +fwrite(STDOUT, "ok\n");
+diff --git a/tests/test_ubuntu_perms.py b/tests/test_ubuntu_perms.py
+new file mode 100644
+index 0000000..6d2dca8
+--- /dev/null
++++ b/tests/test_ubuntu_perms.py
+@@ -0,0 +1,60 @@
++"""Ubuntu/Apache modes: dirs 755, files 644, invoice logo world-readable."""
++from __future__ import annotations
++
++import os
++import tarfile
++import unittest
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parent.parent
++TAR = ROOT / "patches" / "inpmnt-hostinger-changed.tar.gz"
++LOGO = ROOT / "static" / "img" / "inpmnt-logo-invoice.jpg"
++
++
++def _mode(path: Path) -> int:
++    return path.stat().st_mode & 0o777
++
++
++class UbuntuPermsTests(unittest.TestCase):
++    def test_logo_world_readable(self) -> None:
++        self.assertTrue(LOGO.is_file(), "invoice logo JPEG missing")
++        self.assertTrue(os.access(LOGO, os.R_OK))
++        self.assertEqual(_mode(LOGO), 0o644)
++
++    def test_php_and_scripts_modes(self) -> None:
++        pdf = ROOT / "php" / "src" / "InvoicePdf.php"
++        self.assertEqual(_mode(pdf), 0o644)
++        self.assertFalse(_mode(pdf) & 0o002, "PHP must not be world-writable")
++        for rel in (
++            "php/fix-ubuntu-perms.sh",
++            "scripts/check-ubuntu-perms.sh",
++            "patches/make-ubuntu-archives.sh",
++            "deploy/setup-vps.sh",
++            "docker-entrypoint.sh",
++        ):
++            path = ROOT / rel
++            self.assertTrue(path.is_file(), rel)
++            self.assertEqual(_mode(path), 0o755, rel)
++
++    def test_hostinger_tarball_modes(self) -> None:
++        self.assertTrue(TAR.is_file(), "regenerate with bash patches/make-ubuntu-archives.sh")
++        names: set[str] = set()
++        with tarfile.open(TAR, "r:gz") as tf:
++            for member in tf.getmembers():
++                names.add(member.name.lstrip("./"))
++                mode = member.mode & 0o777
++                if member.isdir():
++                    self.assertEqual(mode, 0o755, member.name)
++                elif member.isfile():
++                    want = 0o755 if member.name.endswith(".sh") else 0o644
++                    self.assertEqual(mode, want, f"{member.name} {mode:03o}")
++        for needed in (
++            "static/img/inpmnt-logo-invoice.jpg",
++            "src/InvoicePdf.php",
++            "fix-ubuntu-perms.sh",
++        ):
++            self.assertIn(needed, names)
++
++
++if __name__ == "__main__":
++    unittest.main()
