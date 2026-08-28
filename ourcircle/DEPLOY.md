@@ -1,8 +1,8 @@
 # Family Shield Pro — deploy (no VPS)
 
 **Site:** https://familyshieldpro.com  
-**Zip (v1.0.0):** download **FamilyShieldPro-1.0.0.zip** — `robots.txt` and `sitemap.xml` are already inside it.  
-Unzip into Hostinger `public_html`.  
+**Zip:** https://raw.githubusercontent.com/devildog5x5/InPmnt/cursor/ourcircle-family-shield-4df6/patches/FamilyShieldPro-1.0.0.zip  
+(`robots.txt` and `sitemap.xml` are inside the zip.)  
 **Do not** put this in an InPmnt folder or overwrite a live `.env`.
 
 You do not need Ubuntu, Nginx, systemd, or SSH.

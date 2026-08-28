@@ -50,18 +50,9 @@ If none hits the bar, change the offer before writing more product code.
 
 ## Downloads
 
-One file. `robots.txt` and `sitemap.xml` are **inside** this zip (next to `index.php`). Do not use GitHub “raw” links for those — the browser shows the text instead of saving a file.
+**https://raw.githubusercontent.com/devildog5x5/InPmnt/cursor/ourcircle-family-shield-4df6/patches/FamilyShieldPro-1.0.0.zip**
 
-| File | What it is |
-|---|---|
-| **FamilyShieldPro-1.0.0.zip** | Hostinger drop: app + robots.txt + sitemap.xml + VERSION |
-
-<a href="/opt/cursor/artifacts/FamilyShieldPro-1.0.0.zip">Download FamilyShieldPro-1.0.0.zip</a>
-
-GitHub (use the **Download raw file** button, not the text view):  
-https://github.com/devildog5x5/InPmnt/blob/cursor/ourcircle-family-shield-4df6/patches/FamilyShieldPro-1.0.0.zip
-
-Product **Family Shield Pro v1.0.0** (OurCircle). Not InPmnt. Changelog: [CHANGELOG.md](CHANGELOG.md).
+That zip is the Hostinger site. `robots.txt` and `sitemap.xml` are already inside it (next to `index.php`). Unzip into `public_html`.
 
 ## Hostinger deploy (no VPS)
 

@@ -9,10 +9,10 @@ When the user asks for a file (zip, txt, xml, pdf, image, installer, or any othe
 
 1. Copy the file to `/opt/cursor/artifacts/<filename>` (Cursor download tray).
 2. Commit a copy under repo-root `patches/<filename>` (same pattern as InPmnt-PHP.zip) and push.
-3. In the reply, lead with clickable downloads — never a VM path alone:
-   - GitHub: `https://raw.githubusercontent.com/devildog5x5/InPmnt/<branch>/patches/<filename>`
-   - Tray: `<a href="/opt/cursor/artifacts/<filename>">Download <filename></a>`
+3. In the **user-facing reply**, the download must be a **public HTTPS URL** the user can open in a browser. Never `/opt/cursor/artifacts/...` — that path is not web-accessible to them.
+   - Zip (this is what they click): `https://raw.githubusercontent.com/devildog5x5/InPmnt/<branch>/patches/<filename>`
+   - Same pattern as InPmnt-PHP.zip. Still copy to `/opt/cursor/artifacts/` for the tray, but **do not** put that path in the chat as the download link.
 4. If you built more than one file, make **every** one downloadable the same way.
 5. Prefer a **versioned** filename (`FamilyShieldPro-1.0.0.zip`) plus a latest alias (`FamilyShieldPro.zip`).
 6. Never send `robots.txt`, `sitemap.xml`, or other text as a GitHub raw URL when the user needs a file — the browser shows the data. Put those files **inside the product zip** and give only the zip as the download.
-7. Do not say “it’s on the server” or “it’s in artifacts” without a tray HTML download link to the zip.
+7. Do not give `/opt/cursor/artifacts/` as a download link. It is not a web URL.
