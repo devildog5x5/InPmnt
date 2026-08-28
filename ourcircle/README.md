@@ -48,6 +48,18 @@ Share `/offers` with real buyers. Count refundable reservations, not opinions:
 
 If none hits the bar, change the offer before writing more product code.
 
+## Downloads
+
+Click to download (GitHub):
+
+| File | Link |
+|---|---|
+| **robots.txt** | https://raw.githubusercontent.com/devildog5x5/InPmnt/cursor/ourcircle-family-shield-4df6/ourcircle/patches/robots.txt |
+| **sitemap.xml** | https://raw.githubusercontent.com/devildog5x5/InPmnt/cursor/ourcircle-family-shield-4df6/ourcircle/patches/sitemap.xml |
+| **FamilyShieldPro.zip** (Hostinger) | https://raw.githubusercontent.com/devildog5x5/InPmnt/cursor/ourcircle-family-shield-4df6/ourcircle/patches/FamilyShieldPro.zip |
+
+After the site is live those same SEO files are at https://familyshieldpro.com/robots.txt and https://familyshieldpro.com/sitemap.xml.
+
 ## Hostinger deploy (no VPS)
 
 Same motion as InPmnt: unzip **FamilyShieldPro.zip** into `public_html`. Full steps: **[DEPLOY.md](DEPLOY.md)**. Go-to-market: **[GO_TO_MARKET.md](GO_TO_MARKET.md)**.

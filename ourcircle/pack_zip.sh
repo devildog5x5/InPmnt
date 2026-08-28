@@ -90,10 +90,18 @@ with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
 artifacts.mkdir(parents=True, exist_ok=True)
 dest = artifacts / "FamilyShieldPro.zip"
 shutil.copy2(zip_path, dest)
-try:
-    dest.chmod(0o644)
-except OSError:
-    pass
+patches = root / "patches"
+patches.mkdir(parents=True, exist_ok=True)
+shutil.copy2(zip_path, patches / "FamilyShieldPro.zip")
+shutil.copy2(stage / "robots.txt", patches / "robots.txt")
+shutil.copy2(stage / "sitemap.xml", patches / "sitemap.xml")
+shutil.copy2(stage / "robots.txt", artifacts / "robots.txt")
+shutil.copy2(stage / "sitemap.xml", artifacts / "sitemap.xml")
+for p in (dest, patches / "FamilyShieldPro.zip", artifacts / "robots.txt", artifacts / "sitemap.xml"):
+    try:
+        p.chmod(0o644)
+    except OSError:
+        pass
 print(f"Built {dest} ({dest.stat().st_size} bytes)")
 print("Unzip into public_html. Folders 755, data 775, files 644. Never 777.")
 PY
