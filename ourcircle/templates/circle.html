@@ -1,0 +1,43 @@
+{% extends "shell.html" %}
+{% block heading %}Family circle{% endblock %}
+{% block main %}
+<div class="grid-2">
+  <div class="panel">
+    <h2>People in this circle</h2>
+    <p class="muted">Up to five people on the family plan. Invite the person who will actually answer the phone.</p>
+    <table class="table">
+      <thead><tr><th>Name</th><th>Email</th><th>Role</th></tr></thead>
+      <tbody>
+        {% for m in members %}
+        <tr><td>{{ m.name }}</td><td>{{ m.email }}</td><td>{{ m.role }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% if pending %}
+    <h3>Waiting to join</h3>
+    <ul class="list">
+      {% for p in pending %}
+      <li>{{ p.email }} · join link token {{ p.token }}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </div>
+  <form class="panel" method="post">
+    <h2>Invite someone</h2>
+    <label>Their name</label>
+    <input name="name" />
+    <label>Email</label>
+    <input name="email" type="email" required />
+    <p><button class="btn wide" type="submit">Create invite link</button></p>
+    <p class="disclaimer">Share the join link in a call or a message you already trust — not inside a suspicious thread.</p>
+  </form>
+</div>
+{% if alerts %}
+<div class="panel" style="margin-top:16px">
+  <h2>Call-me alerts</h2>
+  {% for a in alerts %}
+    <p>{{ a.created_at }} — {{ a.message }}</p>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

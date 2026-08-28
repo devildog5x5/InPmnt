@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}OurCircle — Pause. Ask family. Then pay.{% endblock %}
+{% block body %}
+<div class="wrap">
+  <header class="site-header">
+    <a class="brand" href="/">
+      <img src="{{ url_for('static', filename='img/logo.png') }}" alt="OurCircle family mark" />
+      <div><strong>OurCircle</strong><span>A trusted family circle</span></div>
+    </a>
+    <nav class="nav">
+      <a class="btn ghost" href="{{ url_for('offers') }}">Founding offers</a>
+      <a class="btn ghost" href="{{ url_for('login') }}">Sign in</a>
+      <a class="btn" href="{{ url_for('signup') }}">Start a circle</a>
+    </nav>
+  </header>
+
+  <section class="hero">
+    <div>
+      <p class="core-rule">{{ core_rule }}</p>
+      <h1>Not another AI scam detector. A circle that helps you pause.</h1>
+      <p class="lede">Forward a sketchy text, upload a screenshot, or paste a number or website. We show warning signs in plain language — then you ask someone you trust before you send a dime.</p>
+      <p>
+        <a class="btn" href="{{ url_for('signup') }}">Create your family circle</a>
+        <a class="btn gold" href="{{ url_for('signup') }}">Founding year $49</a>
+      </p>
+      <p class="disclaimer">{{ disclaimer }}</p>
+    </div>
+    <div class="hero-card">
+      <img src="{{ url_for('static', filename='img/logo-lockup.png') }}" alt="OurCircle logo" />
+    </div>
+  </section>
+
+  <h2>What you can do</h2>
+  <div class="grid-3">
+    <div class="panel step"><strong>1. Bring the request in</strong>Paste the email or text, upload a screenshot, or enter a phone number, website, offer, or payment ask.</div>
+    <div class="panel step"><strong>2. Read the warning signs</strong>See why it might be a scam, whether a number or site resembles a known trick, and what to do next — never a “this is safe” stamp.</div>
+    <div class="panel step"><strong>3. Involve your circle</strong>Ask a family member to look. Tap “Please call me before I pay” when it is urgent.</div>
+  </div>
+
+  <div class="grid-2" style="margin-top:18px">
+    <div class="panel">
+      <h3>Protected trusted list</h3>
+      <p>Save the real numbers for banks, doctors, insurers, utilities, and family. Checks compare incoming numbers and websites to that list — not to a stranger in the message.</p>
+    </div>
+    <div class="panel">
+      <h3>If something already went wrong</h3>
+      <p>Get calm instructions to report fraud, freeze cards, and tell the people who can actually stop a payment. Speed matters more than shame.</p>
+    </div>
+  </div>
+
+  <h2 style="margin-top:36px">Plans</h2>
+  <div class="plans">
+    {% for p in plans %}
+    <div class="panel">
+      <h3>{{ p.name }}</h3>
+      <p><strong>{{ p.price }}</strong></p>
+      <p class="muted">{{ p.detail }}</p>
+    </div>
+    {% endfor %}
+  </div>
+  <p>Credit unions and insurers: per-member partnership pricing. Churches, senior centers, and veterans groups: $299–$999/year.</p>
+
+  <footer class="footer">
+    OurCircle is built for families — including parents, adult children, and grandparents — who want a second set of eyes. We do not guarantee that a request is legitimate.
+  </footer>
+</div>
+{% endblock %}

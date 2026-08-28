@@ -1,0 +1,54 @@
+# OurCircle
+
+**Pause. Ask family. Then pay.**
+
+OurCircle is a **trusted family circle** for sketchy texts, emails, phone numbers, websites, and payment asks. It is not a generic “AI scam detector” and it will **never tell you something is safe**.
+
+The rule on every screen:
+
+> Never send money, cryptocurrency, gift cards, passwords, or account information until the request is independently verified.
+
+## Run it
+
+From this folder (InPmnt stays on port 5055):
+
+```bash
+cd ourcircle
+python3 run.py
+```
+
+Open **http://127.0.0.1:5065**
+
+Demo circle: `family@ourcircle.app` / `password123`
+
+## What families can do
+
+- Paste a suspicious email or text, a phone number, a website, or an offer
+- Upload a screenshot
+- Read a plain-language risk explanation and specific warning signs
+- See whether a number or domain matches the household trusted list — or resembles a known brand
+- Ask someone in the circle to review it
+- Fire an urgent **Please call me before I pay** alert
+- Keep a protected list of banks, doctors, insurers, utilities, and family contacts
+- Follow reporting steps (FTC, IC3, card freeze) if money already moved
+
+Family plan: up to **five people**. Founding year: **$49** (reservation in this build — no card charge).
+
+## Paid validation (seven days)
+
+Share `/offers` with real buyers. Count refundable reservations, not opinions:
+
+| Product | Seven-day target |
+|---|---|
+| InPmnt | Five $99 annual customers |
+| VendorReady | Two $500 setup deposits |
+| OurCircle | Ten $49 founding families |
+
+If none hits the bar, change the offer before writing more product code.
+
+## Tests
+
+```bash
+cd ourcircle
+python3 -m unittest tests.test_ourcircle -q
+```

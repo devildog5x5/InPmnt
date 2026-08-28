@@ -1,0 +1,62 @@
+{% extends "shell.html" %}
+{% block heading %}Check {{ item.id }}{% endblock %}
+{% block main %}
+<div class="check-card panel">
+  <div class="risk {{ report.level }}">{{ report.title }}</div>
+  <p>{{ report.explanation }}</p>
+  <p class="disclaimer">{{ report.disclaimer }}</p>
+  {% if item.screenshot %}
+    <p><img src="{{ url_for('uploaded', name=item.screenshot) }}" alt="Uploaded screenshot" style="max-width:420px;border-radius:12px" /></p>
+  {% endif %}
+  {% if item.raw_text %}<p><strong>What you pasted</strong><br />{{ item.raw_text }}</p>{% endif %}
+  {% if item.phone %}<p><strong>Number:</strong> {{ item.phone }}</p>{% endif %}
+  {% if item.url %}<p><strong>Website:</strong> {{ item.url }}</p>{% endif %}
+</div>
+
+<div class="grid-2" style="margin-top:16px">
+  <div class="panel">
+    <h2>Warning signs</h2>
+    <ul class="list">{% for s in report.warning_signs %}<li>{{ s }}</li>{% endfor %}</ul>
+    <h3>Number, domain, or known patterns</h3>
+    {% if report.matches %}
+    <ul class="list">{% for m in report.matches %}<li>{{ m }}</li>{% endfor %}</ul>
+    {% else %}
+    <p class="muted">Nothing matched your trusted list or a well-known official domain.</p>
+    {% endif %}
+  </div>
+  <div class="panel">
+    <h2>What to do</h2>
+    <ol class="list">{% for s in report.next_steps %}<li>{{ s }}</li>{% endfor %}</ol>
+    <form method="post" action="{{ url_for('send_alert', check_id=item.id) }}">
+      <button class="btn danger wide" type="submit">Please call me before I pay</button>
+    </form>
+    <form method="post" action="{{ url_for('ask_review', check_id=item.id) }}" style="margin-top:12px">
+      <label>Ask your circle to look</label>
+      <textarea name="comment" placeholder="Mom — can you look at this text before I send anything?"></textarea>
+      <p><button class="btn gold wide" type="submit">Send to family circle</button></p>
+    </form>
+  </div>
+</div>
+
+<div class="panel" style="margin-top:16px">
+  <h2>Circle notes</h2>
+  {% for r in reviews %}
+    <p><span class="pill">{{ r.status }}</span> {{ r.comment }}</p>
+  {% else %}
+    <p class="muted">No one has left a note yet.</p>
+  {% endfor %}
+  <form method="post" action="{{ url_for('reply_review', check_id=item.id) }}">
+    <label>Your note (if you are the trusted reviewer)</label>
+    <textarea name="reply" required></textarea>
+    <label>How this feels</label>
+    <select name="status">
+      <option value="looked">I looked — keep pausing</option>
+      <option value="scam_likely">This looks like a scam</option>
+      <option value="wait">Wait until we talk by phone</option>
+      <option value="call_me">Call me before you do anything</option>
+    </select>
+    <p><button class="btn" type="submit">Add note</button></p>
+  </form>
+</div>
+<p><a href="{{ url_for('report') }}">If money or passwords already went out → Report & recover</a></p>
+{% endblock %}

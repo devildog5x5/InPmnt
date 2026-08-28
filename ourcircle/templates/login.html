@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Sign in · OurCircle{% endblock %}
+{% block body %}
+<div class="auth-page">
+  <div class="auth-card">
+    <a class="brand" href="/"><img src="{{ url_for('static', filename='img/logo.png') }}" alt="" /><div><strong>OurCircle</strong><span>Sign in</span></div></a>
+    {% for cat, msg in get_flashed_messages(with_categories=true) %}
+      <div class="flash {{ cat }}">{{ msg }}</div>
+    {% endfor %}
+    <form method="post">
+      <label>Email</label>
+      <input name="email" type="email" required autocomplete="username" />
+      <label>Password</label>
+      <input name="password" type="password" required autocomplete="current-password" />
+      <p><button class="btn wide" type="submit">Sign in</button></p>
+    </form>
+    <p class="muted">Demo circle: family@ourcircle.app / password123</p>
+    <p><a href="{{ url_for('signup') }}">Start a circle</a></p>
+  </div>
+</div>
+{% endblock %}

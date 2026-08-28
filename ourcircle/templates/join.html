@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Join a circle · OurCircle{% endblock %}
+{% block body %}
+<div class="auth-page">
+  <div class="auth-card">
+    <h1>Join this family circle</h1>
+    <p class="core-rule">{{ core_rule }}</p>
+    {% for cat, msg in get_flashed_messages(with_categories=true) %}
+      <div class="flash {{ cat }}">{{ msg }}</div>
+    {% endfor %}
+    <p>Invite for {{ invite.email }}</p>
+    <form method="post">
+      <label>Your name</label>
+      <input name="name" required value="{{ invite.name or '' }}" />
+      <label>Choose a password (8+)</label>
+      <input name="password" type="password" required minlength="8" />
+      <p><button class="btn wide" type="submit">Join the circle</button></p>
+    </form>
+  </div>
+</div>
+{% endblock %}

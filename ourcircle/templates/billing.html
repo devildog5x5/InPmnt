@@ -1,0 +1,18 @@
+{% extends "shell.html" %}
+{% block heading %}Plans{% endblock %}
+{% block main %}
+<p>This household is on <strong>{{ household.plan }}</strong>{% if household.founding %} (founding){% endif %}.</p>
+<div class="plans">
+  {% for p in plans %}
+  <div class="panel">
+    <h3>{{ p.name }}</h3>
+    <p><strong>{{ p.price }}</strong></p>
+    <p>{{ p.detail }}</p>
+  </div>
+  {% endfor %}
+</div>
+<form method="post" action="{{ url_for('founding') }}">
+  <button class="btn gold" type="submit">Reserve founding family year · $49</button>
+</form>
+<p class="disclaimer">No card is charged in this build. Partnerships (credit unions, insurers) and group licenses are quoted separately.</p>
+{% endblock %}
