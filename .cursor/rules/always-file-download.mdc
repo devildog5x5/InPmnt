@@ -1,0 +1,18 @@
+---
+description: Always give a real file download (zip) for patches and drop-in files; never leave the user with only inline code or a GitHub .patch page.
+alwaysApply: true
+---
+
+# Always ship a file download
+
+Unless the user **explicitly** says they want the diff pasted in chat instead:
+
+1. Do **not** treat a GitHub `.patch` / raw-text URL as the handoff. Browsers and GitHub show that as **code**, not a download.
+2. Put a **`.zip`** (and Hostinger `.tar.gz` when PHP files changed) in:
+   - `patches/` in the repo (commit + push), **and**
+   - `/opt/cursor/artifacts/` with a unique descriptive name so Cursor attaches it as a **file download** on the run.
+3. Point the user at the **zip** (artifact + `…/raw/…/patches/*.zip` URL). Mention `.patch` files only as something **inside** the zip.
+4. Keep Ubuntu modes: files `644`, directories `755`, LF endings. Do not overwrite a live `.env` in drop-in archives.
+5. Commit and push these archives on the working branch. Regenerate with `bash patches/make-ubuntu-archives.sh` when source on that series changes.
+
+This applies to patches, Hostinger `public_html` drops, and any other “here are the changed files” handoff.

@@ -6,6 +6,7 @@ require $root . '/src/Env.php';
 require $root . '/src/Http.php';
 require $root . '/src/Db.php';
 require $root . '/src/Mail.php';
+require $root . '/src/InvoicePdf.php';
 require $root . '/src/Billing.php';
 require $root . '/src/Workspace.php';
 require $root . '/src/App.php';

@@ -7,6 +7,8 @@ from datetime import date, datetime, timedelta
 from functools import wraps
 from typing import Any
 
+from io import BytesIO
+
 from flask import (
     Blueprint,
     current_app,
@@ -15,6 +17,7 @@ from flask import (
     redirect,
     render_template,
     request,
+    send_file,
     session,
     url_for,
 )
@@ -37,7 +40,13 @@ from .database import (
     row_to_dict,
     rows_to_list,
 )
-from .mail import mail_configured, send_email
+from .invoice_pdf import (
+    build_invoice_pdf,
+    invoice_pdf_payload,
+    mention_attachment,
+    pdf_filename,
+)
+from .mail import mail_configured, mail_status, send_email
 from .workspace import (
     assert_can_add_open_invoice,
     effective_plan,
@@ -212,6 +221,139 @@ def invoice_balance(inv: dict[str, Any]) -> float:
     return round(float(inv["amount"]) - float(inv["amount_paid"]), 2)
 
 
+INVOICE_TEMPLATE_NAME = "Invoice"
+DEFAULT_INVOICE_SUBJECT = "Invoice {{number}} from {{business_name}}"
+DEFAULT_INVOICE_BODY = (
+    "Hi {{client_name}},\n\n"
+    "Invoice {{number}} is ready for {{title}}.\n\n"
+    "Amount due: {{amount_due}}\n"
+    "Due date: {{due_date}}\n\n"
+    "A PDF copy of this invoice is attached.\n\n"
+    "Please reply to this email if you have any questions.\n\n"
+    "Thanks,\n{{business_name}}"
+)
+
+
+def invoice_merge_ctx(inv: Any, settings: Any) -> dict[str, Any]:
+    data = dict(inv)
+    biz = settings["business_name"] if settings else "InPmnt"
+    return {
+        "number": data.get("number") or "",
+        "client_name": data.get("client_name") or "",
+        "title": data.get("title") or "",
+        "amount_due": money(invoice_balance(data)),
+        "amount": money(float(data.get("amount") or 0)),
+        "due_date": data.get("due_date") or "",
+        "issue_date": data.get("issue_date") or "",
+        "status": data.get("status") or "",
+        "notes": data.get("notes") or "",
+        "business_name": biz,
+    }
+
+
+def email_invoice_to_client(conn, invoice_id: int, wid: int):
+    """Email the Invoice template. Drafts are marked sent and reminders scheduled.
+
+    Returns a Flask (response, status) tuple on error, or None on success.
+    """
+    inv = conn.execute(
+        """
+        SELECT i.*, c.name AS client_name, c.email AS client_email,
+               c.company AS client_company, c.phone AS client_phone
+        FROM invoices i JOIN clients c ON c.id = i.client_id
+        WHERE i.id = ? AND i.workspace_id = ?
+        """,
+        (invoice_id, wid),
+    ).fetchone()
+    if not inv:
+        return jsonify({"error": "Not found"}), 404
+
+    to = (inv["client_email"] or "").strip()
+    if not to or "@" not in to:
+        return jsonify({"error": "Client has no email address. Add one on the client, then send again."}), 400
+
+    settings = get_settings(conn, wid)
+    was_draft = (inv["status"] or "") == "draft"
+    if was_draft:
+        blocked = assert_can_add_open_invoice(conn, wid, settings)
+        if blocked:
+            return jsonify({"error": blocked}), 403
+
+    tmpl = conn.execute(
+        "SELECT * FROM templates WHERE workspace_id=? AND name=? LIMIT 1",
+        (wid, INVOICE_TEMPLATE_NAME),
+    ).fetchone()
+    ctx = invoice_merge_ctx(inv, settings)
+    subject = render_template_vars(
+        tmpl["subject"] if tmpl else DEFAULT_INVOICE_SUBJECT, ctx
+    )
+    body = mention_attachment(
+        render_template_vars(tmpl["body"] if tmpl else DEFAULT_INVOICE_BODY, ctx)
+    )
+    pdf_bytes = build_invoice_pdf(invoice_pdf_payload(inv, settings))
+    filename = pdf_filename(str(inv["number"] or "invoice"))
+    attachments = [{"filename": filename, "content": pdf_bytes, "mime": "application/pdf"}]
+
+    if not mail_configured():
+        if not _allow_fake_email():
+            return _email_not_configured_response()
+    else:
+        try:
+            send_email(
+                to=to,
+                subject=subject,
+                body=body,
+                from_name=settings["business_name"] if settings else None,
+                attachments=attachments,
+            )
+        except Exception as exc:  # noqa: BLE001
+            return jsonify({"error": str(exc)}), 502
+
+    now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    today = date.today().isoformat()
+    if was_draft:
+        if (inv["due_date"] or "") < today and float(inv["amount_paid"] or 0) < float(inv["amount"] or 0):
+            status = "overdue" if float(inv["amount_paid"] or 0) == 0 else "partial"
+        elif float(inv["amount_paid"] or 0) >= float(inv["amount"] or 0):
+            status = "paid"
+        elif float(inv["amount_paid"] or 0) > 0:
+            status = "partial"
+        else:
+            status = "sent"
+        conn.execute(
+            "UPDATE invoices SET status=?, updated_at=? WHERE id=? AND workspace_id=?",
+            (status, now, invoice_id, wid),
+        )
+        schedule_reminders_for_invoice(conn, invoice_id, inv["due_date"], force=True)
+
+    cur = conn.execute(
+        """
+        INSERT INTO reminders (
+            invoice_id, channel, scheduled_for, status, subject, body, sent_at, created_at
+        ) VALUES (?, 'email', ?, 'sent', ?, ?, ?, ?)
+        """,
+        (invoice_id, today, subject, body, now, now),
+    )
+    rid = cur.lastrowid
+    log_activity(
+        conn,
+        "invoice",
+        f"Emailed invoice {inv['number']} to {to}",
+        "invoice",
+        invoice_id,
+        workspace_id=wid,
+    )
+    log_activity(
+        conn,
+        "reminder",
+        f"Sent INVOICE email for {inv['number']} to {to}",
+        "reminder",
+        rid,
+        workspace_id=wid,
+    )
+    return None
+
+
 def schedule_reminders_for_invoice(conn, invoice_id: int, due_date: str, force: bool = False) -> int:
     inv0 = conn.execute("SELECT workspace_id FROM invoices WHERE id = ?", (invoice_id,)).fetchone()
     if not inv0:
@@ -259,6 +401,7 @@ def schedule_reminders_for_invoice(conn, invoice_id: int, due_date: str, force: 
     ctx = {
         "number": inv["number"],
         "client_name": inv["client_name"],
+        "title": inv["title"] if "title" in inv.keys() else "",
         "amount_due": money(invoice_balance(dict(inv))),
         "due_date": inv["due_date"],
         "status": inv["status"],
@@ -590,6 +733,33 @@ def api_invoices():
     return jsonify(rows)
 
 
+@bp.get("/api/invoices/<int:invoice_id>/pdf")
+@login_required
+def api_invoice_pdf(invoice_id: int):
+    wid = require_workspace_id()
+    with db_session(db_path()) as conn:
+        inv = conn.execute(
+            """
+            SELECT i.*, c.name AS client_name, c.email AS client_email,
+                   c.company AS client_company, c.phone AS client_phone
+            FROM invoices i JOIN clients c ON c.id = i.client_id
+            WHERE i.id = ? AND i.workspace_id = ?
+            """,
+            (invoice_id, wid),
+        ).fetchone()
+        if not inv:
+            return jsonify({"error": "Not found"}), 404
+        settings = get_settings(conn, wid)
+        pdf_bytes = build_invoice_pdf(invoice_pdf_payload(inv, settings))
+        filename = pdf_filename(str(inv["number"] or "invoice"))
+    return send_file(
+        BytesIO(pdf_bytes),
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name=filename,
+    )
+
+
 @bp.get("/api/invoices/<int:invoice_id>")
 @login_required
 def api_invoice(invoice_id: int):
@@ -626,6 +796,8 @@ def api_create_invoice():
     status = data.get("status") or "draft"
     if status not in ("draft", "sent", "partial", "overdue", "paid"):
         status = "draft"
+    want_send = status == "sent"
+    insert_status = "draft" if want_send else status
     now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
     wid = require_workspace_id()
 
@@ -637,7 +809,7 @@ def api_create_invoice():
         if not client:
             return jsonify({"error": "Client not found"}), 404
         settings = get_settings(conn, wid)
-        if status in ("sent", "partial", "overdue"):
+        if insert_status in ("sent", "partial", "overdue") or want_send:
             blocked = assert_can_add_open_invoice(conn, wid, settings)
             if blocked:
                 return jsonify({"error": blocked}), 403
@@ -658,19 +830,27 @@ def api_create_invoice():
                 data.get("currency") or "USD",
                 issue,
                 due,
-                status,
+                insert_status,
                 (data.get("notes") or "").strip(),
                 now,
                 now,
             ),
         )
         invoice_id = cur.lastrowid
-        if status in ("sent", "partial", "overdue"):
+        emailed = False
+        if want_send:
+            err = email_invoice_to_client(conn, invoice_id, wid)
+            if err:
+                return err
+            emailed = True
+        elif insert_status in ("sent", "partial", "overdue"):
             schedule_reminders_for_invoice(conn, invoice_id, due, force=True)
         log_activity(
             conn, "invoice", f"Created invoice {number}", "invoice", invoice_id, workspace_id=wid
         )
         data_out = invoice_detail(conn, invoice_id, wid)
+    if data_out:
+        data_out["emailed"] = emailed
     return jsonify(data_out), 201
 
 
@@ -750,39 +930,14 @@ def api_update_invoice(invoice_id: int):
 @bp.post("/api/invoices/<int:invoice_id>/send")
 @login_required
 def api_send_invoice(invoice_id: int):
-    now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
     wid = require_workspace_id()
     with db_session(db_path()) as conn:
-        inv = conn.execute(
-            "SELECT * FROM invoices WHERE id=? AND workspace_id=?",
-            (invoice_id, wid),
-        ).fetchone()
-        if not inv:
-            return jsonify({"error": "Not found"}), 404
-        if inv["status"] == "draft":
-            settings = get_settings(conn, wid)
-            blocked = assert_can_add_open_invoice(conn, wid, settings)
-            if blocked:
-                return jsonify({"error": blocked}), 403
-        status = "paid" if inv["amount_paid"] >= inv["amount"] else (
-            "partial" if inv["amount_paid"] > 0 else "sent"
-        )
-        if inv["due_date"] < date.today().isoformat() and status != "paid":
-            status = "overdue" if inv["amount_paid"] == 0 else "partial"
-        conn.execute(
-            "UPDATE invoices SET status=?, updated_at=? WHERE id=? AND workspace_id=?",
-            (status, now, invoice_id, wid),
-        )
-        schedule_reminders_for_invoice(conn, invoice_id, inv["due_date"], force=True)
-        log_activity(
-            conn,
-            "invoice",
-            f"Marked {inv['number']} as sent — reminders scheduled",
-            "invoice",
-            invoice_id,
-            workspace_id=wid,
-        )
+        err = email_invoice_to_client(conn, invoice_id, wid)
+        if err:
+            return err
         out = invoice_detail(conn, invoice_id, wid)
+    if out:
+        out["emailed"] = True
     return jsonify(out)
 
 
@@ -890,7 +1045,8 @@ def _email_not_configured_response():
                     "Email is not configured. Set RESEND_API_KEY or "
                     "SMTP_HOST/SMTP_USER/MAIL_FROM in .env "
                     "(or ALLOW_FAKE_EMAIL=1 for local testing)."
-                )
+                ),
+                "status": mail_status(),
             }
         ),
         503,
@@ -1208,6 +1364,50 @@ def api_get_settings():
         settings["plan"] = settings.get("plan") or "trial"
         settings["trial_ends_on"] = settings.get("trial_ends_on")
     return jsonify(settings)
+
+
+@bp.get("/api/mail/status")
+@login_required
+def api_mail_status():
+    return jsonify(mail_status())
+
+
+@bp.post("/api/mail/test")
+@login_required
+def api_mail_test():
+    user = g.user or {}
+    to = (user.get("email") or "").strip()
+    wid = require_workspace_id()
+    with db_session(db_path()) as conn:
+        settings = get_settings(conn, wid)
+        if not to:
+            to = ((settings["email"] if settings else "") or "").strip()
+        if not to or "@" not in to:
+            return jsonify(
+                {"error": "No mailbox to send a test to. Add an email on this account or in Settings."}
+            ), 400
+        if not mail_configured():
+            if not _allow_fake_email():
+                return _email_not_configured_response()
+            return jsonify({"ok": True, "provider": "fake", "to": to, "status": mail_status()})
+        try:
+            result = send_email(
+                to=to,
+                subject="InPmnt test email",
+                body="This is a test from InPmnt.\n\nIf you received this, outbound mail is working.\n",
+                from_name=settings["business_name"] if settings else None,
+            )
+        except Exception as exc:  # noqa: BLE001
+            return jsonify({"error": str(exc), "status": mail_status()}), 502
+        log_activity(
+            conn,
+            "reminder",
+            f"Sent test email to {to}",
+            "settings",
+            wid,
+            workspace_id=wid,
+        )
+    return jsonify({"ok": True, "to": to, "status": mail_status(), **result})
 
 
 @bp.put("/api/settings")
