@@ -1,0 +1,1436 @@
+diff --git a/.cursor/rules/always-file-download.mdc b/.cursor/rules/always-file-download.mdc
+new file mode 100644
+index 0000000..6199a91
+--- /dev/null
++++ b/.cursor/rules/always-file-download.mdc
+@@ -0,0 +1,18 @@
++---
++description: Always give a real file download (zip) for patches and drop-in files; never leave the user with only inline code or a GitHub .patch page.
++alwaysApply: true
++---
++
++# Always ship a file download
++
++Unless the user **explicitly** says they want the diff pasted in chat instead:
++
++1. Do **not** treat a GitHub `.patch` / raw-text URL as the handoff. Browsers and GitHub show that as **code**, not a download.
++2. Put a **`.zip`** (and Hostinger `.tar.gz` when PHP files changed) in:
++   - `patches/` in the repo (commit + push), **and**
++   - `/opt/cursor/artifacts/` with a unique descriptive name so Cursor attaches it as a **file download** on the run.
++3. Point the user at the **zip** (artifact + `…/raw/…/patches/*.zip` URL). Mention `.patch` files only as something **inside** the zip.
++4. Keep Ubuntu modes: files `644`, directories `755`, LF endings. Do not overwrite a live `.env` in drop-in archives.
++5. Commit and push these archives on the working branch. Regenerate with `bash patches/make-ubuntu-archives.sh` when source on that series changes.
++
++This applies to patches, Hostinger `public_html` drops, and any other “here are the changed files” handoff.
+diff --git a/app/database.py b/app/database.py
+index 356e813..5130b20 100644
+--- a/app/database.py
++++ b/app/database.py
+@@ -38,6 +38,7 @@ DEFAULT_TEMPLATE_DEFS = [
+         "Invoice {{number}} is ready for {{title}}.\n\n"
+         "Amount due: {{amount_due}}\n"
+         "Due date: {{due_date}}\n\n"
++        "A PDF copy of this invoice is attached.\n\n"
+         "Please reply to this email if you have any questions.\n\n"
+         "Thanks,\n{{business_name}}",
+         0,
+diff --git a/app/invoice_pdf.py b/app/invoice_pdf.py
+new file mode 100644
+index 0000000..2c8e959
+--- /dev/null
++++ b/app/invoice_pdf.py
+@@ -0,0 +1,338 @@
++"""Professional one-page invoice PDF (Helvetica + optional JPEG logo). No extra deps."""
++from __future__ import annotations
++
++from pathlib import Path
++from typing import Any
++
++# WinAnsi Helvetica widths (1/1000 em), public-domain FPDF tables.
++_HELV = [
++    278, 278, 355, 556, 556, 889, 667, 191, 333, 333, 389, 584, 278, 333, 278, 278,
++    556, 556, 556, 556, 556, 556, 556, 556, 556, 556, 278, 278, 584, 584, 584, 556,
++    1015, 667, 667, 722, 722, 667, 611, 778, 722, 278, 500, 667, 556, 833, 722, 778,
++    667, 778, 722, 667, 611, 722, 667, 944, 667, 667, 611, 278, 278, 278, 469, 556,
++    333, 556, 556, 500, 556, 556, 278, 556, 556, 222, 222, 500, 222, 833, 556, 556,
++    556, 556, 333, 500, 278, 556, 500, 722, 500, 500, 500, 334, 260, 334, 584, 278,
++]
++_HELV_B = [
++    278, 333, 474, 556, 556, 889, 722, 238, 333, 333, 389, 584, 278, 333, 278, 278,
++    556, 556, 556, 556, 556, 556, 556, 556, 556, 556, 333, 333, 584, 584, 584, 611,
++    975, 722, 722, 722, 722, 667, 611, 778, 722, 278, 556, 722, 611, 833, 722, 778,
++    667, 778, 722, 667, 611, 722, 667, 944, 667, 667, 611, 333, 278, 333, 584, 556,
++    333, 556, 611, 556, 611, 556, 333, 611, 611, 278, 278, 556, 278, 889, 611, 611,
++    611, 611, 389, 556, 333, 611, 556, 778, 556, 556, 500, 389, 280, 389, 584, 278,
++]
++
++
++def _w(bold: bool, ch: str, size: float) -> float:
++    o = ord(ch)
++    if o == 0x00B7:
++        o = 46  # period-width stand-in
++    if o < 32 or o > 126:
++        o = 63  # ?
++    table = _HELV_B if bold else _HELV
++    return table[o - 32] * size / 1000.0
++
++
++def _esc(text: str) -> str:
++    out = []
++    for ch in text.replace("\r", " ").replace("\n", " "):
++        o = ord(ch)
++        if ch in "\\()":
++            out.append("\\" + ch)
++        elif o == 0x2014:
++            out.append("\\227")
++        elif o == 0x00B7:
++            out.append("\xb7")
++        elif o in (0x2018, 0x2019):
++            out.append("'")
++        elif o in (0x201C, 0x201D):
++            out.append("(" if o == 0x201C else ")")
++        elif 32 <= o <= 126:
++            out.append(ch)
++        else:
++            out.append("?")
++    return "".join(out)
++
++
++def _rgb(hex_color: str) -> str:
++    h = hex_color.lstrip("#")
++    r, g, b = int(h[0:2], 16) / 255.0, int(h[2:4], 16) / 255.0, int(h[4:6], 16) / 255.0
++    return f"{r:.3f} {g:.3f} {b:.3f}"
++
++
++def logo_path() -> Path | None:
++    root = Path(__file__).resolve().parent.parent
++    for p in (
++        root / "static" / "img" / "inpmnt-logo-invoice.jpg",
++        root / "php" / "static" / "img" / "inpmnt-logo-invoice.jpg",
++    ):
++        if p.is_file():
++            return p
++    return None
++
++
++def _money(n: float) -> str:
++    return f"${n:,.2f}"
++
++
++def pdf_filename(number: str) -> str:
++    safe = "".join(ch if ch.isalnum() or ch in "._-" else "_" for ch in (number or "invoice"))
++    safe = safe.strip("._") or "invoice"
++    if not safe.lower().endswith(".pdf"):
++        safe += ".pdf"
++    return safe
++
++
++def mention_attachment(body: str) -> str:
++    text = body or ""
++    if "pdf copy of this invoice" in text.lower():
++        return text
++    return text.rstrip() + "\n\nA PDF copy of this invoice is attached.\n"
++
++
++def invoice_pdf_payload(inv: Any, settings: Any | None) -> dict[str, Any]:
++    """Normalize invoice + settings rows into build_invoice_pdf keys."""
++    data = _as_dict(inv)
++    st = _as_dict(settings)
++    amount = float(data.get("amount") or 0)
++    paid = float(data.get("amount_paid") or 0)
++    due = round(amount - paid, 2)
++    return {
++        "business_name": st.get("business_name") or "InPmnt",
++        "number": data.get("number") or "INV-0000",
++        "client_name": data.get("client_name") or "Client",
++        "client_company": data.get("client_company") or "",
++        "client_email": data.get("client_email") or "",
++        "client_phone": data.get("client_phone") or "",
++        "title": data.get("title") or "Services",
++        "notes": data.get("notes") or "",
++        "issue_date": data.get("issue_date") or "",
++        "due_date": data.get("due_date") or "",
++        "status": data.get("status") or "sent",
++        "amount": _money(amount),
++        "amount_paid": _money(paid),
++        "amount_due": _money(due),
++        "owner_name": st.get("owner_name") or "",
++        "business_email": st.get("email") or "",
++        "business_phone": st.get("phone") or "",
++        "website": st.get("website") or "",
++        "currency": st.get("currency") or "USD",
++    }
++
++
++def _as_dict(row: Any) -> dict[str, Any]:
++    if row is None:
++        return {}
++    if isinstance(row, dict):
++        return dict(row)
++    keys = getattr(row, "keys", None)
++    if callable(keys):
++        return {k: row[k] for k in keys()}
++    return dict(row)
++
++
++def build_invoice_pdf(data: dict[str, Any]) -> bytes:
++    """Return a one-page letter PDF. Keys documented in InvoicePdf PHP twin."""
++    W, H = 612.0, 792.0
++    ops: list[str] = []
++
++    def fill_rect(x: float, y: float, w: float, h: float, color: str) -> None:
++        ops.append(f"{_rgb(color)} rg {x:.2f} {y:.2f} {w:.2f} {h:.2f} re f")
++
++    def text(x: float, y: float, s: str, *, size: float = 10, bold: bool = False, color: str = "15202b") -> None:
++        font = "F2" if bold else "F1"
++        ops.append(
++            f"BT /{font} {size:.1f} Tf {_rgb(color)} rg 1 0 0 1 {x:.2f} {y:.2f} Tm ({_esc(s)}) Tj ET"
++        )
++
++    def text_right(x_right: float, y: float, s: str, *, size: float = 10, bold: bool = False, color: str = "15202b") -> None:
++        tw = sum(_w(bold, c, size) for c in s)
++        text(x_right - tw, y, s, size=size, bold=bold, color=color)
++
++    def hline(x: float, y: float, w: float, color: str = "e2e8ee", t: float = 0.6) -> None:
++        fill_rect(x, y, w, t, color)
++
++    biz = str(data.get("business_name") or "InPmnt")
++    number = str(data.get("number") or "INV-0000")
++    client = str(data.get("client_name") or "Client")
++    company = str(data.get("client_company") or "")
++    client_email = str(data.get("client_email") or "")
++    client_phone = str(data.get("client_phone") or "")
++    title = str(data.get("title") or "Services")
++    notes = str(data.get("notes") or "")
++    issue = str(data.get("issue_date") or "")
++    due = str(data.get("due_date") or "")
++    status = str(data.get("status") or "sent").upper()
++    amount = str(data.get("amount") or "$0.00")
++    paid = str(data.get("amount_paid") or "$0.00")
++    due_amt = str(data.get("amount_due") or amount)
++    owner = str(data.get("owner_name") or "")
++    biz_email = str(data.get("business_email") or "")
++    biz_phone = str(data.get("business_phone") or "")
++    website = str(data.get("website") or "")
++    currency = str(data.get("currency") or "USD")
++
++    # Header
++    fill_rect(0, H - 118, W, 118, "101920")
++    fill_rect(0, H - 122, W, 4, "1a8a84")
++    jpeg = b""
++    img_w = img_h = 0
++    lp = logo_path()
++    if lp:
++        jpeg = lp.read_bytes()
++        img_w, img_h = 160, 160
++        # 52pt square in header
++        ops.append("q 52 0 0 52 40 698 cm /Im1 Do Q")
++    text(102 if jpeg else 48, 748, "InPmnt", size=16, bold=True, color="ffffff")
++    text(102 if jpeg else 48, 730, "Get paid without the chase.", size=8, color="8a99a8")
++    text_right(564, 748, "INVOICE", size=22, bold=True, color="5ee0d8")
++    text_right(564, 728, number, size=12, bold=True, color="ffffff")
++    text_right(564, 712, status, size=8, bold=True, color="1a8a84")
++
++    # Parties
++    y_from = 650
++    text(48, y_from, "FROM", size=8, bold=True, color="667888")
++    text(320, y_from, "BILL TO", size=8, bold=True, color="667888")
++    y_from -= 16
++    y_to = y_from
++    text(48, y_from, biz, size=12, bold=True)
++    text(320, y_to, client, size=12, bold=True)
++    y_from -= 14
++    y_to -= 14
++    for line in (owner, biz_email, biz_phone, website):
++        if line:
++            text(48, y_from, line, size=9, color="2a3a48")
++            y_from -= 12
++    if company:
++        text(320, y_to, company, size=9, color="2a3a48")
++        y_to -= 12
++    for line in (client_email, client_phone):
++        if line:
++            text(320, y_to, line, size=9, color="2a3a48")
++            y_to -= 12
++
++    # Meta strip
++    fill_rect(48, 538, 516, 52, "f6f8fa")
++    text(64, 572, "Issued", size=8, bold=True, color="667888")
++    text(64, 554, issue or "—", size=11, bold=True)
++    text(220, 572, "Due", size=8, bold=True, color="667888")
++    text(220, 554, due or "—", size=11, bold=True)
++    text(360, 572, "Currency", size=8, bold=True, color="667888")
++    text(360, 554, currency, size=11, bold=True)
++    text_right(548, 572, "Amount due", size=8, bold=True, color="667888")
++    text_right(548, 552, due_amt, size=13, bold=True, color="0d6b66")
++
++    # Line table
++    fill_rect(48, 500, 516, 22, "0d6b66")
++    text(64, 507, "Description", size=9, bold=True, color="ffffff")
++    text_right(548, 507, "Amount", size=9, bold=True, color="ffffff")
++    fill_rect(48, 468, 516, 32, "ffffff")
++    hline(48, 468, 516, "e2e8ee")
++    text(64, 480, title, size=10)
++    text_right(548, 480, amount, size=10, bold=True)
++
++    # Totals
++    fill_rect(332, 378, 232, 78, "f6f8fa")
++    text(348, 432, "Subtotal", size=9, color="667888")
++    text_right(548, 432, amount, size=9)
++    text(348, 414, "Paid", size=9, color="667888")
++    text_right(548, 414, paid, size=9)
++    hline(348, 404, 200, "cfd8e1")
++    text(348, 388, "Amount due", size=11, bold=True, color="0d6b66")
++    text_right(548, 388, due_amt, size=12, bold=True, color="0d6b66")
++
++    if notes:
++        text(48, 432, "Notes", size=8, bold=True, color="667888")
++        wrapped = _wrap(notes, 42)
++        ny = 416
++        for line in wrapped[:6]:
++            text(48, ny, line, size=9, color="2a3a48")
++            ny -= 12
++
++    fill_rect(0, 0, W, 48, "101920")
++    text(48, 22, "InPmnt  ·  Professional invoices & reminders", size=8, color="8a99a8")
++    text_right(564, 22, "Thank you for your business", size=8, color="5ee0d8")
++
++    content = "\n".join(ops) + "\n"
++    content_b = content.encode("latin-1", "replace")
++
++    objects: list[bytes] = []
++
++    def add(obj: bytes) -> int:
++        objects.append(obj)
++        return len(objects)
++
++    add(b"<< /Type /Catalog /Pages 2 0 R >>")
++    add(b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>")
++    resources = b"<< /Font << /F1 4 0 R /F2 5 0 R >>"
++    img_obj_num = None
++    if jpeg:
++        img_obj_num = 6
++        resources += b" /XObject << /Im1 6 0 R >>"
++    resources += b" >>"
++    add(
++        f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {W:.0f} {H:.0f}] "
++        f"/Resources {resources.decode('ascii')} /Contents 7 0 R >>".encode("ascii")
++        if jpeg
++        else f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {W:.0f} {H:.0f}] "
++        f"/Resources {resources.decode('ascii')} /Contents 6 0 R >>".encode("ascii")
++    )
++    add(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>")
++    add(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>")
++    if jpeg:
++        add(
++            f"<< /Type /XObject /Subtype /Image /Width {img_w} /Height {img_h} "
++            f"/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length {len(jpeg)} >>\n"
++            f"stream\n".encode("ascii")
++            + jpeg
++            + b"\nendstream"
++        )
++        stream_num = 7
++    else:
++        stream_num = 6
++    add(
++        f"<< /Length {len(content_b)} >>\nstream\n".encode("ascii") + content_b + b"\nendstream"
++    )
++
++    # Object numbers: 1 catalog, 2 pages, 3 page, 4 F1, 5 F2, [6 image], stream
++    # If no jpeg, page Contents should be 6. Fix page object if no jpeg — already handled.
++    # If jpeg, Contents 7 0 R — but we added catalog, pages, page, f1, f2, image, stream = 7. Good.
++    # If no jpeg, objects: catalog, pages, page, f1, f2, stream = 6. Page says Contents 6. Good.
++
++    out = bytearray(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
++    offsets = [0]
++    for i, obj in enumerate(objects, start=1):
++        offsets.append(len(out))
++        out += f"{i} 0 obj\n".encode("ascii")
++        out += obj
++        if not obj.endswith(b"endstream"):
++            out += b"\n"
++        out += b"endobj\n"
++    xref = len(out)
++    out += f"xref\n0 {len(objects) + 1}\n".encode("ascii")
++    out += b"0000000000 65535 f \n"
++    for off in offsets[1:]:
++        out += f"{off:010d} 00000 n \n".encode("ascii")
++    out += (
++        f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n".encode(
++            "ascii"
++        )
++    )
++    return bytes(out)
++
++
++def _wrap(text: str, width: int) -> list[str]:
++    words = text.replace("\n", " ").split()
++    lines: list[str] = []
++    cur = ""
++    for w in words:
++        trial = (cur + " " + w).strip()
++        if len(trial) <= width:
++            cur = trial
++        else:
++            if cur:
++                lines.append(cur)
++            cur = w
++    if cur:
++        lines.append(cur)
++    return lines or [""]
+diff --git a/app/mail.py b/app/mail.py
+index 7da32bd..5416708 100644
+--- a/app/mail.py
++++ b/app/mail.py
+@@ -6,7 +6,7 @@ import smtplib
+ import ssl
+ from email.message import EmailMessage
+ from email.utils import formataddr
+-from typing import Any
++from typing import Any, Sequence
+ 
+ 
+ _PLACEHOLDER_RESEND = {"re_...", "re_your_api_key", "re_changeme"}
+@@ -65,8 +65,15 @@ def mail_status() -> dict[str, Any]:
+     }
+ 
+ 
+-def send_email(*, to: str, subject: str, body: str, from_name: str | None = None) -> dict[str, Any]:
+-    """Send a plain-text email. Raises RuntimeError on failure / missing config."""
++def send_email(
++    *,
++    to: str,
++    subject: str,
++    body: str,
++    from_name: str | None = None,
++    attachments: Sequence[dict[str, Any]] | None = None,
++) -> dict[str, Any]:
++    """Send a plain-text email, optionally with attachments. Raises RuntimeError on failure."""
+     to = (to or "").strip()
+     if not to or "@" not in to:
+         raise RuntimeError("Client has no email address")
+@@ -77,6 +84,7 @@ def send_email(*, to: str, subject: str, body: str, from_name: str | None = None
+ 
+     display = (from_name or os.environ.get("MAIL_FROM_NAME") or "InPmnt").strip()
+     from_header = formataddr((display, mail_from)) if display else mail_from
++    atts = list(attachments or [])
+ 
+     force = _clean(os.environ.get("MAIL_PROVIDER")).lower()
+     resend_key = _resend_key()
+@@ -87,7 +95,7 @@ def send_email(*, to: str, subject: str, body: str, from_name: str | None = None
+     errors: list[str] = []
+     if try_resend:
+         try:
+-            return _send_resend(resend_key, from_header, to, subject, body)
++            return _send_resend(resend_key, from_header, to, subject, body, atts)
+         except Exception as exc:  # noqa: BLE001
+             errors.append(str(exc))
+             if not smtp_ok or force == "resend":
+@@ -99,7 +107,7 @@ def send_email(*, to: str, subject: str, body: str, from_name: str | None = None
+     if try_smtp:
+         host = _clean(os.environ.get("SMTP_HOST"))
+         try:
+-            return _send_smtp(host, from_header, mail_from, to, subject, body)
++            return _send_smtp(host, from_header, mail_from, to, subject, body, atts)
+         except Exception as exc:  # noqa: BLE001
+             detail = str(exc)
+             if errors:
+@@ -111,14 +119,41 @@ def send_email(*, to: str, subject: str, body: str, from_name: str | None = None
+     )
+ 
+ 
+-def _send_resend(api_key: str, from_header: str, to: str, subject: str, body: str) -> dict[str, Any]:
++def _attachment_bytes(att: dict[str, Any]) -> bytes:
++    raw = att.get("content") or b""
++    if isinstance(raw, str):
++        return raw.encode("latin-1")
++    return bytes(raw)
++
++
++def _send_resend(
++    api_key: str,
++    from_header: str,
++    to: str,
++    subject: str,
++    body: str,
++    attachments: Sequence[dict[str, Any]] | None = None,
++) -> dict[str, Any]:
++    import base64
+     import json
+     import urllib.error
+     import urllib.request
+ 
+-    payload = json.dumps(
+-        {"from": from_header, "to": [to], "subject": subject or "(no subject)", "text": body or ""}
+-    ).encode("utf-8")
++    payload_obj: dict[str, Any] = {
++        "from": from_header,
++        "to": [to],
++        "subject": subject or "(no subject)",
++        "text": body or "",
++    }
++    if attachments:
++        payload_obj["attachments"] = [
++            {
++                "filename": str(att.get("filename") or "invoice.pdf"),
++                "content": base64.b64encode(_attachment_bytes(att)).decode("ascii"),
++            }
++            for att in attachments
++        ]
++    payload = json.dumps(payload_obj).encode("utf-8")
+     req = urllib.request.Request(
+         "https://api.resend.com/emails",
+         data=payload,
+@@ -141,7 +176,13 @@ def _send_resend(api_key: str, from_header: str, to: str, subject: str, body: st
+ 
+ 
+ def _send_smtp(
+-    host: str, from_header: str, mail_from: str, to: str, subject: str, body: str
++    host: str,
++    from_header: str,
++    mail_from: str,
++    to: str,
++    subject: str,
++    body: str,
++    attachments: Sequence[dict[str, Any]] | None = None,
+ ) -> dict[str, Any]:
+     port = int(_clean(os.environ.get("SMTP_PORT")) or "587")
+     user = _clean(os.environ.get("SMTP_USER"))
+@@ -156,6 +197,15 @@ def _send_smtp(
+     msg["To"] = to
+     msg["Reply-To"] = mail_from
+     msg.set_content(body or "")
++    for att in attachments or []:
++        mime = str(att.get("mime") or "application/pdf")
++        main, _, sub = mime.partition("/")
++        msg.add_attachment(
++            _attachment_bytes(att),
++            maintype=main or "application",
++            subtype=sub or "pdf",
++            filename=str(att.get("filename") or "invoice.pdf"),
++        )
+ 
+     context = ssl.create_default_context()
+     if use_ssl or port == 465:
+diff --git a/app/routes.py b/app/routes.py
+index a9879c9..3accabd 100644
+--- a/app/routes.py
++++ b/app/routes.py
+@@ -7,6 +7,8 @@ from datetime import date, datetime, timedelta
+ from functools import wraps
+ from typing import Any
+ 
++from io import BytesIO
++
+ from flask import (
+     Blueprint,
+     current_app,
+@@ -15,6 +17,7 @@ from flask import (
+     redirect,
+     render_template,
+     request,
++    send_file,
+     session,
+     url_for,
+ )
+@@ -37,6 +40,12 @@ from .database import (
+     row_to_dict,
+     rows_to_list,
+ )
++from .invoice_pdf import (
++    build_invoice_pdf,
++    invoice_pdf_payload,
++    mention_attachment,
++    pdf_filename,
++)
+ from .mail import mail_configured, mail_status, send_email
+ from .workspace import (
+     assert_can_add_open_invoice,
+@@ -219,6 +228,7 @@ DEFAULT_INVOICE_BODY = (
+     "Invoice {{number}} is ready for {{title}}.\n\n"
+     "Amount due: {{amount_due}}\n"
+     "Due date: {{due_date}}\n\n"
++    "A PDF copy of this invoice is attached.\n\n"
+     "Please reply to this email if you have any questions.\n\n"
+     "Thanks,\n{{business_name}}"
+ )
+@@ -248,7 +258,8 @@ def email_invoice_to_client(conn, invoice_id: int, wid: int):
+     """
+     inv = conn.execute(
+         """
+-        SELECT i.*, c.name AS client_name, c.email AS client_email
++        SELECT i.*, c.name AS client_name, c.email AS client_email,
++               c.company AS client_company, c.phone AS client_phone
+         FROM invoices i JOIN clients c ON c.id = i.client_id
+         WHERE i.id = ? AND i.workspace_id = ?
+         """,
+@@ -276,7 +287,12 @@ def email_invoice_to_client(conn, invoice_id: int, wid: int):
+     subject = render_template_vars(
+         tmpl["subject"] if tmpl else DEFAULT_INVOICE_SUBJECT, ctx
+     )
+-    body = render_template_vars(tmpl["body"] if tmpl else DEFAULT_INVOICE_BODY, ctx)
++    body = mention_attachment(
++        render_template_vars(tmpl["body"] if tmpl else DEFAULT_INVOICE_BODY, ctx)
++    )
++    pdf_bytes = build_invoice_pdf(invoice_pdf_payload(inv, settings))
++    filename = pdf_filename(str(inv["number"] or "invoice"))
++    attachments = [{"filename": filename, "content": pdf_bytes, "mime": "application/pdf"}]
+ 
+     if not mail_configured():
+         if not _allow_fake_email():
+@@ -288,6 +304,7 @@ def email_invoice_to_client(conn, invoice_id: int, wid: int):
+                 subject=subject,
+                 body=body,
+                 from_name=settings["business_name"] if settings else None,
++                attachments=attachments,
+             )
+         except Exception as exc:  # noqa: BLE001
+             return jsonify({"error": str(exc)}), 502
+@@ -716,6 +733,33 @@ def api_invoices():
+     return jsonify(rows)
+ 
+ 
++@bp.get("/api/invoices/<int:invoice_id>/pdf")
++@login_required
++def api_invoice_pdf(invoice_id: int):
++    wid = require_workspace_id()
++    with db_session(db_path()) as conn:
++        inv = conn.execute(
++            """
++            SELECT i.*, c.name AS client_name, c.email AS client_email,
++                   c.company AS client_company, c.phone AS client_phone
++            FROM invoices i JOIN clients c ON c.id = i.client_id
++            WHERE i.id = ? AND i.workspace_id = ?
++            """,
++            (invoice_id, wid),
++        ).fetchone()
++        if not inv:
++            return jsonify({"error": "Not found"}), 404
++        settings = get_settings(conn, wid)
++        pdf_bytes = build_invoice_pdf(invoice_pdf_payload(inv, settings))
++        filename = pdf_filename(str(inv["number"] or "invoice"))
++    return send_file(
++        BytesIO(pdf_bytes),
++        mimetype="application/pdf",
++        as_attachment=True,
++        download_name=filename,
++    )
++
++
+ @bp.get("/api/invoices/<int:invoice_id>")
+ @login_required
+ def api_invoice(invoice_id: int):
+diff --git a/php/bootstrap.php b/php/bootstrap.php
+index da43bef..75acea1 100644
+--- a/php/bootstrap.php
++++ b/php/bootstrap.php
+@@ -6,6 +6,7 @@ require $root . '/src/Env.php';
+ require $root . '/src/Http.php';
+ require $root . '/src/Db.php';
+ require $root . '/src/Mail.php';
++require $root . '/src/InvoicePdf.php';
+ require $root . '/src/Billing.php';
+ require $root . '/src/Workspace.php';
+ require $root . '/src/App.php';
+diff --git a/php/src/App.php b/php/src/App.php
+index 5ab2c2c..56e8b00 100644
+--- a/php/src/App.php
++++ b/php/src/App.php
+@@ -209,6 +209,9 @@ final class App
+                 $this->apiDeleteInvoice($wid, (int) $m[1]);
+             }
+         }
++        if (preg_match('#^/api/invoices/(\d+)/pdf$#', $path, $m) && $method === 'GET') {
++            $this->apiInvoicePdf($wid, (int) $m[1]);
++        }
+         if (preg_match('#^/api/invoices/(\d+)/send$#', $path, $m) && $method === 'POST') {
+             $this->apiSendInvoice($wid, (int) $m[1]);
+         }
+@@ -685,11 +688,30 @@ final class App
+         Http::json($out);
+     }
+ 
+-    /** Email the Invoice template. Drafts are marked sent and reminders are scheduled. */
++    private function apiInvoicePdf(int $wid, int $id): void
++    {
++        $st = $this->db->prepare(
++            'SELECT i.*, c.name AS client_name, c.email AS client_email,
++                    c.company AS client_company, c.phone AS client_phone
++             FROM invoices i JOIN clients c ON c.id = i.client_id
++             WHERE i.id=? AND i.workspace_id=?'
++        );
++        $st->execute([$id, $wid]);
++        $inv = $st->fetch();
++        if (!$inv) {
++            Http::json(['error' => 'Not found'], 404);
++        }
++        $settings = Workspace::settings($this->db, $wid) ?? [];
++        $pdf = InvoicePdf::build(InvoicePdf::payload($inv, $settings));
++        Http::pdf($pdf, InvoicePdf::filename((string) ($inv['number'] ?? 'invoice')));
++    }
++
++    /** Email the Invoice template with a PDF attachment. Drafts are marked sent and reminders are scheduled. */
+     private function deliverInvoice(int $wid, int $id): void
+     {
+         $st = $this->db->prepare(
+-            'SELECT i.*, c.name AS client_name, c.email AS client_email
++            'SELECT i.*, c.name AS client_name, c.email AS client_email,
++                    c.company AS client_company, c.phone AS client_phone
+              FROM invoices i JOIN clients c ON c.id = i.client_id
+              WHERE i.id=? AND i.workspace_id=?'
+         );
+@@ -726,17 +748,20 @@ final class App
+             'business_name' => $settings['business_name'] ?? 'InPmnt',
+         ];
+         $subject = Db::renderVars($tmpl['subject'] ?? 'Invoice {{number}} from {{business_name}}', $ctx);
+-        $body = Db::renderVars(
+-            $tmpl['body'] ?? "Hi {{client_name}},\n\nInvoice {{number}} is ready for {{title}}.\n\nAmount due: {{amount_due}}\nDue date: {{due_date}}\n\nPlease reply to this email if you have any questions.\n\nThanks,\n{{business_name}}",
++        $body = InvoicePdf::mentionAttachment(Db::renderVars(
++            $tmpl['body'] ?? "Hi {{client_name}},\n\nInvoice {{number}} is ready for {{title}}.\n\nAmount due: {{amount_due}}\nDue date: {{due_date}}\n\nA PDF copy of this invoice is attached.\n\nPlease reply to this email if you have any questions.\n\nThanks,\n{{business_name}}",
+             $ctx
+-        );
++        ));
++        $pdf = InvoicePdf::build(InvoicePdf::payload($inv, $settings ?? []));
++        $filename = InvoicePdf::filename((string) ($inv['number'] ?? 'invoice'));
++        $attachments = [['filename' => $filename, 'content' => $pdf, 'mime' => 'application/pdf']];
+         if (!Mailer::configured()) {
+             if (!Env::truthy('ALLOW_FAKE_EMAIL')) {
+                 $this->emailNotConfigured();
+             }
+         } else {
+             try {
+-                Mailer::send($to, $subject, $body, $settings['business_name'] ?? null);
++                Mailer::send($to, $subject, $body, $settings['business_name'] ?? null, $attachments);
+             } catch (Throwable $e) {
+                 Http::json(['error' => $e->getMessage()], 502);
+             }
+diff --git a/php/src/Db.php b/php/src/Db.php
+index dddd223..0ce4d3c 100644
+--- a/php/src/Db.php
++++ b/php/src/Db.php
+@@ -160,7 +160,7 @@ final class Db
+     {
+         return [
+             ['Invoice', 'email', 'Invoice {{number}} from {{business_name}}',
+-                "Hi {{client_name}},\n\nInvoice {{number}} is ready for {{title}}.\n\nAmount due: {{amount_due}}\nDue date: {{due_date}}\n\nPlease reply to this email if you have any questions.\n\nThanks,\n{{business_name}}", 0],
++                "Hi {{client_name}},\n\nInvoice {{number}} is ready for {{title}}.\n\nAmount due: {{amount_due}}\nDue date: {{due_date}}\n\nA PDF copy of this invoice is attached.\n\nPlease reply to this email if you have any questions.\n\nThanks,\n{{business_name}}", 0],
+             ['Friendly nudge', 'email', 'Quick reminder about invoice {{number}}',
+                 "Hi {{client_name}},\n\nJust a friendly reminder that invoice {{number}} for {{amount_due}} is due on {{due_date}}.\n\nYou can reply to this email if you have any questions.\n\nThanks,\n{{business_name}}", 1],
+             ['Due today', 'email', 'Invoice {{number}} is due today',
+diff --git a/php/src/Http.php b/php/src/Http.php
+index b065039..96a216f 100644
+--- a/php/src/Http.php
++++ b/php/src/Http.php
+@@ -11,6 +11,17 @@ final class Http
+         exit;
+     }
+ 
++    public static function pdf(string $bytes, string $filename): never
++    {
++        $safe = preg_replace('/[^A-Za-z0-9._-]+/', '_', $filename) ?: 'invoice.pdf';
++        http_response_code(200);
++        header('Content-Type: application/pdf');
++        header('Content-Disposition: attachment; filename="' . $safe . '"');
++        header('Content-Length: ' . (string) strlen($bytes));
++        echo $bytes;
++        exit;
++    }
++
+     public static function redirect(string $url, int $status = 302): never
+     {
+         http_response_code($status);
+diff --git a/php/src/InvoicePdf.php b/php/src/InvoicePdf.php
+new file mode 100644
+index 0000000..7e773e2
+--- /dev/null
++++ b/php/src/InvoicePdf.php
+@@ -0,0 +1,326 @@
++<?php
++declare(strict_types=1);
++
++/** One-page letter invoice PDF. Helvetica + optional JPEG logo. No Composer. */
++final class InvoicePdf
++{
++    /** @param array<string,mixed> $data */
++    public static function build(array $data): string
++    {
++        $W = 612.0;
++        $H = 792.0;
++        $ops = [];
++        $fill = static function (float $x, float $y, float $w, float $h, string $hex) use (&$ops): void {
++            $ops[] = self::rgb($hex) . sprintf(' rg %.2f %.2f %.2f %.2f re f', $x, $y, $w, $h);
++        };
++        $text = static function (float $x, float $y, string $s, float $size = 10.0, bool $bold = false, string $color = '15202b') use (&$ops): void {
++            $font = $bold ? 'F2' : 'F1';
++            $ops[] = sprintf(
++                'BT /%s %.1f Tf %s rg 1 0 0 1 %.2f %.2f Tm (%s) Tj ET',
++                $font,
++                $size,
++                self::rgb($color),
++                $x,
++                $y,
++                self::esc($s)
++            );
++        };
++        $textRight = static function (float $xr, float $y, string $s, float $size = 10.0, bool $bold = false, string $color = '15202b') use ($text): void {
++            $tw = self::width($s, $size, $bold);
++            $text($xr - $tw, $y, $s, $size, $bold, $color);
++        };
++
++        $biz = (string) ($data['business_name'] ?? 'InPmnt');
++        $number = (string) ($data['number'] ?? 'INV-0000');
++        $client = (string) ($data['client_name'] ?? 'Client');
++        $company = (string) ($data['client_company'] ?? '');
++        $clientEmail = (string) ($data['client_email'] ?? '');
++        $clientPhone = (string) ($data['client_phone'] ?? '');
++        $title = (string) ($data['title'] ?? 'Services');
++        $notes = (string) ($data['notes'] ?? '');
++        $issue = (string) ($data['issue_date'] ?? '');
++        $due = (string) ($data['due_date'] ?? '');
++        $status = strtoupper((string) ($data['status'] ?? 'sent'));
++        $amount = (string) ($data['amount'] ?? '$0.00');
++        $paid = (string) ($data['amount_paid'] ?? '$0.00');
++        $dueAmt = (string) ($data['amount_due'] ?? $amount);
++        $owner = (string) ($data['owner_name'] ?? '');
++        $bizEmail = (string) ($data['business_email'] ?? '');
++        $bizPhone = (string) ($data['business_phone'] ?? '');
++        $website = (string) ($data['website'] ?? '');
++        $currency = (string) ($data['currency'] ?? 'USD');
++
++        $fill(0, $H - 118, $W, 118, '101920');
++        $fill(0, $H - 122, $W, 4, '1a8a84');
++
++        $jpeg = self::logoJpeg();
++        $imgW = 160;
++        $imgH = 160;
++        if ($jpeg !== null) {
++            $ops[] = 'q 52 0 0 52 40 698 cm /Im1 Do Q';
++        }
++        $text($jpeg !== null ? 102.0 : 48.0, 748, 'InPmnt', 16, true, 'ffffff');
++        $text($jpeg !== null ? 102.0 : 48.0, 730, 'Get paid without the chase.', 8, false, '8a99a8');
++        $textRight(564, 748, 'INVOICE', 22, true, '5ee0d8');
++        $textRight(564, 728, $number, 12, true, 'ffffff');
++        $textRight(564, 712, $status, 8, true, '1a8a84');
++
++        $yFrom = 650.0;
++        $text(48, $yFrom, 'FROM', 8, true, '667888');
++        $text(320, $yFrom, 'BILL TO', 8, true, '667888');
++        $yFrom -= 16;
++        $yTo = $yFrom;
++        $text(48, $yFrom, $biz, 12, true);
++        $text(320, $yTo, $client, 12, true);
++        $yFrom -= 14;
++        $yTo -= 14;
++        foreach ([$owner, $bizEmail, $bizPhone, $website] as $line) {
++            if ($line !== '') {
++                $text(48, $yFrom, $line, 9, false, '2a3a48');
++                $yFrom -= 12;
++            }
++        }
++        if ($company !== '') {
++            $text(320, $yTo, $company, 9, false, '2a3a48');
++            $yTo -= 12;
++        }
++        foreach ([$clientEmail, $clientPhone] as $line) {
++            if ($line !== '') {
++                $text(320, $yTo, $line, 9, false, '2a3a48');
++                $yTo -= 12;
++            }
++        }
++
++        $fill(48, 538, 516, 52, 'f6f8fa');
++        $text(64, 572, 'Issued', 8, true, '667888');
++        $text(64, 554, $issue !== '' ? $issue : '—', 11, true);
++        $text(220, 572, 'Due', 8, true, '667888');
++        $text(220, 554, $due !== '' ? $due : '—', 11, true);
++        $text(360, 572, 'Currency', 8, true, '667888');
++        $text(360, 554, $currency, 11, true);
++        $textRight(548, 572, 'Amount due', 8, true, '667888');
++        $textRight(548, 552, $dueAmt, 13, true, '0d6b66');
++
++        $fill(48, 500, 516, 22, '0d6b66');
++        $text(64, 507, 'Description', 9, true, 'ffffff');
++        $textRight(548, 507, 'Amount', 9, true, 'ffffff');
++        $fill(48, 468, 516, 32, 'ffffff');
++        $fill(48, 468, 516, 0.6, 'e2e8ee');
++        $text(64, 480, $title, 10);
++        $textRight(548, 480, $amount, 10, true);
++
++        $fill(332, 378, 232, 78, 'f6f8fa');
++        $text(348, 432, 'Subtotal', 9, false, '667888');
++        $textRight(548, 432, $amount, 9);
++        $text(348, 414, 'Paid', 9, false, '667888');
++        $textRight(548, 414, $paid, 9);
++        $fill(348, 404, 200, 0.6, 'cfd8e1');
++        $text(348, 388, 'Amount due', 11, true, '0d6b66');
++        $textRight(548, 388, $dueAmt, 12, true, '0d6b66');
++
++        if ($notes !== '') {
++            $text(48, 432, 'Notes', 8, true, '667888');
++            $ny = 416.0;
++            foreach (array_slice(self::wrap($notes, 42), 0, 6) as $line) {
++                $text(48, $ny, $line, 9, false, '2a3a48');
++                $ny -= 12;
++            }
++        }
++
++        $fill(0, 0, $W, 48, '101920');
++        $text(48, 22, 'InPmnt  ·  Professional invoices & reminders', 8, false, '8a99a8');
++        $textRight(564, 22, 'Thank you for your business', 8, false, '5ee0d8');
++
++        $content = implode("\n", $ops) . "\n";
++        $contentB = $content; // already ASCII/latin
++
++        $objects = [];
++        $objects[] = '<< /Type /Catalog /Pages 2 0 R >>';
++        $objects[] = '<< /Type /Pages /Kids [3 0 R] /Count 1 >>';
++        if ($jpeg !== null) {
++            $resources = '<< /Font << /F1 4 0 R /F2 5 0 R >> /XObject << /Im1 6 0 R >> >>';
++            $objects[] = "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {$W} {$H}] /Resources {$resources} /Contents 7 0 R >>";
++        } else {
++            $resources = '<< /Font << /F1 4 0 R /F2 5 0 R >> >>';
++            $objects[] = "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {$W} {$H}] /Resources {$resources} /Contents 6 0 R >>";
++        }
++        $objects[] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>';
++        $objects[] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>';
++        if ($jpeg !== null) {
++            $objects[] = '<< /Type /XObject /Subtype /Image /Width ' . $imgW . ' /Height ' . $imgH
++                . ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' . strlen($jpeg)
++                . " >>\nstream\n" . $jpeg . "\nendstream";
++        }
++        $objects[] = '<< /Length ' . strlen($contentB) . " >>\nstream\n" . $contentB . "\nendstream";
++
++        $out = "%PDF-1.4\n%\xE2\xE3\xCF\xD3\n";
++        $offsets = [0];
++        foreach ($objects as $i => $obj) {
++            $offsets[] = strlen($out);
++            $n = $i + 1;
++            $out .= "{$n} 0 obj\n" . $obj;
++            if (!str_ends_with($obj, 'endstream')) {
++                $out .= "\n";
++            }
++            $out .= "endobj\n";
++        }
++        $xref = strlen($out);
++        $count = count($objects) + 1;
++        $out .= "xref\n0 {$count}\n0000000000 65535 f \n";
++        for ($i = 1; $i < $count; $i++) {
++            $out .= sprintf("%010d 00000 n \n", $offsets[$i]);
++        }
++        $out .= "trailer\n<< /Size {$count} /Root 1 0 R >>\nstartxref\n{$xref}\n%%EOF\n";
++        return $out;
++    }
++
++    /** @param array<string,mixed> $inv @param array<string,mixed>|null $settings */
++    public static function payload(array $inv, ?array $settings): array
++    {
++        $st = $settings ?? [];
++        $amount = (float) ($inv['amount'] ?? 0);
++        $paid = (float) ($inv['amount_paid'] ?? 0);
++        $due = round($amount - $paid, 2);
++        return [
++            'business_name' => (string) ($st['business_name'] ?? 'InPmnt'),
++            'number' => (string) ($inv['number'] ?? 'INV-0000'),
++            'client_name' => (string) ($inv['client_name'] ?? 'Client'),
++            'client_company' => (string) ($inv['client_company'] ?? ''),
++            'client_email' => (string) ($inv['client_email'] ?? ''),
++            'client_phone' => (string) ($inv['client_phone'] ?? ''),
++            'title' => (string) ($inv['title'] ?? 'Services'),
++            'notes' => (string) ($inv['notes'] ?? ''),
++            'issue_date' => (string) ($inv['issue_date'] ?? ''),
++            'due_date' => (string) ($inv['due_date'] ?? ''),
++            'status' => (string) ($inv['status'] ?? 'sent'),
++            'amount' => Db::money($amount),
++            'amount_paid' => Db::money($paid),
++            'amount_due' => Db::money($due),
++            'owner_name' => (string) ($st['owner_name'] ?? ''),
++            'business_email' => (string) ($st['email'] ?? ''),
++            'business_phone' => (string) ($st['phone'] ?? ''),
++            'website' => (string) ($st['website'] ?? ''),
++            'currency' => (string) ($st['currency'] ?? 'USD'),
++        ];
++    }
++
++    public static function filename(string $number): string
++    {
++        $safe = preg_replace('/[^A-Za-z0-9._-]+/', '_', $number) ?: 'invoice';
++        $safe = trim($safe, '._') ?: 'invoice';
++        if (!str_ends_with(strtolower($safe), '.pdf')) {
++            $safe .= '.pdf';
++        }
++        return $safe;
++    }
++
++    public static function mentionAttachment(string $body): string
++    {
++        if (str_contains(strtolower($body), 'pdf copy of this invoice')) {
++            return $body;
++        }
++        return rtrim($body) . "\n\nA PDF copy of this invoice is attached.\n";
++    }
++
++    public static function logoPath(): ?string
++    {
++        $root = dirname(__DIR__);
++        $cands = [
++            $root . '/static/img/inpmnt-logo-invoice.jpg',
++            dirname($root) . '/static/img/inpmnt-logo-invoice.jpg',
++        ];
++        foreach ($cands as $p) {
++            if (is_file($p)) {
++                return $p;
++            }
++        }
++        return null;
++    }
++
++    private static function logoJpeg(): ?string
++    {
++        $p = self::logoPath();
++        if ($p === null) {
++            return null;
++        }
++        $raw = file_get_contents($p);
++        return $raw === false ? null : $raw;
++    }
++
++    private static function rgb(string $hex): string
++    {
++        $hex = ltrim($hex, '#');
++        $r = hexdec(substr($hex, 0, 2)) / 255;
++        $g = hexdec(substr($hex, 2, 2)) / 255;
++        $b = hexdec(substr($hex, 4, 2)) / 255;
++        return sprintf('%.3f %.3f %.3f', $r, $g, $b);
++    }
++
++    private static function esc(string $text): string
++    {
++        $text = str_replace(["\r", "\n"], ' ', $text);
++        $out = '';
++        $chars = preg_split('//u', $text, -1, PREG_SPLIT_NO_EMPTY) ?: [];
++        foreach ($chars as $ch) {
++            if ($ch === '\\' || $ch === '(' || $ch === ')') {
++                $out .= '\\' . $ch;
++                continue;
++            }
++            if ($ch === "\u{00B7}") {
++                $out .= "\xB7";
++                continue;
++            }
++            if ($ch === "\u{2014}") {
++                $out .= "\x97";
++                continue;
++            }
++            if (strlen($ch) === 1) {
++                $o = ord($ch);
++                $out .= ($o >= 32 && $o <= 126) ? $ch : '?';
++            } else {
++                $out .= '?';
++            }
++        }
++        return $out;
++    }
++
++    private static function width(string $s, float $size, bool $bold): float
++    {
++        $helv = [278,278,355,556,556,889,667,191,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,278,278,584,584,584,556,1015,667,667,722,722,667,611,778,722,278,500,667,556,833,722,778,667,778,722,667,611,722,667,944,667,667,611,278,278,278,469,556,333,556,556,500,556,556,278,556,556,222,222,500,222,833,556,556,556,556,333,500,278,556,500,722,500,500,500,334,260,334,584,278];
++        $helvB = [278,333,474,556,556,889,722,238,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,333,333,584,584,584,611,975,722,722,722,722,667,611,778,722,278,556,722,611,833,722,778,667,778,722,667,611,722,667,944,667,667,611,333,278,333,584,556,333,556,611,556,611,556,333,611,611,278,278,556,278,889,611,611,611,611,389,556,333,611,556,778,556,556,500,389,280,389,584,278];
++        $table = $bold ? $helvB : $helv;
++        $w = 0.0;
++        $chars = preg_split('//u', $s, -1, PREG_SPLIT_NO_EMPTY) ?: [];
++        foreach ($chars as $ch) {
++            $o = strlen($ch) === 1 ? ord($ch) : 46;
++            if ($o < 32 || $o > 126) {
++                $o = 46;
++            }
++            $w += $table[$o - 32] * $size / 1000.0;
++        }
++        return $w;
++    }
++
++    /** @return list<string> */
++    private static function wrap(string $text, int $width): array
++    {
++        $words = preg_split('/\s+/', trim(str_replace(["\r", "\n"], ' ', $text))) ?: [];
++        $lines = [];
++        $cur = '';
++        foreach ($words as $word) {
++            $trial = trim($cur . ' ' . $word);
++            if (strlen($trial) <= $width) {
++                $cur = $trial;
++            } else {
++                if ($cur !== '') {
++                    $lines[] = $cur;
++                }
++                $cur = $word;
++            }
++        }
++        if ($cur !== '') {
++            $lines[] = $cur;
++        }
++        return $lines ?: [''];
++    }
++}
+diff --git a/php/src/Mail.php b/php/src/Mail.php
+index 23fa803..e300bb4 100644
+--- a/php/src/Mail.php
++++ b/php/src/Mail.php
+@@ -37,7 +37,7 @@ final class Mailer
+         ];
+     }
+ 
+-    public static function send(string $to, string $subject, string $body, ?string $fromName = null): array
++    public static function send(string $to, string $subject, string $body, ?string $fromName = null, array $attachments = []): array
+     {
+         $to = trim($to);
+         if ($to === '' || !str_contains($to, '@')) {
+@@ -59,7 +59,7 @@ final class Mailer
+         $errors = [];
+         if ($tryResend) {
+             try {
+-                self::resend($resend, $fromHeader, $to, $subject, $body);
++                self::resend($resend, $fromHeader, $to, $subject, $body, $attachments);
+                 return ['provider' => 'resend', 'id' => null];
+             } catch (Throwable $e) {
+                 $errors[] = $e->getMessage();
+@@ -72,7 +72,7 @@ final class Mailer
+         if ($trySmtp) {
+             $host = trim(Env::get('SMTP_HOST'));
+             try {
+-                self::smtpSocket($host, $fromHeader, $mailFrom, $to, $subject, $body);
++                self::smtpSocket($host, $fromHeader, $mailFrom, $to, $subject, $body, $attachments);
+                 return ['provider' => 'smtp', 'id' => null];
+             } catch (Throwable $e) {
+                 if ($errors) {
+@@ -138,17 +138,27 @@ final class Mailer
+         return $value;
+     }
+ 
+-    private static function resend(string $apiKey, string $from, string $to, string $subject, string $body): void
++    private static function resend(string $apiKey, string $from, string $to, string $subject, string $body, array $attachments = []): void
+     {
+         if (!function_exists('curl_init')) {
+             throw new RuntimeException('Resend error: PHP curl extension is not enabled');
+         }
+-        $payload = json_encode([
++        $payloadArr = [
+             'from' => $from,
+             'to' => [$to],
+             'subject' => $subject !== '' ? $subject : '(no subject)',
+             'text' => $body,
+-        ], JSON_UNESCAPED_SLASHES);
++        ];
++        if ($attachments) {
++            $payloadArr['attachments'] = [];
++            foreach ($attachments as $att) {
++                $payloadArr['attachments'][] = [
++                    'filename' => (string) ($att['filename'] ?? 'invoice.pdf'),
++                    'content' => base64_encode((string) ($att['content'] ?? '')),
++                ];
++            }
++        }
++        $payload = json_encode($payloadArr, JSON_UNESCAPED_SLASHES);
+         $ch = curl_init('https://api.resend.com/emails');
+         curl_setopt_array($ch, [
+             CURLOPT_POST => true,
+@@ -178,7 +188,8 @@ final class Mailer
+         string $mailFrom,
+         string $to,
+         string $subject,
+-        string $body
++        string $body,
++        array $attachments = []
+     ): void {
+         $port = self::smtpPort();
+         $user = trim(Env::get('SMTP_USER'));
+@@ -246,23 +257,62 @@ final class Mailer
+             $expect($cmd('RCPT TO:<' . $to . '>'), '25', 'RCPT TO');
+             $expect($cmd('DATA'), '354', 'DATA');
+             $safeSubject = self::headerSafe($subject !== '' ? $subject : '(no subject)');
+-            $dotBody = preg_replace('/^\./m', '..', str_replace(["\r\n", "\r"], "\n", $body)) ?? $body;
+-            $dotBody = str_replace("\n", "\r\n", $dotBody);
+-            $msg = 'Subject: ' . $safeSubject . "\r\n"
+-                . 'From: ' . $fromHeader . "\r\n"
+-                . 'To: ' . $to . "\r\n"
+-                . 'Reply-To: ' . $mailFrom . "\r\n"
+-                . "MIME-Version: 1.0\r\n"
+-                . "Content-Type: text/plain; charset=UTF-8\r\n"
+-                . "Content-Transfer-Encoding: 8bit\r\n\r\n"
+-                . $dotBody . "\r\n.";
+-            $expect($cmd($msg), '250', 'message');
++            $payload = self::rfc822($fromHeader, $mailFrom, $to, $safeSubject, $body, $attachments);
++            $expect($cmd($payload), '250', 'message');
+             $cmd('QUIT');
+         } finally {
+             fclose($fp);
+         }
+     }
+ 
++    /** @param list<array{filename?:string,content?:string,mime?:string}> $attachments */
++    private static function rfc822(
++        string $fromHeader,
++        string $mailFrom,
++        string $to,
++        string $safeSubject,
++        string $body,
++        array $attachments
++    ): string {
++        $dot = static function (string $s): string {
++            $s = str_replace(["\r\n", "\r"], "\n", $s);
++            $s = preg_replace('/^\./m', '..', $s) ?? $s;
++            return str_replace("\n", "\r\n", $s);
++        };
++        $headers = 'Subject: ' . $safeSubject . "\r\n"
++            . 'From: ' . $fromHeader . "\r\n"
++            . 'To: ' . $to . "\r\n"
++            . 'Reply-To: ' . $mailFrom . "\r\n"
++            . "MIME-Version: 1.0\r\n";
++        if (!$attachments) {
++            return $dot(
++                $headers
++                . "Content-Type: text/plain; charset=UTF-8\r\n"
++                . "Content-Transfer-Encoding: 8bit\r\n\r\n"
++                . $body
++            ) . "\r\n.";
++        }
++        $bound = '----=_InPmnt_' . bin2hex(random_bytes(8));
++        $parts = $headers
++            . 'Content-Type: multipart/mixed; boundary="' . $bound . "\"\r\n\r\n"
++            . '--' . $bound . "\r\n"
++            . "Content-Type: text/plain; charset=UTF-8\r\n"
++            . "Content-Transfer-Encoding: 8bit\r\n\r\n"
++            . $body . "\r\n";
++        foreach ($attachments as $att) {
++            $name = preg_replace('/[^A-Za-z0-9._-]+/', '_', (string) ($att['filename'] ?? 'invoice.pdf')) ?: 'invoice.pdf';
++            $mime = (string) ($att['mime'] ?? 'application/pdf');
++            $b64 = chunk_split(base64_encode((string) ($att['content'] ?? '')), 76, "\r\n");
++            $parts .= '--' . $bound . "\r\n"
++                . 'Content-Type: ' . $mime . '; name="' . $name . "\"\r\n"
++                . "Content-Transfer-Encoding: base64\r\n"
++                . 'Content-Disposition: attachment; filename="' . $name . "\"\r\n\r\n"
++                . $b64;
++        }
++        $parts .= '--' . $bound . "--\r\n";
++        return $dot($parts) . '.';
++    }
++
+     /** @param callable(string):string $cmd */
+     private static function smtpAuth(callable $cmd, callable $expect, string $user, string $password): void
+     {
+diff --git a/static/img/inpmnt-logo-invoice.jpg b/static/img/inpmnt-logo-invoice.jpg
+new file mode 100644
+index 0000000000000000000000000000000000000000..85db2bd097c87e7d39eb23158325ebbf60d83ae3
+GIT binary patch
+literal 3845
+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
+
+literal 0
+HcmV?d00001
+
+diff --git a/static/js/app.js b/static/js/app.js
+index 888328c..592a225 100644
+--- a/static/js/app.js
++++ b/static/js/app.js
+@@ -334,6 +334,7 @@ async function renderInvoiceDetail(id) {
+       actions: `
+         <button class="btn secondary" data-go="#/invoices">Back</button>
+         ${inv.status === "draft" ? `<button class="btn" id="btn-send">Send invoice</button>` : `<button class="btn secondary" id="btn-send">Email invoice</button>`}
++        <a class="btn secondary" href="/api/invoices/${id}/pdf">Download PDF</a>
+         ${inv.status !== "paid" && inv.status !== "draft" ? `<button class="btn" id="btn-pay">Record payment</button>` : ""}
+         ${inv.status === "overdue" || inv.status === "partial" ? `<button class="btn danger" id="btn-final">Final notice</button>` : ""}
+       `,
+@@ -642,7 +643,7 @@ async function renderTemplates() {
+     ${topbar({
+       eyebrow: "Workspace",
+       title: "Message templates",
+-      subtitle: "Use {{client_name}}, {{number}}, {{title}}, {{amount_due}}, {{due_date}}, {{business_name}}. The Invoice template is what Send invoice emails.",
++      subtitle: "Use {{client_name}}, {{number}}, {{title}}, {{amount_due}}, {{due_date}}, {{business_name}}. The Invoice template is what Send invoice emails (a PDF is attached automatically).",
+     })}
+     <div class="stack">
+       ${templates
+diff --git a/tests/test_invoice_pdf.py b/tests/test_invoice_pdf.py
+new file mode 100644
+index 0000000..4af7b1f
+--- /dev/null
++++ b/tests/test_invoice_pdf.py
+@@ -0,0 +1,75 @@
++"""Professional invoice PDF generator."""
++from __future__ import annotations
++
++import unittest
++
++from app.invoice_pdf import (
++    build_invoice_pdf,
++    invoice_pdf_payload,
++    logo_path,
++    mention_attachment,
++    pdf_filename,
++)
++
++
++SAMPLE = {
++    "business_name": "Foster Field Services",
++    "number": "INV-1042",
++    "client_name": "Maya Chen",
++    "client_company": "Chen Landscape",
++    "client_email": "maya@client.example",
++    "client_phone": "555-0100",
++    "title": "Spring cleanup",
++    "notes": "Thank you for choosing us this season.",
++    "issue_date": "2026-04-01",
++    "due_date": "2026-04-15",
++    "status": "sent",
++    "amount": "$1,250.00",
++    "amount_paid": "$0.00",
++    "amount_due": "$1,250.00",
++    "owner_name": "Robert Foster",
++    "business_email": "billing@example.com",
++    "business_phone": "555-0199",
++    "website": "inpmnt.com",
++    "currency": "USD",
++}
++
++
++class InvoicePdfTests(unittest.TestCase):
++    def test_pdf_magic_and_branding(self) -> None:
++        pdf = build_invoice_pdf(SAMPLE)
++        self.assertTrue(pdf.startswith(b"%PDF-1.4"))
++        self.assertIn(b"%%EOF", pdf[-32:])
++        self.assertIn(b"/BaseFont /Helvetica", pdf)
++        self.assertIn(b"INVOICE", pdf)
++        self.assertIn(b"INV-1042", pdf)
++        self.assertIn(b"Foster Field Services", pdf)
++        self.assertIn(b"Maya Chen", pdf)
++        self.assertIn(b"Spring cleanup", pdf)
++        self.assertIn(b"InPmnt  \xb7  Professional", pdf)
++        self.assertNotIn(b"? Professional", pdf)
++        self.assertTrue(logo_path() is not None)
++        self.assertIn(b"/Im1", pdf)
++        self.assertIn(b"/DCTDecode", pdf)
++
++    def test_payload_and_filename(self) -> None:
++        payload = invoice_pdf_payload(
++            {"number": "INV-7", "amount": 10, "amount_paid": 2.5, "title": "Job"},
++            {"business_name": "Pat Co", "currency": "USD"},
++        )
++        self.assertEqual(payload["amount"], "$10.00")
++        self.assertEqual(payload["amount_paid"], "$2.50")
++        self.assertEqual(payload["amount_due"], "$7.50")
++        self.assertEqual(pdf_filename("INV-7"), "INV-7.pdf")
++        self.assertEqual(pdf_filename("weird name.pdf"), "weird_name.pdf")
++
++    def test_mention_attachment_once(self) -> None:
++        body = "Hi Maya,\n\nPlease pay."
++        once = mention_attachment(body)
++        self.assertIn("PDF copy of this invoice is attached", once)
++        twice = mention_attachment(once)
++        self.assertEqual(twice.count("PDF copy of this invoice is attached"), 1)
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/tests/test_invoice_send.py b/tests/test_invoice_send.py
+index 7b6856c..57eca11 100644
+--- a/tests/test_invoice_send.py
++++ b/tests/test_invoice_send.py
+@@ -105,6 +105,12 @@ class InvoiceSendTests(unittest.TestCase):
+             self.assertIn(inv["number"], kwargs["subject"])
+             self.assertIn("Spring cleanup", kwargs["body"])
+             self.assertIn("$250.00", kwargs["body"])
++            self.assertIn("PDF copy of this invoice is attached", kwargs["body"])
++            atts = kwargs.get("attachments") or []
++            self.assertEqual(len(atts), 1)
++            self.assertTrue(str(atts[0]["filename"]).endswith(".pdf"))
++            self.assertTrue(atts[0]["content"].startswith(b"%PDF"))
++            self.assertIn(b"/Im1", atts[0]["content"])
+ 
+     def test_create_send_now_emails(self) -> None:
+         with patch("app.routes.send_email", return_value={"provider": "smtp", "id": None}) as send:
+@@ -124,6 +130,17 @@ class InvoiceSendTests(unittest.TestCase):
+             send.assert_called_once()
+             self.assertEqual(send.call_args.kwargs["to"], "maya@client.example")
+             self.assertIn("Fence repair", send.call_args.kwargs["body"])
++            atts = send.call_args.kwargs.get("attachments") or []
++            self.assertEqual(len(atts), 1)
++            self.assertTrue(atts[0]["content"].startswith(b"%PDF"))
++
++    def test_download_pdf(self) -> None:
++        inv = self._create_draft()
++        res = self.client.get(f"/api/invoices/{inv['id']}/pdf")
++        self.assertEqual(res.status_code, 200, res.data[:200])
++        self.assertTrue(res.data.startswith(b"%PDF"))
++        self.assertIn("pdf", (res.mimetype or "").lower())
++        self.assertIn(b"INVOICE", res.data)
+ 
+     def test_missing_client_email_blocks_send(self) -> None:
+         no_mail = self.client.post("/api/clients", json={"name": "No Email Co"})
