@@ -163,6 +163,19 @@ def mention_attachment(body: str) -> str:
     return text.rstrip() + "\n\nA PDF copy of this invoice is attached.\n"
 
 
+def invoice_email_pdf_attachment(inv: Any, settings: Any | None) -> list[dict[str, Any]]:
+    """PDF attachment list for invoice / reminder / final-notice emails."""
+    data = _as_dict(inv)
+    pdf_bytes = build_invoice_pdf(invoice_pdf_payload(data, settings))
+    return [
+        {
+            "filename": pdf_filename(str(data.get("number") or "invoice")),
+            "content": pdf_bytes,
+            "mime": "application/pdf",
+        }
+    ]
+
+
 def invoice_pdf_payload(inv: Any, settings: Any | None) -> dict[str, Any]:
     """Normalize invoice + settings rows into build_invoice_pdf keys."""
     data = _as_dict(inv)

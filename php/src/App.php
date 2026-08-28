@@ -767,14 +767,7 @@ final class App
     private function deliverInvoice(int $wid, int $id): string
     {
         @set_time_limit(120);
-        $st = $this->db->prepare(
-            'SELECT i.*, c.name AS client_name, c.email AS client_email,
-                    c.company AS client_company, c.phone AS client_phone
-             FROM invoices i JOIN clients c ON c.id = i.client_id
-             WHERE i.id=? AND i.workspace_id=?'
-        );
-        $st->execute([$id, $wid]);
-        $inv = $st->fetch();
+        $inv = $this->loadInvoiceForEmail($wid, $id);
         if (!$inv) {
             Http::json(['error' => 'Not found'], 404);
         }
@@ -810,9 +803,7 @@ final class App
             $tmpl['body'] ?? "Hi {{client_name}},\n\nInvoice {{number}} is ready for {{title}}.\n\nAmount due: {{amount_due}}\nDue date: {{due_date}}\n\nA PDF copy of this invoice is attached.\n\nPlease reply to this email if you have any questions.\n\nThanks,\n{{business_name}}",
             $ctx
         ));
-        $pdf = InvoicePdf::build(InvoicePdf::payload($inv, $settings ?? []));
-        $filename = InvoicePdf::filename((string) ($inv['number'] ?? 'invoice'));
-        $attachments = [['filename' => $filename, 'content' => $pdf, 'mime' => 'application/pdf']];
+        $attachments = InvoicePdf::attachment($inv, $settings ?? []);
         $provider = 'fake';
         if (!Mailer::configured()) {
             if (!Env::truthy('ALLOW_FAKE_EMAIL')) {
@@ -974,6 +965,33 @@ final class App
         Http::json($rows);
     }
 
+    /** @return array<string,mixed>|null */
+    private function loadInvoiceForEmail(int $wid, int $invoiceId): ?array
+    {
+        $st = $this->db->prepare(
+            'SELECT i.*, c.name AS client_name, c.email AS client_email,
+                    c.company AS client_company, c.phone AS client_phone
+             FROM invoices i JOIN clients c ON c.id = i.client_id
+             WHERE i.id=? AND i.workspace_id=?'
+        );
+        $st->execute([$invoiceId, $wid]);
+        $inv = $st->fetch();
+        return $inv ?: null;
+    }
+
+    /**
+     * @return array{0:list<array{filename:string,content:string,mime:string}>,1:string}
+     */
+    private function reminderEmailPdf(int $wid, int $invoiceId, string $body): array
+    {
+        $inv = $this->loadInvoiceForEmail($wid, $invoiceId);
+        if (!$inv) {
+            throw new RuntimeException('Invoice not found for reminder PDF');
+        }
+        $settings = Workspace::settings($this->db, $wid) ?? [];
+        return [InvoicePdf::attachment($inv, $settings), InvoicePdf::mentionAttachment($body)];
+    }
+
     private function apiSendReminder(int $wid, int $id): void
     {
         $st = $this->db->prepare(
@@ -1001,18 +1019,31 @@ final class App
             Db::log($this->db, 'reminder', "SMS stub (not wired yet) for {$r['number']} to " . ($r['phone'] ?: $r['client_name']), 'reminder', $id, $wid);
             $this->db->prepare('UPDATE reminders SET status=?, sent_at=? WHERE id=?')->execute(['sent', $now, $id]);
         } elseif ($channel === 'email') {
+            @set_time_limit(120);
+            try {
+                [$attachments, $body] = $this->reminderEmailPdf($wid, (int) $r['invoice_id'], (string) ($r['body'] ?? ''));
+            } catch (Throwable $e) {
+                Http::json(['error' => $e->getMessage()], 502);
+            }
             if (!Mailer::configured()) {
                 if (!Env::truthy('ALLOW_FAKE_EMAIL')) {
                     $this->emailNotConfigured();
                 }
             } else {
                 try {
-                    Mailer::send((string) ($r['email'] ?? ''), (string) ($r['subject'] ?? ''), (string) ($r['body'] ?? ''), $settings['business_name'] ?? null);
+                    Mailer::send(
+                        (string) ($r['email'] ?? ''),
+                        (string) ($r['subject'] ?? ''),
+                        $body,
+                        $settings['business_name'] ?? null,
+                        $attachments
+                    );
                 } catch (Throwable $e) {
                     Http::json(['error' => $e->getMessage()], 502);
                 }
             }
-            $this->db->prepare('UPDATE reminders SET status=?, sent_at=? WHERE id=?')->execute(['sent', $now, $id]);
+            $this->db->prepare('UPDATE reminders SET status=?, sent_at=?, body=? WHERE id=?')
+                ->execute(['sent', $now, $body, $id]);
             Db::log($this->db, 'reminder', "Sent EMAIL reminder for {$r['number']} to " . ($r['email'] ?: $r['client_name']), 'reminder', $id, $wid);
         } else {
             Http::json(['error' => "Unknown channel: {$channel}"], 400);
@@ -1028,7 +1059,7 @@ final class App
         $now = Db::now();
         $settings = Workspace::settings($this->db, $wid);
         $st = $this->db->prepare(
-            "SELECT r.id, r.channel, r.subject, r.body, i.number, c.name AS client_name, c.email, c.phone
+            "SELECT r.id, r.invoice_id, r.channel, r.subject, r.body, i.number, c.name AS client_name, c.email, c.phone
              FROM reminders r
              JOIN invoices i ON i.id = r.invoice_id
              JOIN clients c ON c.id = i.client_id
@@ -1054,9 +1085,21 @@ final class App
                 }
                 Db::log($this->db, 'reminder', "SMS stub (not wired yet) for {$r['number']} to " . ($r['phone'] ?: $r['client_name']), 'reminder', (int) $r['id'], $wid);
             } elseif ($channel === 'email') {
+                @set_time_limit(120);
+                try {
+                    [$attachments, $body] = $this->reminderEmailPdf($wid, (int) $r['invoice_id'], (string) ($r['body'] ?? ''));
+                } catch (Throwable $e) {
+                    Http::json(['error' => $e->getMessage(), 'sent' => $sent], 502);
+                }
                 if (Mailer::configured()) {
                     try {
-                        Mailer::send((string) ($r['email'] ?? ''), (string) ($r['subject'] ?? ''), (string) ($r['body'] ?? ''), $settings['business_name'] ?? null);
+                        Mailer::send(
+                            (string) ($r['email'] ?? ''),
+                            (string) ($r['subject'] ?? ''),
+                            $body,
+                            $settings['business_name'] ?? null,
+                            $attachments
+                        );
                     } catch (Throwable $e) {
                         Http::json(['error' => $e->getMessage(), 'sent' => $sent], 502);
                     }
@@ -1065,7 +1108,12 @@ final class App
             } else {
                 continue;
             }
-            $this->db->prepare('UPDATE reminders SET status=?, sent_at=? WHERE id=?')->execute(['sent', $now, $r['id']]);
+            if ($channel === 'email') {
+                $this->db->prepare('UPDATE reminders SET status=?, sent_at=?, body=? WHERE id=?')
+                    ->execute(['sent', $now, $body, $r['id']]);
+            } else {
+                $this->db->prepare('UPDATE reminders SET status=?, sent_at=? WHERE id=?')->execute(['sent', $now, $r['id']]);
+            }
             $sent++;
         }
         Http::json(['sent' => $sent]);
@@ -1073,13 +1121,8 @@ final class App
 
     private function apiFinalNotice(int $wid, int $id): void
     {
-        $st = $this->db->prepare(
-            'SELECT i.*, c.name AS client_name, c.email AS client_email
-             FROM invoices i JOIN clients c ON c.id = i.client_id
-             WHERE i.id = ? AND i.workspace_id = ?'
-        );
-        $st->execute([$id, $wid]);
-        $inv = $st->fetch();
+        @set_time_limit(120);
+        $inv = $this->loadInvoiceForEmail($wid, $id);
         if (!$inv) {
             Http::json(['error' => 'Not found'], 404);
         }
@@ -1097,14 +1140,28 @@ final class App
             'business_name' => $settings['business_name'] ?? 'InPmnt',
         ];
         $subject = Db::renderVars($tmpl['subject'] ?? 'Final notice', $ctx);
-        $body = Db::renderVars($tmpl['body'] ?? 'Final notice', $ctx);
+        try {
+            [$attachments, $body] = $this->reminderEmailPdf(
+                $wid,
+                $id,
+                Db::renderVars($tmpl['body'] ?? 'Final notice', $ctx)
+            );
+        } catch (Throwable $e) {
+            Http::json(['error' => $e->getMessage()], 502);
+        }
         if (!Mailer::configured()) {
             if (!Env::truthy('ALLOW_FAKE_EMAIL')) {
                 $this->emailNotConfigured();
             }
         } else {
             try {
-                Mailer::send((string) ($inv['client_email'] ?? ''), $subject, $body, $settings['business_name'] ?? null);
+                Mailer::send(
+                    (string) ($inv['client_email'] ?? ''),
+                    $subject,
+                    $body,
+                    $settings['business_name'] ?? null,
+                    $attachments
+                );
             } catch (Throwable $e) {
                 Http::json(['error' => $e->getMessage()], 502);
             }

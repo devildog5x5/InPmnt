@@ -6,6 +6,7 @@ import unittest
 
 from app.invoice_pdf import (
     build_invoice_pdf,
+    invoice_email_pdf_attachment,
     invoice_pdf_payload,
     logo_path,
     mention_attachment,
@@ -86,6 +87,23 @@ class InvoicePdfTests(unittest.TestCase):
         self.assertIn("PDF copy of this invoice is attached", once)
         twice = mention_attachment(once)
         self.assertEqual(twice.count("PDF copy of this invoice is attached"), 1)
+
+    def test_email_pdf_attachment_list(self) -> None:
+        atts = invoice_email_pdf_attachment(
+            {
+                "number": "INV-1042",
+                "amount": 100,
+                "amount_paid": 0,
+                "client_name": "Maya Chen",
+                "title": "Spring cleanup",
+            },
+            {"business_name": "Pat Co"},
+        )
+        self.assertEqual(len(atts), 1)
+        self.assertEqual(atts[0]["filename"], "INV-1042.pdf")
+        self.assertEqual(atts[0]["mime"], "application/pdf")
+        self.assertTrue(atts[0]["content"].startswith(b"%PDF"))
+        self.assertIn(b"INV-1042", atts[0]["content"])
 
 
 if __name__ == "__main__":

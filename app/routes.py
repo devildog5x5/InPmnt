@@ -42,6 +42,7 @@ from .database import (
 )
 from .invoice_pdf import (
     build_invoice_pdf,
+    invoice_email_pdf_attachment,
     invoice_pdf_payload,
     mention_attachment,
     pdf_filename,
@@ -251,21 +252,35 @@ def invoice_merge_ctx(inv: Any, settings: Any) -> dict[str, Any]:
     }
 
 
+_INVOICE_CLIENT_SQL = """
+        SELECT i.*, c.name AS client_name, c.email AS client_email,
+               c.company AS client_company, c.phone AS client_phone
+        FROM invoices i JOIN clients c ON c.id = i.client_id
+        WHERE i.id = ? AND i.workspace_id = ?
+        """
+
+
+def load_invoice_for_email(conn, invoice_id: int, wid: int):
+    """Invoice + client fields for PDF/email. Separate from reminder joins (id/status clash)."""
+    return conn.execute(_INVOICE_CLIENT_SQL, (invoice_id, wid)).fetchone()
+
+
+def reminder_email_pdf(conn, invoice_id: int, wid: int, body: str) -> tuple[list[dict[str, Any]], str]:
+    """PDF attachment list plus body that mentions the invoice file."""
+    inv = load_invoice_for_email(conn, invoice_id, wid)
+    if not inv:
+        raise RuntimeError("Invoice not found for reminder PDF")
+    settings = get_settings(conn, wid)
+    return invoice_email_pdf_attachment(inv, settings), mention_attachment(body)
+
+
 def email_invoice_to_client(conn, invoice_id: int, wid: int, meta: dict[str, Any] | None = None):
     """Email the Invoice template. Drafts are marked sent and reminders scheduled.
 
     Returns a Flask (response, status) tuple on error, or None on success.
     On success, meta (if provided) gets provider and to.
     """
-    inv = conn.execute(
-        """
-        SELECT i.*, c.name AS client_name, c.email AS client_email,
-               c.company AS client_company, c.phone AS client_phone
-        FROM invoices i JOIN clients c ON c.id = i.client_id
-        WHERE i.id = ? AND i.workspace_id = ?
-        """,
-        (invoice_id, wid),
-    ).fetchone()
+    inv = load_invoice_for_email(conn, invoice_id, wid)
     if not inv:
         return jsonify({"error": "Not found"}), 404
 
@@ -291,9 +306,7 @@ def email_invoice_to_client(conn, invoice_id: int, wid: int, meta: dict[str, Any
     body = mention_attachment(
         render_template_vars(tmpl["body"] if tmpl else DEFAULT_INVOICE_BODY, ctx)
     )
-    pdf_bytes = build_invoice_pdf(invoice_pdf_payload(inv, settings))
-    filename = pdf_filename(str(inv["number"] or "invoice"))
-    attachments = [{"filename": filename, "content": pdf_bytes, "mime": "application/pdf"}]
+    attachments = invoice_email_pdf_attachment(inv, settings)
 
     provider = "fake"
     if not mail_configured():
@@ -1202,6 +1215,10 @@ def api_send_reminder(reminder_id: int):
                 (now, reminder_id),
             )
         elif channel == "email":
+            try:
+                attachments, body = reminder_email_pdf(conn, int(r["invoice_id"]), wid, r["body"] or "")
+            except Exception as exc:  # noqa: BLE001
+                return jsonify({"error": str(exc)}), 502
             if not mail_configured():
                 if not _allow_fake_email():
                     return _email_not_configured_response()
@@ -1210,14 +1227,15 @@ def api_send_reminder(reminder_id: int):
                     send_email(
                         to=r["email"] or "",
                         subject=r["subject"] or "",
-                        body=r["body"] or "",
+                        body=body,
                         from_name=settings["business_name"] if settings else None,
+                        attachments=attachments,
                     )
                 except Exception as exc:  # noqa: BLE001
                     return jsonify({"error": str(exc)}), 502
             conn.execute(
-                "UPDATE reminders SET status='sent', sent_at=? WHERE id=?",
-                (now, reminder_id),
+                "UPDATE reminders SET status='sent', sent_at=?, body=? WHERE id=?",
+                (now, body, reminder_id),
             )
             dest = r["email"]
             log_activity(
@@ -1246,8 +1264,8 @@ def api_send_due():
         settings = get_settings(conn, wid)
         rows = conn.execute(
             """
-            SELECT r.id, r.channel, r.subject, r.body, i.number, c.name AS client_name,
-                   c.email, c.phone
+            SELECT r.id, r.invoice_id, r.channel, r.subject, r.body, i.number,
+                   c.name AS client_name, c.email, c.phone
             FROM reminders r
             JOIN invoices i ON i.id = r.invoice_id
             JOIN clients c ON c.id = i.client_id
@@ -1274,13 +1292,20 @@ def api_send_due():
                     workspace_id=wid,
                 )
             elif channel == "email":
+                try:
+                    attachments, body = reminder_email_pdf(
+                        conn, int(r["invoice_id"]), wid, r["body"] or ""
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    return jsonify({"error": str(exc), "sent": sent}), 502
                 if mail_configured():
                     try:
                         send_email(
                             to=r["email"] or "",
                             subject=r["subject"] or "",
-                            body=r["body"] or "",
+                            body=body,
                             from_name=settings["business_name"] if settings else None,
+                            attachments=attachments,
                         )
                     except Exception as exc:  # noqa: BLE001
                         return jsonify({"error": str(exc), "sent": sent}), 502
@@ -1295,10 +1320,16 @@ def api_send_due():
                 )
             else:
                 continue
-            conn.execute(
-                "UPDATE reminders SET status='sent', sent_at=? WHERE id=?",
-                (now, r["id"]),
-            )
+            if channel == "email":
+                conn.execute(
+                    "UPDATE reminders SET status='sent', sent_at=?, body=? WHERE id=?",
+                    (now, body, r["id"]),
+                )
+            else:
+                conn.execute(
+                    "UPDATE reminders SET status='sent', sent_at=? WHERE id=?",
+                    (now, r["id"]),
+                )
             sent += 1
     return jsonify({"sent": sent})
 
@@ -1310,14 +1341,7 @@ def api_final_notice(invoice_id: int):
     today = date.today().isoformat()
     wid = require_workspace_id()
     with db_session(db_path()) as conn:
-        inv = conn.execute(
-            """
-            SELECT i.*, c.name AS client_name, c.email AS client_email
-            FROM invoices i JOIN clients c ON c.id = i.client_id
-            WHERE i.id = ? AND i.workspace_id = ?
-            """,
-            (invoice_id, wid),
-        ).fetchone()
+        inv = load_invoice_for_email(conn, invoice_id, wid)
         if not inv:
             return jsonify({"error": "Not found"}), 404
         settings = get_settings(conn, wid)
@@ -1334,7 +1358,15 @@ def api_final_notice(invoice_id: int):
             "business_name": settings["business_name"] if settings else "InPmnt",
         }
         subject = render_template_vars(tmpl["subject"] if tmpl else "Final notice", ctx)
-        body = render_template_vars(tmpl["body"] if tmpl else "Final notice", ctx)
+        try:
+            attachments, body = reminder_email_pdf(
+                conn,
+                invoice_id,
+                wid,
+                render_template_vars(tmpl["body"] if tmpl else "Final notice", ctx),
+            )
+        except Exception as exc:  # noqa: BLE001
+            return jsonify({"error": str(exc)}), 502
 
         if not mail_configured():
             if not _allow_fake_email():
@@ -1346,6 +1378,7 @@ def api_final_notice(invoice_id: int):
                     subject=subject,
                     body=body,
                     from_name=settings["business_name"] if settings else None,
+                    attachments=attachments,
                 )
             except Exception as exc:  # noqa: BLE001
                 return jsonify({"error": str(exc)}), 502
