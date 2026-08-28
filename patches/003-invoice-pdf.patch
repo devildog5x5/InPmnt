@@ -12,10 +12,10 @@ index 356e813..5130b20 100644
          0,
 diff --git a/app/invoice_pdf.py b/app/invoice_pdf.py
 new file mode 100644
-index 0000000..2c8e959
+index 0000000..1b07a42
 --- /dev/null
 +++ b/app/invoice_pdf.py
-@@ -0,0 +1,338 @@
+@@ -0,0 +1,351 @@
 +"""Professional one-page invoice PDF (Helvetica + optional JPEG logo). No extra deps."""
 +from __future__ import annotations
 +
@@ -87,6 +87,27 @@ index 0000000..2c8e959
 +        if p.is_file():
 +            return p
 +    return None
++
++
++def _jpeg_size(data: bytes) -> tuple[int, int]:
++    """Read SOF width/height from a baseline or progressive JPEG."""
++    i = 0
++    n = len(data)
++    while i < n - 8:
++        if data[i] != 0xFF:
++            i += 1
++            continue
++        marker = data[i + 1]
++        if marker in (0xD8, 0xD9, 0x01) or 0xD0 <= marker <= 0xD7:
++            i += 2
++            continue
++        seglen = (data[i + 2] << 8) | data[i + 3]
++        if marker in (0xC0, 0xC1, 0xC2, 0xC3):
++            height = (data[i + 5] << 8) | data[i + 6]
++            width = (data[i + 7] << 8) | data[i + 8]
++            return width, height
++        i += 2 + max(seglen, 0)
++    return 160, 160
 +
 +
 +def _money(n: float) -> str:
@@ -190,43 +211,42 @@ index 0000000..2c8e959
 +    website = str(data.get("website") or "")
 +    currency = str(data.get("currency") or "USD")
 +
-+    # Header
-+    fill_rect(0, H - 118, W, 118, "101920")
-+    fill_rect(0, H - 122, W, 4, "1a8a84")
++    # Letterhead: teal rule + company logo top-left on white (not a dark bar).
++    fill_rect(0, H - 8, W, 8, "0d6b66")
 +    jpeg = b""
 +    img_w = img_h = 0
++    logo_pt = 88.0
++    logo_x = 40.0
++    logo_y = 680.0  # 88pt tall → top at 768, 16pt under the teal rule
 +    lp = logo_path()
 +    if lp:
 +        jpeg = lp.read_bytes()
-+        img_w, img_h = 160, 160
-+        # 52pt square in header
-+        ops.append("q 52 0 0 52 40 698 cm /Im1 Do Q")
-+    text(102 if jpeg else 48, 748, "InPmnt", size=16, bold=True, color="ffffff")
-+    text(102 if jpeg else 48, 730, "Get paid without the chase.", size=8, color="8a99a8")
-+    text_right(564, 748, "INVOICE", size=22, bold=True, color="5ee0d8")
-+    text_right(564, 728, number, size=12, bold=True, color="ffffff")
-+    text_right(564, 712, status, size=8, bold=True, color="1a8a84")
-+
-+    # Parties
-+    y_from = 650
-+    text(48, y_from, "FROM", size=8, bold=True, color="667888")
-+    text(320, y_from, "BILL TO", size=8, bold=True, color="667888")
-+    y_from -= 16
-+    y_to = y_from
-+    text(48, y_from, biz, size=12, bold=True)
-+    text(320, y_to, client, size=12, bold=True)
-+    y_from -= 14
-+    y_to -= 14
++        img_w, img_h = _jpeg_size(jpeg)
++        ops.append(f"q {logo_pt:.2f} 0 0 {logo_pt:.2f} {logo_x:.2f} {logo_y:.2f} cm /Im1 Do Q")
++    text_x = (logo_x + logo_pt + 16) if jpeg else 48.0
++    text(text_x, 752, biz, size=16, bold=True)
++    y_info = 732
 +    for line in (owner, biz_email, biz_phone, website):
 +        if line:
-+            text(48, y_from, line, size=9, color="2a3a48")
-+            y_from -= 12
++            text(text_x, y_info, line, size=9, color="2a3a48")
++            y_info -= 12
++    text_right(564, 752, "INVOICE", size=22, bold=True, color="0d6b66")
++    text_right(564, 732, number, size=12, bold=True)
++    text_right(564, 716, status, size=8, bold=True, color="1a8a84")
++    hline(40, 664, 532, "e2e8ee", 1.0)
++
++    # BILL TO — FROM is the letterhead (logo + business name)
++    y_to = 640
++    text(48, y_to, "BILL TO", size=8, bold=True, color="667888")
++    y_to -= 16
++    text(48, y_to, client, size=12, bold=True)
++    y_to -= 14
 +    if company:
-+        text(320, y_to, company, size=9, color="2a3a48")
++        text(48, y_to, company, size=9, color="2a3a48")
 +        y_to -= 12
 +    for line in (client_email, client_phone):
 +        if line:
-+            text(320, y_to, line, size=9, color="2a3a48")
++            text(48, y_to, line, size=9, color="2a3a48")
 +            y_to -= 12
 +
 +    # Meta strip
@@ -303,19 +323,12 @@ index 0000000..2c8e959
 +            f"/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length {len(jpeg)} >>\n"
 +            f"stream\n".encode("ascii")
 +            + jpeg
-+            + b"\nendstream"
++            + b"endstream"
 +        )
 +        stream_num = 7
 +    else:
 +        stream_num = 6
-+    add(
-+        f"<< /Length {len(content_b)} >>\nstream\n".encode("ascii") + content_b + b"\nendstream"
-+    )
-+
-+    # Object numbers: 1 catalog, 2 pages, 3 page, 4 F1, 5 F2, [6 image], stream
-+    # If no jpeg, page Contents should be 6. Fix page object if no jpeg — already handled.
-+    # If jpeg, Contents 7 0 R — but we added catalog, pages, page, f1, f2, image, stream = 7. Good.
-+    # If no jpeg, objects: catalog, pages, page, f1, f2, stream = 6. Page says Contents 6. Good.
++    add(f"<< /Length {len(content_b)} >>\nstream\n".encode("ascii") + content_b + b"endstream")
 +
 +    out = bytearray(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
 +    offsets = [0]
@@ -323,7 +336,7 @@ index 0000000..2c8e959
 +        offsets.append(len(out))
 +        out += f"{i} 0 obj\n".encode("ascii")
 +        out += obj
-+        if not obj.endswith(b"endstream"):
++        if not obj.endswith(b"\n"):
 +            out += b"\n"
 +        out += b"endobj\n"
 +    xref = len(out)
@@ -717,10 +730,10 @@ index b065039..96a216f 100644
          http_response_code($status);
 diff --git a/php/src/InvoicePdf.php b/php/src/InvoicePdf.php
 new file mode 100644
-index 0000000..7e773e2
+index 0000000..20c2b72
 --- /dev/null
 +++ b/php/src/InvoicePdf.php
-@@ -0,0 +1,326 @@
+@@ -0,0 +1,354 @@
 +<?php
 +declare(strict_types=1);
 +
@@ -773,43 +786,44 @@ index 0000000..7e773e2
 +        $website = (string) ($data['website'] ?? '');
 +        $currency = (string) ($data['currency'] ?? 'USD');
 +
-+        $fill(0, $H - 118, $W, 118, '101920');
-+        $fill(0, $H - 122, $W, 4, '1a8a84');
++        $fill(0, $H - 8, $W, 8, '0d6b66');
 +
 +        $jpeg = self::logoJpeg();
 +        $imgW = 160;
 +        $imgH = 160;
++        $logoPt = 88.0;
++        $logoX = 40.0;
++        $logoY = 680.0;
 +        if ($jpeg !== null) {
-+            $ops[] = 'q 52 0 0 52 40 698 cm /Im1 Do Q';
++            [$imgW, $imgH] = self::jpegSize($jpeg);
++            $ops[] = sprintf('q %.2f 0 0 %.2f %.2f %.2f cm /Im1 Do Q', $logoPt, $logoPt, $logoX, $logoY);
 +        }
-+        $text($jpeg !== null ? 102.0 : 48.0, 748, 'InPmnt', 16, true, 'ffffff');
-+        $text($jpeg !== null ? 102.0 : 48.0, 730, 'Get paid without the chase.', 8, false, '8a99a8');
-+        $textRight(564, 748, 'INVOICE', 22, true, '5ee0d8');
-+        $textRight(564, 728, $number, 12, true, 'ffffff');
-+        $textRight(564, 712, $status, 8, true, '1a8a84');
-+
-+        $yFrom = 650.0;
-+        $text(48, $yFrom, 'FROM', 8, true, '667888');
-+        $text(320, $yFrom, 'BILL TO', 8, true, '667888');
-+        $yFrom -= 16;
-+        $yTo = $yFrom;
-+        $text(48, $yFrom, $biz, 12, true);
-+        $text(320, $yTo, $client, 12, true);
-+        $yFrom -= 14;
-+        $yTo -= 14;
++        $textX = $jpeg !== null ? ($logoX + $logoPt + 16) : 48.0;
++        $text($textX, 752, $biz, 16, true);
++        $yInfo = 732.0;
 +        foreach ([$owner, $bizEmail, $bizPhone, $website] as $line) {
 +            if ($line !== '') {
-+                $text(48, $yFrom, $line, 9, false, '2a3a48');
-+                $yFrom -= 12;
++                $text($textX, $yInfo, $line, 9, false, '2a3a48');
++                $yInfo -= 12;
 +            }
 +        }
++        $textRight(564, 752, 'INVOICE', 22, true, '0d6b66');
++        $textRight(564, 732, $number, 12, true);
++        $textRight(564, 716, $status, 8, true, '1a8a84');
++        $fill(40, 664, 532, 1.0, 'e2e8ee');
++
++        $yTo = 640.0;
++        $text(48, $yTo, 'BILL TO', 8, true, '667888');
++        $yTo -= 16;
++        $text(48, $yTo, $client, 12, true);
++        $yTo -= 14;
 +        if ($company !== '') {
-+            $text(320, $yTo, $company, 9, false, '2a3a48');
++            $text(48, $yTo, $company, 9, false, '2a3a48');
 +            $yTo -= 12;
 +        }
 +        foreach ([$clientEmail, $clientPhone] as $line) {
 +            if ($line !== '') {
-+                $text(320, $yTo, $line, 9, false, '2a3a48');
++                $text(48, $yTo, $line, 9, false, '2a3a48');
 +                $yTo -= 12;
 +            }
 +        }
@@ -872,9 +886,9 @@ index 0000000..7e773e2
 +        if ($jpeg !== null) {
 +            $objects[] = '<< /Type /XObject /Subtype /Image /Width ' . $imgW . ' /Height ' . $imgH
 +                . ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' . strlen($jpeg)
-+                . " >>\nstream\n" . $jpeg . "\nendstream";
++                . " >>\nstream\n" . $jpeg . 'endstream';
 +        }
-+        $objects[] = '<< /Length ' . strlen($contentB) . " >>\nstream\n" . $contentB . "\nendstream";
++        $objects[] = '<< /Length ' . strlen($contentB) . " >>\nstream\n" . $contentB . 'endstream';
 +
 +        $out = "%PDF-1.4\n%\xE2\xE3\xCF\xD3\n";
 +        $offsets = [0];
@@ -882,7 +896,7 @@ index 0000000..7e773e2
 +            $offsets[] = strlen($out);
 +            $n = $i + 1;
 +            $out .= "{$n} 0 obj\n" . $obj;
-+            if (!str_ends_with($obj, 'endstream')) {
++            if (!str_ends_with($obj, "\n")) {
 +                $out .= "\n";
 +            }
 +            $out .= "endobj\n";
@@ -968,6 +982,33 @@ index 0000000..7e773e2
 +        }
 +        $raw = file_get_contents($p);
 +        return $raw === false ? null : $raw;
++    }
++
++    /** @return array{0:int,1:int} */
++    private static function jpegSize(string $jpeg): array
++    {
++        $len = strlen($jpeg);
++        $i = 0;
++        while ($i < $len - 8) {
++            if (ord($jpeg[$i]) !== 0xFF) {
++                $i++;
++                continue;
++            }
++            $marker = ord($jpeg[$i + 1]);
++            if ($marker === 0xD8 || $marker === 0xD9 || $marker === 0x01
++                || ($marker >= 0xD0 && $marker <= 0xD7)) {
++                $i += 2;
++                continue;
++            }
++            $seglen = (ord($jpeg[$i + 2]) << 8) | ord($jpeg[$i + 3]);
++            if ($marker === 0xC0 || $marker === 0xC1 || $marker === 0xC2 || $marker === 0xC3) {
++                $h = (ord($jpeg[$i + 5]) << 8) | ord($jpeg[$i + 6]);
++                $w = (ord($jpeg[$i + 7]) << 8) | ord($jpeg[$i + 8]);
++                return [$w, $h];
++            }
++            $i += 2 + max($seglen, 0);
++        }
++        return [160, 160];
 +    }
 +
 +    private static function rgb(string $hex): string
@@ -1193,6 +1234,73 @@ index 23fa803..e300bb4 100644
      /** @param callable(string):string $cmd */
      private static function smtpAuth(callable $cmd, callable $expect, string $user, string $password): void
      {
+diff --git a/static/css/app.css b/static/css/app.css
+index 26a763e..0bb4c4e 100644
+--- a/static/css/app.css
++++ b/static/css/app.css
+@@ -636,6 +636,7 @@ td.mono, .mono {
+     align-items: stretch;
+     gap: 14px;
+   }
++  .invoice-letterhead { flex-wrap: wrap; }
+ }
+ 
+ /* ---------- InPmnt extras ---------- */
+@@ -651,6 +652,54 @@ td.mono, .mono {
+   display: block;
+ }
+ 
++.invoice-sheet {
++  background: #fff;
++  border: 1px solid var(--line);
++  border-radius: 14px;
++  margin-bottom: 16px;
++  overflow: hidden;
++}
++.invoice-sheet::before {
++  content: "";
++  display: block;
++  height: 6px;
++  background: var(--brand);
++}
++.invoice-letterhead {
++  display: flex;
++  align-items: center;
++  gap: 16px;
++  padding: 18px 20px 16px;
++}
++.invoice-logo {
++  width: 88px;
++  height: 88px;
++  border-radius: 12px;
++  object-fit: cover;
++  background: #000;
++  flex-shrink: 0;
++}
++.invoice-letterhead-copy { flex: 1; min-width: 0; }
++.invoice-biz {
++  font-family: var(--font-display);
++  font-size: 1.25rem;
++  font-weight: 700;
++  letter-spacing: -0.03em;
++}
++.invoice-biz-meta {
++  color: var(--muted);
++  font-size: 0.85rem;
++  margin-top: 4px;
++}
++.invoice-letterhead-right { text-align: right; }
++.invoice-word {
++  font-family: var(--font-display);
++  font-size: 1.35rem;
++  font-weight: 700;
++  color: var(--brand);
++  letter-spacing: 0.04em;
++}
++
+ .toolbar {
+   display: flex;
+   justify-content: space-between;
 diff --git a/static/img/inpmnt-logo-invoice.jpg b/static/img/inpmnt-logo-invoice.jpg
 new file mode 100644
 index 0000000000000000000000000000000000000000..85db2bd097c87e7d39eb23158325ebbf60d83ae3
@@ -1274,10 +1382,20 @@ literal 0
 HcmV?d00001
 
 diff --git a/static/js/app.js b/static/js/app.js
-index 888328c..592a225 100644
+index 888328c..9a12f6a 100644
 --- a/static/js/app.js
 +++ b/static/js/app.js
-@@ -334,6 +334,7 @@ async function renderInvoiceDetail(id) {
+@@ -325,7 +325,8 @@ async function renderInvoices(filter = "all") {
+ }
+ 
+ async function renderInvoiceDetail(id) {
+-  const inv = await api(`/api/invoices/${id}`);
++  const [inv, s] = await Promise.all([api(`/api/invoices/${id}`), api("/api/settings")]);
++  const bizMeta = [s.owner_name, s.email, s.phone].filter(Boolean).join(" · ");
+   appEl.innerHTML = `
+     ${topbar({
+       eyebrow: "Invoice",
+@@ -334,10 +335,24 @@ async function renderInvoiceDetail(id) {
        actions: `
          <button class="btn secondary" data-go="#/invoices">Back</button>
          ${inv.status === "draft" ? `<button class="btn" id="btn-send">Send invoice</button>` : `<button class="btn secondary" id="btn-send">Email invoice</button>`}
@@ -1285,7 +1403,24 @@ index 888328c..592a225 100644
          ${inv.status !== "paid" && inv.status !== "draft" ? `<button class="btn" id="btn-pay">Record payment</button>` : ""}
          ${inv.status === "overdue" || inv.status === "partial" ? `<button class="btn danger" id="btn-final">Final notice</button>` : ""}
        `,
-@@ -642,7 +643,7 @@ async function renderTemplates() {
+     })}
++    <div class="invoice-sheet">
++      <div class="invoice-letterhead">
++        <img class="invoice-logo" src="/static/img/inpmnt-icon.png" alt="Company logo" />
++        <div class="invoice-letterhead-copy">
++          <div class="invoice-biz">${s.business_name || "InPmnt"}</div>
++          ${bizMeta ? `<div class="invoice-biz-meta">${bizMeta}</div>` : ""}
++        </div>
++        <div class="invoice-letterhead-right">
++          <div class="invoice-word">INVOICE</div>
++          <div class="mono">${inv.number}</div>
++        </div>
++      </div>
++    </div>
+     <div class="grid-kpi">
+       <div class="kpi"><div class="kpi-label">Amount</div><div class="kpi-value">${money(inv.amount)}</div></div>
+       <div class="kpi"><div class="kpi-label">Paid</div><div class="kpi-value">${money(inv.amount_paid)}</div></div>
+@@ -642,7 +657,7 @@ async function renderTemplates() {
      ${topbar({
        eyebrow: "Workspace",
        title: "Message templates",
@@ -1296,10 +1431,10 @@ index 888328c..592a225 100644
        ${templates
 diff --git a/tests/test_invoice_pdf.py b/tests/test_invoice_pdf.py
 new file mode 100644
-index 0000000..4af7b1f
+index 0000000..c39cb6e
 --- /dev/null
 +++ b/tests/test_invoice_pdf.py
-@@ -0,0 +1,75 @@
+@@ -0,0 +1,81 @@
 +"""Professional invoice PDF generator."""
 +from __future__ import annotations
 +
@@ -1353,6 +1488,12 @@ index 0000000..4af7b1f
 +        self.assertTrue(logo_path() is not None)
 +        self.assertIn(b"/Im1", pdf)
 +        self.assertIn(b"/DCTDecode", pdf)
++        # Company logo sits top-left on the letterhead (88pt at x=40, y=680), not the old 52pt dark-header slot.
++        self.assertIn(b"q 88.00 0 0 88.00 40.00 680.00 cm /Im1 Do Q", pdf)
++        self.assertNotIn(b"q 52 0 0 52 40 698", pdf)
++        self.assertIn(b"/Width 160", pdf)
++        self.assertIn(b"/Height 160", pdf)
++        self.assertNotIn(b"endstreamendobj", pdf)
 +
 +    def test_payload_and_filename(self) -> None:
 +        payload = invoice_pdf_payload(
