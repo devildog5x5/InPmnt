@@ -582,7 +582,7 @@ index 7da32bd..9da0eb9 100644
      context = ssl.create_default_context()
      if use_ssl or port == 465:
 diff --git a/app/routes.py b/app/routes.py
-index a9879c9..0435568 100644
+index a9879c9..f0506d0 100644
 --- a/app/routes.py
 +++ b/app/routes.py
 @@ -7,6 +7,8 @@ from datetime import date, datetime, timedelta
@@ -677,7 +677,51 @@ index a9879c9..0435568 100644
  
      now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
      today = date.today().isoformat()
-@@ -716,6 +739,33 @@ def api_invoices():
+@@ -639,6 +662,17 @@ def api_create_client():
+ def api_update_client(client_id: int):
+     data = request.get_json(force=True) or {}
+     wid = require_workspace_id()
++
++    def text_field(key: str, current: Any) -> str | None:
++        if key not in data:
++            val = current
++        else:
++            val = data.get(key)
++        if val is None:
++            return None
++        s = str(val).strip()
++        return s or None
++
+     with db_session(db_path()) as conn:
+         existing = conn.execute(
+             "SELECT * FROM clients WHERE id = ? AND workspace_id = ?",
+@@ -646,7 +680,9 @@ def api_update_client(client_id: int):
+         ).fetchone()
+         if not existing:
+             return jsonify({"error": "Not found"}), 404
+-        name = (data.get("name") or existing["name"]).strip()
++        name = text_field("name", existing["name"]) or ""
++        if not name:
++            return jsonify({"error": "Name is required"}), 400
+         conn.execute(
+             """
+             UPDATE clients SET name=?, company=?, email=?, phone=?, notes=?
+@@ -654,10 +690,10 @@ def api_update_client(client_id: int):
+             """,
+             (
+                 name,
+-                (data.get("company") if "company" in data else existing["company"]),
+-                (data.get("email") if "email" in data else existing["email"]),
+-                (data.get("phone") if "phone" in data else existing["phone"]),
+-                (data.get("notes") if "notes" in data else existing["notes"]),
++                text_field("company", existing["company"]),
++                text_field("email", existing["email"]),
++                text_field("phone", existing["phone"]),
++                text_field("notes", existing["notes"]),
+                 client_id,
+                 wid,
+             ),
+@@ -716,6 +752,33 @@ def api_invoices():
      return jsonify(rows)
  
  
@@ -711,7 +755,7 @@ index a9879c9..0435568 100644
  @bp.get("/api/invoices/<int:invoice_id>")
  @login_required
  def api_invoice(invoice_id: int):
-@@ -794,8 +844,9 @@ def api_create_invoice():
+@@ -794,8 +857,9 @@ def api_create_invoice():
          )
          invoice_id = cur.lastrowid
          emailed = False
@@ -722,7 +766,7 @@ index a9879c9..0435568 100644
              if err:
                  return err
              emailed = True
-@@ -807,15 +858,26 @@ def api_create_invoice():
+@@ -807,15 +871,26 @@ def api_create_invoice():
          data_out = invoice_detail(conn, invoice_id, wid)
      if data_out:
          data_out["emailed"] = emailed
@@ -749,7 +793,7 @@ index a9879c9..0435568 100644
      with db_session(db_path()) as conn:
          existing = conn.execute(
              "SELECT * FROM invoices WHERE id=? AND workspace_id=?",
-@@ -823,15 +885,36 @@ def api_update_invoice(invoice_id: int):
+@@ -823,15 +898,36 @@ def api_update_invoice(invoice_id: int):
          ).fetchone()
          if not existing:
              return jsonify({"error": "Not found"}), 404
@@ -790,7 +834,7 @@ index a9879c9..0435568 100644
          client = conn.execute(
              "SELECT id FROM clients WHERE id=? AND workspace_id=?",
              (fields["client_id"], wid),
-@@ -879,7 +962,18 @@ def api_update_invoice(invoice_id: int):
+@@ -879,7 +975,18 @@ def api_update_invoice(invoice_id: int):
              invoice_id,
              workspace_id=wid,
          )
@@ -809,7 +853,7 @@ index a9879c9..0435568 100644
      return jsonify(out)
  
  
-@@ -887,13 +981,16 @@ def api_update_invoice(invoice_id: int):
+@@ -887,13 +994,16 @@ def api_update_invoice(invoice_id: int):
  @login_required
  def api_send_invoice(invoice_id: int):
      wid = require_workspace_id()
@@ -1184,7 +1228,7 @@ index 0000000..cc2849f
 +echo "Then in hPanel: Cache → Purge All (and CDN purge if you use it)."
 +echo "Also: WordPress → Delete this installation so Hostinger does not restore it."
 diff --git a/php/src/App.php b/php/src/App.php
-index 5ab2c2c..59fb6ad 100644
+index 5ab2c2c..b700672 100644
 --- a/php/src/App.php
 +++ b/php/src/App.php
 @@ -72,6 +72,10 @@ final class App
@@ -1208,7 +1252,39 @@ index 5ab2c2c..59fb6ad 100644
          if (preg_match('#^/api/invoices/(\d+)/send$#', $path, $m) && $method === 'POST') {
              $this->apiSendInvoice($wid, (int) $m[1]);
          }
-@@ -615,8 +622,9 @@ final class App
+@@ -413,15 +420,26 @@ final class App
+         if (!$existing) {
+             Http::json(['error' => 'Not found'], 404);
+         }
+-        $name = trim((string) ($data['name'] ?? $existing['name']));
++        $text = static function (string $key, mixed $current) use ($data): ?string {
++            $val = array_key_exists($key, $data) ? $data[$key] : $current;
++            if ($val === null) {
++                return null;
++            }
++            $s = trim((string) $val);
++            return $s === '' ? null : $s;
++        };
++        $name = $text('name', $existing['name']) ?? '';
++        if ($name === '') {
++            Http::json(['error' => 'Name is required'], 400);
++        }
+         $this->db->prepare(
+             'UPDATE clients SET name=?, company=?, email=?, phone=?, notes=? WHERE id=? AND workspace_id=?'
+         )->execute([
+             $name,
+-            array_key_exists('company', $data) ? $data['company'] : $existing['company'],
+-            array_key_exists('email', $data) ? $data['email'] : $existing['email'],
+-            array_key_exists('phone', $data) ? $data['phone'] : $existing['phone'],
+-            array_key_exists('notes', $data) ? $data['notes'] : $existing['notes'],
++            $text('company', $existing['company']),
++            $text('email', $existing['email']),
++            $text('phone', $existing['phone']),
++            $text('notes', $existing['notes']),
+             $id, $wid,
+         ]);
+         Db::log($this->db, 'client', "Updated client {$name}", 'client', $id, $wid);
+@@ -615,8 +633,9 @@ final class App
          ]);
          $invoiceId = (int) $this->db->lastInsertId();
          $emailed = false;
@@ -1219,7 +1295,7 @@ index 5ab2c2c..59fb6ad 100644
              $emailed = true;
          } elseif (in_array($insertStatus, ['sent', 'partial', 'overdue'], true)) {
              $this->scheduleReminders($invoiceId, $due, true);
-@@ -625,6 +633,9 @@ final class App
+@@ -625,6 +644,9 @@ final class App
          $out = $this->invoiceDetail($invoiceId, $wid);
          if (is_array($out)) {
              $out['emailed'] = $emailed;
@@ -1229,7 +1305,7 @@ index 5ab2c2c..59fb6ad 100644
          }
          Http::json($out, 201);
      }
-@@ -638,14 +649,38 @@ final class App
+@@ -638,14 +660,38 @@ final class App
          if (!$existing) {
              Http::json(['error' => 'Not found'], 404);
          }
@@ -1272,7 +1348,7 @@ index 5ab2c2c..59fb6ad 100644
          ];
          $c = $this->db->prepare('SELECT id FROM clients WHERE id=? AND workspace_id=?');
          $c->execute([$fields['client_id'], $wid]);
-@@ -672,24 +707,58 @@ final class App
+@@ -672,24 +718,58 @@ final class App
          }
          Db::refreshInvoiceStatus($this->db, $id);
          Db::log($this->db, 'invoice', "Updated invoice {$existing['number']}", 'invoice', $id, $wid);
@@ -1336,7 +1412,7 @@ index 5ab2c2c..59fb6ad 100644
               FROM invoices i JOIN clients c ON c.id = i.client_id
               WHERE i.id=? AND i.workspace_id=?'
          );
-@@ -726,17 +795,22 @@ final class App
+@@ -726,17 +806,22 @@ final class App
              'business_name' => $settings['business_name'] ?? 'InPmnt',
          ];
          $subject = Db::renderVars($tmpl['subject'] ?? 'Invoice {{number}} from {{business_name}}', $ctx);
@@ -1363,7 +1439,7 @@ index 5ab2c2c..59fb6ad 100644
              } catch (Throwable $e) {
                  Http::json(['error' => $e->getMessage()], 502);
              }
-@@ -761,6 +835,7 @@ final class App
+@@ -761,6 +846,7 @@ final class App
          $rid = (int) $this->db->lastInsertId();
          Db::log($this->db, 'invoice', "Emailed invoice {$inv['number']} to {$to}", 'invoice', $id, $wid);
          Db::log($this->db, 'reminder', "Sent INVOICE email for {$inv['number']} to {$to}", 'reminder', $rid, $wid);
@@ -2600,7 +2676,7 @@ literal 0
 HcmV?d00001
 
 diff --git a/static/js/app.js b/static/js/app.js
-index 888328c..9c6274c 100644
+index 888328c..1c13b38 100644
 --- a/static/js/app.js
 +++ b/static/js/app.js
 @@ -21,14 +21,30 @@ function toast(message, kind = "") {
@@ -2854,13 +2930,13 @@ index 888328c..9c6274c 100644
 +        </div>
 +        <div class="field full"><label>Title / description</label>
 +          <input name="title" required placeholder="Job or service description" value="${esc(existing?.title || "")}" />
-+        </div>
+         </div>
+-        <div class="field"><label>Notes</label><input name="notes" placeholder="Optional" /></div>
 +        <div class="field"><label>Issue date</label><input name="issue_date" type="date" value="${issueVal}" /></div>
 +        <div class="field"><label>Due date</label><input name="due_date" type="date" value="${dueVal}" /></div>
 +        <div class="field full"><label>Notes</label>
 +          <input name="notes" placeholder="Optional" value="${esc(existing?.notes || "")}" />
-         </div>
--        <div class="field"><label>Notes</label><input name="notes" placeholder="Optional" /></div>
++        </div>
 +        <p class="field full muted" style="margin:0">Need to email later? Save the draft, then use <strong>Send now</strong> on the Invoices page.</p>
          <div class="modal-actions field full">
            <button type="button" class="btn secondary" id="m-cancel">Cancel</button>
@@ -2928,7 +3004,150 @@ index 888328c..9c6274c 100644
          }
        };
      },
-@@ -642,7 +787,7 @@ async function renderTemplates() {
+@@ -507,13 +652,69 @@ function openPaymentModal(invoiceId, after) {
+ }
+ 
+ /* ---------- Clients ---------- */
++async function openClientModal(existing = null) {
++  const isEdit = Boolean(existing && existing.id);
++  openModal({
++    title: isEdit ? `Edit ${esc(existing.name)}` : "Add client",
++    lead: isEdit
++      ? "Update contact details. Invoice emails use this address."
++      : "Save the client, then create invoices. You can edit them later.",
++    body: `
++      <form id="client-form" class="form-grid">
++        <div class="field"><label>Name</label><input name="name" required value="${esc(existing?.name || "")}" /></div>
++        <div class="field"><label>Company</label><input name="company" value="${esc(existing?.company || "")}" /></div>
++        <div class="field"><label>Email</label><input name="email" type="email" value="${esc(existing?.email || "")}" /></div>
++        <div class="field"><label>Phone</label><input name="phone" value="${esc(existing?.phone || "")}" /></div>
++        <div class="field full"><label>Notes</label><textarea name="notes">${esc(existing?.notes || "")}</textarea></div>
++        <div class="modal-actions field full">
++          <button type="button" class="btn secondary" id="m-cancel">Cancel</button>
++          <button class="btn" type="submit">${isEdit ? "Save" : "Add client"}</button>
++        </div>
++      </form>
++    `,
++    onMount: (modal) => {
++      modal.querySelector("#m-cancel").onclick = closeModal;
++      modal.querySelector("#client-form").onsubmit = async (e) => {
++        e.preventDefault();
++        const payload = Object.fromEntries(new FormData(e.target).entries());
++        const btn = modal.querySelector("#client-form button[type=submit]");
++        btn.disabled = true;
++        try {
++          if (isEdit) {
++            const saved = await api(`/api/clients/${existing.id}`, {
++              method: "PUT",
++              body: JSON.stringify(payload),
++            });
++            if (!saved || !saved.id) {
++              throw new Error("Could not save client.");
++            }
++            closeModal();
++            toast(`Saved ${saved.name}`);
++          } else {
++            const saved = await api("/api/clients", { method: "POST", body: JSON.stringify(payload) });
++            if (!saved || !saved.id) {
++              throw new Error("Could not add client.");
++            }
++            closeModal();
++            toast("Client added");
++          }
++          renderClients();
++        } catch (err) {
++          btn.disabled = false;
++          toast(err.message || "Could not save client", "error");
++        }
++      };
++    },
++  });
++}
++
+ async function renderClients() {
+   const clients = await api("/api/clients");
+   appEl.innerHTML = `
+     ${topbar({
+       eyebrow: "Collections",
+       title: "Clients",
+-      subtitle: "People and businesses you invoice.",
++      subtitle: "Add a client, then edit them any time — email is what Send now uses.",
+       actions: `<button class="btn" id="btn-new-client">Add client</button>`,
+     })}
+     <div class="toolbar">
+@@ -527,20 +728,29 @@ async function renderClients() {
+     const el = appEl.querySelector("#client-table");
+     el.innerHTML = rows.length
+       ? `<table>
+-          <thead><tr><th>Name</th><th>Company</th><th>Email</th><th>Phone</th><th>Open balance</th><th>Invoices</th></tr></thead>
++          <thead><tr><th>Name</th><th>Company</th><th>Email</th><th>Phone</th><th>Open balance</th><th>Invoices</th><th></th></tr></thead>
+           <tbody>${rows
+             .map(
+               (c) => `<tr>
+-                <td>${c.name}</td>
+-                <td>${c.company || "—"}</td>
+-                <td>${c.email || "—"}</td>
+-                <td>${c.phone || "—"}</td>
++                <td>${esc(c.name)}</td>
++                <td>${esc(c.company || "—")}</td>
++                <td>${esc(c.email || "—")}</td>
++                <td>${esc(c.phone || "—")}</td>
+                 <td class="mono">${money(c.open_balance)}</td>
+                 <td>${c.invoice_count}</td>
++                <td class="row-actions">
++                  <button class="btn sm secondary" data-edit-client="${c.id}">Edit</button>
++                </td>
+               </tr>`
+             )
+             .join("")}</tbody></table>`
+       : empty("No clients yet.");
++    el.querySelectorAll("[data-edit-client]").forEach((btn) =>
++      btn.addEventListener("click", () => {
++        const client = rows.find((c) => String(c.id) === String(btn.dataset.editClient));
++        if (client) openClientModal(client);
++      })
++    );
+   };
+   paint(clients);
+   appEl.querySelector("#client-q").oninput = (e) => {
+@@ -554,35 +764,7 @@ async function renderClients() {
+       )
+     );
+   };
+-  appEl.querySelector("#btn-new-client").onclick = () => {
+-    openModal({
+-      title: "Add client",
+-      body: `
+-        <form id="client-form" class="form-grid">
+-          <div class="field"><label>Name</label><input name="name" required /></div>
+-          <div class="field"><label>Company</label><input name="company" /></div>
+-          <div class="field"><label>Email</label><input name="email" type="email" /></div>
+-          <div class="field"><label>Phone</label><input name="phone" /></div>
+-          <div class="field full"><label>Notes</label><textarea name="notes"></textarea></div>
+-          <div class="modal-actions field full">
+-            <button type="button" class="btn secondary" id="m-cancel">Cancel</button>
+-            <button class="btn" type="submit">Save</button>
+-          </div>
+-        </form>
+-      `,
+-      onMount: (modal) => {
+-        modal.querySelector("#m-cancel").onclick = closeModal;
+-        modal.querySelector("#client-form").onsubmit = async (e) => {
+-          e.preventDefault();
+-          const payload = Object.fromEntries(new FormData(e.target).entries());
+-          await api("/api/clients", { method: "POST", body: JSON.stringify(payload) });
+-          closeModal();
+-          toast("Client added");
+-          renderClients();
+-        };
+-      },
+-    });
+-  };
++  appEl.querySelector("#btn-new-client").onclick = () => openClientModal();
+ }
+ 
+ /* ---------- Reminders ---------- */
+@@ -642,7 +824,7 @@ async function renderTemplates() {
      ${topbar({
        eyebrow: "Workspace",
        title: "Message templates",
@@ -2937,6 +3156,103 @@ index 888328c..9c6274c 100644
      })}
      <div class="stack">
        ${templates
+diff --git a/tests/test_clients.py b/tests/test_clients.py
+new file mode 100644
+index 0000000..adcc47b
+--- /dev/null
++++ b/tests/test_clients.py
+@@ -0,0 +1,91 @@
++"""Create and edit clients after they exist."""
++from __future__ import annotations
++
++import os
++import tempfile
++import unittest
++
++from app import create_app
++from app.database import init_db
++
++
++class ClientEditTests(unittest.TestCase):
++    def setUp(self) -> None:
++        self._saved = {k: os.environ.get(k) for k in ("DATABASE_PATH",)}
++        fd, self.db_path = tempfile.mkstemp(suffix=".db")
++        os.close(fd)
++        os.environ["DATABASE_PATH"] = self.db_path
++        init_db(self.db_path)
++        app = create_app()
++        app.config["TESTING"] = True
++        app.config["DATABASE"] = self.db_path
++        self.client = app.test_client()
++        signup = self.client.post(
++            "/signup",
++            data={
++                "name": "Pat",
++                "business_name": "Pat Co",
++                "email": "pat@example.com",
++                "password": "password123",
++            },
++        )
++        self.assertIn(signup.status_code, (302, 303))
++
++    def tearDown(self) -> None:
++        try:
++            os.remove(self.db_path)
++        except OSError:
++            pass
++        for key, value in self._saved.items():
++            if value is None:
++                os.environ.pop(key, None)
++            else:
++                os.environ[key] = value
++
++    def test_create_then_edit_client(self) -> None:
++        created = self.client.post(
++            "/api/clients",
++            json={
++                "name": "Maya Chen",
++                "email": "old@client.example",
++                "company": "Chen Landscape",
++                "phone": "555-0100",
++            },
++        )
++        self.assertEqual(created.status_code, 201, created.get_json())
++        cid = created.get_json()["id"]
++        res = self.client.put(
++            f"/api/clients/{cid}",
++            json={
++                "name": "Maya Chen",
++                "email": "maya@client.example",
++                "company": "Chen Landscape LLC",
++                "phone": "555-0199",
++                "notes": "Prefers email",
++            },
++        )
++        self.assertEqual(res.status_code, 200, res.get_json())
++        body = res.get_json()
++        self.assertEqual(body["email"], "maya@client.example")
++        self.assertEqual(body["company"], "Chen Landscape LLC")
++        self.assertEqual(body["phone"], "555-0199")
++        self.assertEqual(body["notes"], "Prefers email")
++        listed = self.client.get("/api/clients").get_json()
++        row = next(r for r in listed if r["id"] == cid)
++        self.assertEqual(row["email"], "maya@client.example")
++
++    def test_update_rejects_empty_name(self) -> None:
++        created = self.client.post("/api/clients", json={"name": "Keep Me"}).get_json()
++        res = self.client.put(f"/api/clients/{created['id']}", json={"name": "   "})
++        self.assertEqual(res.status_code, 400)
++        listed = self.client.get("/api/clients").get_json()
++        row = next(r for r in listed if r["id"] == created["id"])
++        self.assertEqual(row["name"], "Keep Me")
++
++    def test_update_missing_client_404(self) -> None:
++        res = self.client.put("/api/clients/99999", json={"name": "Nope"})
++        self.assertEqual(res.status_code, 404)
++
++
++if __name__ == "__main__":
++    unittest.main()
 diff --git a/tests/test_hostinger_front_controller.py b/tests/test_hostinger_front_controller.py
 new file mode 100644
 index 0000000..b6d4186
