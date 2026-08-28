@@ -420,15 +420,26 @@ final class App
         if (!$existing) {
             Http::json(['error' => 'Not found'], 404);
         }
-        $name = trim((string) ($data['name'] ?? $existing['name']));
+        $text = static function (string $key, mixed $current) use ($data): ?string {
+            $val = array_key_exists($key, $data) ? $data[$key] : $current;
+            if ($val === null) {
+                return null;
+            }
+            $s = trim((string) $val);
+            return $s === '' ? null : $s;
+        };
+        $name = $text('name', $existing['name']) ?? '';
+        if ($name === '') {
+            Http::json(['error' => 'Name is required'], 400);
+        }
         $this->db->prepare(
             'UPDATE clients SET name=?, company=?, email=?, phone=?, notes=? WHERE id=? AND workspace_id=?'
         )->execute([
             $name,
-            array_key_exists('company', $data) ? $data['company'] : $existing['company'],
-            array_key_exists('email', $data) ? $data['email'] : $existing['email'],
-            array_key_exists('phone', $data) ? $data['phone'] : $existing['phone'],
-            array_key_exists('notes', $data) ? $data['notes'] : $existing['notes'],
+            $text('company', $existing['company']),
+            $text('email', $existing['email']),
+            $text('phone', $existing['phone']),
+            $text('notes', $existing['notes']),
             $id, $wid,
         ]);
         Db::log($this->db, 'client', "Updated client {$name}", 'client', $id, $wid);
