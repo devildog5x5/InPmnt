@@ -39,6 +39,9 @@ git show HEAD:php/.env.example > "$stage/.env.example"
 git show HEAD:static/js/app.js > "$stage/static/js/app.js"
 git show HEAD:static/css/app.css > "$stage/static/css/app.css"
 git show HEAD:static/img/inpmnt-logo-invoice.jpg > "$stage/static/img/inpmnt-logo-invoice.jpg"
+if git cat-file -e HEAD:php/src/inpmnt-logo-invoice.jpg 2>/dev/null; then
+  git show HEAD:php/src/inpmnt-logo-invoice.jpg > "$stage/src/inpmnt-logo-invoice.jpg"
+fi
 if git cat-file -e HEAD:php/fix-ubuntu-perms.sh 2>/dev/null; then
   git show HEAD:php/fix-ubuntu-perms.sh > "$stage/fix-ubuntu-perms.sh"
 fi

@@ -223,14 +223,36 @@ final class InvoicePdf
         return rtrim($body) . "\n\nA PDF copy of this invoice is attached.\n";
     }
 
+    /** @return list<string> */
+    public static function logoCandidates(): array
+    {
+        $srcDir = __DIR__;
+        $phpDir = dirname($srcDir);
+        $repoDir = dirname($phpDir);
+        $names = ['inpmnt-logo-invoice.jpg', 'inpmnt-icon.png'];
+        $dirs = [
+            $srcDir,
+            $phpDir . '/static/img',
+            $repoDir . '/static/img',
+            $phpDir . '/img',
+        ];
+        $doc = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/\\');
+        if ($doc !== '') {
+            $dirs[] = $doc . '/static/img';
+            $dirs[] = $doc . '/img';
+        }
+        $out = [];
+        foreach ($dirs as $dir) {
+            foreach ($names as $name) {
+                $out[] = $dir . '/' . $name;
+            }
+        }
+        return $out;
+    }
+
     public static function logoPath(): ?string
     {
-        $root = dirname(__DIR__);
-        $cands = [
-            $root . '/static/img/inpmnt-logo-invoice.jpg',
-            dirname($root) . '/static/img/inpmnt-logo-invoice.jpg',
-        ];
-        foreach ($cands as $p) {
+        foreach (self::logoCandidates() as $p) {
             if (is_file($p) && is_readable($p)) {
                 return $p;
             }
@@ -240,37 +262,78 @@ final class InvoicePdf
 
     private static function logoJpeg(): ?string
     {
-        $p = self::logoPath();
-        if ($p === null) {
+        foreach (self::logoCandidates() as $p) {
+            if (!is_file($p) || !is_readable($p)) {
+                continue;
+            }
+            $raw = file_get_contents($p);
+            if ($raw === false || $raw === '') {
+                continue;
+            }
+            $ext = strtolower(pathinfo($p, PATHINFO_EXTENSION));
+            if ($ext === 'png') {
+                $jpeg = self::pngToJpeg($raw);
+                if ($jpeg !== null) {
+                    return $jpeg;
+                }
+                $sibling = dirname($p) . '/inpmnt-logo-invoice.jpg';
+                if (is_file($sibling) && is_readable($sibling)) {
+                    $alt = file_get_contents($sibling);
+                    if (is_string($alt) && str_starts_with($alt, "\xFF\xD8")) {
+                        return $alt;
+                    }
+                }
+                continue;
+            }
+            if (str_starts_with($raw, "\xFF\xD8")) {
+                return $raw;
+            }
+        }
+        return null;
+    }
+
+    private static function pngToJpeg(string $png): ?string
+    {
+        if (!function_exists('imagecreatefromstring')) {
             return null;
         }
-        $raw = file_get_contents($p);
-        return $raw === false ? null : $raw;
+        $im = @imagecreatefromstring($png);
+        if ($im === false) {
+            return null;
+        }
+        $size = 160;
+        $dst = imagecreatetruecolor($size, $size);
+        $bg = imagecolorallocate($dst, 16, 25, 32);
+        imagefilledrectangle($dst, 0, 0, $size, $size, $bg);
+        imagecopyresampled($dst, $im, 0, 0, 0, 0, $size, $size, imagesx($im), imagesy($im));
+        ob_start();
+        imagejpeg($dst, null, 88);
+        $jpeg = ob_get_clean();
+        imagedestroy($im);
+        imagedestroy($dst);
+        return is_string($jpeg) && str_starts_with($jpeg, "\xFF\xD8") ? $jpeg : null;
     }
 
     /** @return array{0:int,1:int} */
     private static function jpegSize(string $jpeg): array
     {
         $len = strlen($jpeg);
-        $i = 0;
+        $i = 2;
         while ($i < $len - 8) {
             if (ord($jpeg[$i]) !== 0xFF) {
-                $i++;
-                continue;
+                break;
             }
             $marker = ord($jpeg[$i + 1]);
-            if ($marker === 0xD8 || $marker === 0xD9 || $marker === 0x01
-                || ($marker >= 0xD0 && $marker <= 0xD7)) {
-                $i += 2;
-                continue;
-            }
-            $seglen = (ord($jpeg[$i + 2]) << 8) | ord($jpeg[$i + 3]);
-            if ($marker === 0xC0 || $marker === 0xC1 || $marker === 0xC2 || $marker === 0xC3) {
+            if ($marker === 0xC0 || $marker === 0xC1 || $marker === 0xC2) {
                 $h = (ord($jpeg[$i + 5]) << 8) | ord($jpeg[$i + 6]);
                 $w = (ord($jpeg[$i + 7]) << 8) | ord($jpeg[$i + 8]);
-                return [$w, $h];
+                return [$w > 0 ? $w : 160, $h > 0 ? $h : 160];
             }
-            $i += 2 + max($seglen, 0);
+            $seglen = (ord($jpeg[$i + 2]) << 8) | ord($jpeg[$i + 3]);
+            if ($seglen < 2) {
+                break;
+            }
+            $i += 2 + $seglen;
         }
         return [160, 160];
     }

@@ -1,6 +1,7 @@
 """Professional invoice PDF generator."""
 from __future__ import annotations
 
+from pathlib import Path
 import unittest
 
 from app.invoice_pdf import (
@@ -57,6 +58,16 @@ class InvoicePdfTests(unittest.TestCase):
         self.assertIn(b"/Width 160", pdf)
         self.assertIn(b"/Height 160", pdf)
         self.assertNotIn(b"endstreamendobj", pdf)
+
+    def test_logo_from_png_when_jpeg_missing(self) -> None:
+        from unittest.mock import patch
+
+        png = Path(__file__).resolve().parent.parent / "static" / "img" / "inpmnt-icon.png"
+        self.assertTrue(png.is_file())
+        with patch("app.invoice_pdf._logo_candidates", return_value=[png]):
+            pdf = build_invoice_pdf(SAMPLE)
+        self.assertIn(b"/Im1", pdf)
+        self.assertIn(b"/DCTDecode", pdf)
 
     def test_payload_and_filename(self) -> None:
         payload = invoice_pdf_payload(

@@ -50,6 +50,7 @@ class UbuntuPermsTests(unittest.TestCase):
                     self.assertEqual(mode, want, f"{member.name} {mode:03o}")
         for needed in (
             "static/img/inpmnt-logo-invoice.jpg",
+            "src/inpmnt-logo-invoice.jpg",
             "src/InvoicePdf.php",
             "fix-ubuntu-perms.sh",
         ):

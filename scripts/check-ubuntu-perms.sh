@@ -92,6 +92,7 @@ import tarfile
 path = sys.argv[1]
 needed = {
     "./static/img/inpmnt-logo-invoice.jpg",
+    "./src/inpmnt-logo-invoice.jpg",
     "./src/InvoicePdf.php",
     "./static/js/app.js",
     "./static/css/app.css",

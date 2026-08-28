@@ -23,7 +23,7 @@ find src static -type f -exec chmod 644 {} \;
 # bootstrap.php lands in public_html/ — keep your live .env
 ```
 
-The tarball includes `src/InvoicePdf.php`, `static/img/inpmnt-logo-invoice.jpg`, and `fix-ubuntu-perms.sh`.
+The tarball includes `src/InvoicePdf.php`, `src/inpmnt-logo-invoice.jpg`, `static/img/inpmnt-logo-invoice.jpg`, and `fix-ubuntu-perms.sh`. Copy the PHP file **and** the JPEG — if the JPEG is missing, the generator falls back to `static/img/inpmnt-icon.png`.
 
 On **Ubuntu Apache**, after unzip/tar:
 

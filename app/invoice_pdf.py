@@ -62,14 +62,26 @@ def _rgb(hex_color: str) -> str:
 
 
 def logo_path() -> Path | None:
-    root = Path(__file__).resolve().parent.parent
-    for p in (
-        root / "static" / "img" / "inpmnt-logo-invoice.jpg",
-        root / "php" / "static" / "img" / "inpmnt-logo-invoice.jpg",
-    ):
+    for p in _logo_candidates():
         if p.is_file() and os.access(p, os.R_OK):
             return p
     return None
+
+
+def _logo_candidates() -> list[Path]:
+    root = Path(__file__).resolve().parent.parent
+    names = ("inpmnt-logo-invoice.jpg", "inpmnt-icon.png")
+    dirs = [
+        Path(__file__).resolve().parent,
+        root / "static" / "img",
+        root / "php" / "static" / "img",
+        root / "php" / "src",
+    ]
+    out: list[Path] = []
+    for d in dirs:
+        for name in names:
+            out.append(d / name)
+    return out
 
 
 def _jpeg_size(data: bytes) -> tuple[int, int]:
@@ -93,6 +105,45 @@ def _jpeg_size(data: bytes) -> tuple[int, int]:
     return 160, 160
 
 
+def _png_file_to_jpeg(path: Path) -> bytes | None:
+    try:
+        from io import BytesIO
+
+        from PIL import Image
+
+        im = Image.open(path).convert("RGB")
+        im = im.resize((160, 160), Image.Resampling.LANCZOS)
+        buf = BytesIO()
+        im.save(buf, format="JPEG", quality=88)
+        raw = buf.getvalue()
+        return raw if raw.startswith(b"\xff\xd8") else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def logo_jpeg() -> tuple[bytes, int, int] | None:
+    """Return (jpeg_bytes, width, height) for the InPmnt mark, or None."""
+    for p in _logo_candidates():
+        if not p.is_file() or not os.access(p, os.R_OK):
+            continue
+        suffix = p.suffix.lower()
+        if suffix in {".jpg", ".jpeg"}:
+            raw = p.read_bytes()
+            if raw.startswith(b"\xff\xd8"):
+                w, h = _jpeg_size(raw)
+                return raw, w, h
+        elif suffix == ".png":
+            converted = _png_file_to_jpeg(p)
+            if converted:
+                w, h = _jpeg_size(converted)
+                return converted, w, h
+            sibling = p.with_name("inpmnt-logo-invoice.jpg")
+            if sibling.is_file() and os.access(sibling, os.R_OK):
+                raw = sibling.read_bytes()
+                if raw.startswith(b"\xff\xd8"):
+                    w, h = _jpeg_size(raw)
+                    return raw, w, h
+    return None
 def _money(n: float) -> str:
     return f"${n:,.2f}"
 
@@ -201,10 +252,9 @@ def build_invoice_pdf(data: dict[str, Any]) -> bytes:
     logo_pt = 88.0
     logo_x = 40.0
     logo_y = 680.0  # 88pt tall → top at 768, 16pt under the teal rule
-    lp = logo_path()
-    if lp:
-        jpeg = lp.read_bytes()
-        img_w, img_h = _jpeg_size(jpeg)
+    logo = logo_jpeg()
+    if logo:
+        jpeg, img_w, img_h = logo
         ops.append(f"q {logo_pt:.2f} 0 0 {logo_pt:.2f} {logo_x:.2f} {logo_y:.2f} cm /Im1 Do Q")
     text_x = (logo_x + logo_pt + 16) if jpeg else 48.0
     text(text_x, 752, biz, size=16, bold=True)

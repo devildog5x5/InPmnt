@@ -31,6 +31,9 @@ fi
 if [ -f "$ROOT/static/img/inpmnt-logo-invoice.jpg" ]; then
   chmod 644 "$ROOT/static/img/inpmnt-logo-invoice.jpg"
 fi
+if [ -f "$ROOT/src/inpmnt-logo-invoice.jpg" ]; then
+  chmod 644 "$ROOT/src/inpmnt-logo-invoice.jpg"
+fi
 if [ -f "$ROOT/static/img/inpmnt-icon.png" ]; then
   chmod 644 "$ROOT/static/img/inpmnt-icon.png"
 fi
