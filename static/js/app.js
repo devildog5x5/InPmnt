@@ -394,7 +394,7 @@ async function renderInvoiceDetail(id) {
             </div>`
                 )
                 .join("")
-            : empty("No reminders scheduled. Mark the invoice as sent to generate a schedule.")
+            : empty("No reminders scheduled. Send the invoice to email the client and generate a schedule.")
         }
       </div>
     </div>
