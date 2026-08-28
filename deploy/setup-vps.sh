@@ -37,6 +37,9 @@ if [[ ! -f .env ]]; then
 fi
 
 chown -R www-data:www-data "$APP_DIR"
+find "$APP_DIR" -type d -exec chmod 755 {} \;
+find "$APP_DIR" -type f -exec chmod 644 {} \;
+chmod 755 "$APP_DIR/docker-entrypoint.sh" "$APP_DIR/deploy/"*.sh 2>/dev/null || true
 
 cp deploy/inpmnt.service /etc/systemd/system/inpmnt.service
 sed "s/YOUR_DOMAIN/${DOMAIN}/g" deploy/nginx.inpmnt.conf > /etc/nginx/sites-available/inpmnt

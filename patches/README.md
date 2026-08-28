@@ -23,7 +23,14 @@ find src static -type f -exec chmod 644 {} \;
 # bootstrap.php lands in public_html/ — keep your live .env
 ```
 
-The tarball includes `src/InvoicePdf.php` and `static/img/inpmnt-logo-invoice.jpg`.
+The tarball includes `src/InvoicePdf.php`, `static/img/inpmnt-logo-invoice.jpg`, and `fix-ubuntu-perms.sh`.
+
+On **Ubuntu Apache**, after unzip/tar:
+
+```bash
+sudo bash fix-ubuntu-perms.sh
+# dirs 755, files 644, data/ 775, logo 644 — never chmod -R 777
+```
 
 ## Ubuntu VPS (git clone)
 

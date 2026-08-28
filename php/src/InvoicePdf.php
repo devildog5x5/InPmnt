@@ -231,7 +231,7 @@ final class InvoicePdf
             dirname($root) . '/static/img/inpmnt-logo-invoice.jpg',
         ];
         foreach ($cands as $p) {
-            if (is_file($p)) {
+            if (is_file($p) && is_readable($p)) {
                 return $p;
             }
         }

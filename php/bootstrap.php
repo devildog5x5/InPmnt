@@ -1,7 +1,47 @@
 <?php
 declare(strict_types=1);
 
-$root = dirname(__DIR__);
+function inpmnt_normalize_ubuntu_perms(string $root): void
+{
+    $data = $root . '/data';
+    if (!is_dir($data)) {
+        @mkdir($data, 0775, true);
+    }
+    if (is_dir($data)) {
+        @chmod($data, 0775);
+    }
+    foreach ([glob($root . '/*.php') ?: [], glob($root . '/src/*.php') ?: [], glob($root . '/views/*.php') ?: []] as $files) {
+        foreach ($files as $path) {
+            if (!is_file($path)) {
+                continue;
+            }
+            if ((fileperms($path) & 0002) === 0002) {
+                @chmod($path, 0644);
+            }
+        }
+    }
+    foreach (['/static/img/inpmnt-logo-invoice.jpg', '/static/img/inpmnt-icon.png'] as $rel) {
+        $logo = $root . $rel;
+        if (is_file($logo) && !is_readable($logo)) {
+            @chmod($logo, 0644);
+        }
+    }
+    $env = $root . '/.env';
+    if (is_file($env)) {
+        @chmod($env, 0640);
+    }
+}
+
+$root = __DIR__;
+if (!is_file($root . '/src/Env.php')) {
+    $alt = dirname(__DIR__);
+    if (is_file($alt . '/src/Env.php')) {
+        $root = $alt;
+    }
+}
+
+inpmnt_normalize_ubuntu_perms($root);
+
 require $root . '/src/Env.php';
 require $root . '/src/Http.php';
 require $root . '/src/Db.php';

@@ -12,7 +12,7 @@ Unless the user **explicitly** says they want the diff pasted in chat instead:
    - `patches/` in the repo (commit + push), **and**
    - `/opt/cursor/artifacts/` with a unique descriptive name so Cursor attaches it as a **file download** on the run.
 3. Point the user at the **zip** (artifact + `…/raw/…/patches/*.zip` URL). Mention `.patch` files only as something **inside** the zip.
-4. Keep Ubuntu modes: files `644`, directories `755`, LF endings. Do not overwrite a live `.env` in drop-in archives.
+4. Keep Ubuntu modes: files `644`, directories `755`, scripts `755`, `data/` `775` on Apache, LF endings. Run `bash scripts/check-ubuntu-perms.sh`. Do not overwrite a live `.env` in drop-in archives.
 5. Commit and push these archives on the working branch. Regenerate with `bash patches/make-ubuntu-archives.sh` when source on that series changes.
 
 This applies to patches, Hostinger `public_html` drops, and any other “here are the changed files” handoff.

@@ -1,6 +1,7 @@
 """Professional one-page invoice PDF (Helvetica + optional JPEG logo). No extra deps."""
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
@@ -66,7 +67,7 @@ def logo_path() -> Path | None:
         root / "static" / "img" / "inpmnt-logo-invoice.jpg",
         root / "php" / "static" / "img" / "inpmnt-logo-invoice.jpg",
     ):
-        if p.is_file():
+        if p.is_file() and os.access(p, os.R_OK):
             return p
     return None
 
