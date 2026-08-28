@@ -31,7 +31,13 @@ def _mail_from() -> str:
 
 
 def smtp_configured() -> bool:
-    return bool(_clean(os.environ.get("SMTP_HOST")) and _clean(os.environ.get("SMTP_USER")) and _mail_from())
+    # Hostinger SMTP rejects empty passwords after a long hang; treat as not configured.
+    return bool(
+        _clean(os.environ.get("SMTP_HOST"))
+        and _clean(os.environ.get("SMTP_USER"))
+        and _clean(os.environ.get("SMTP_PASSWORD"))
+        and _mail_from()
+    )
 
 
 def mail_configured() -> bool:

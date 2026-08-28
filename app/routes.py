@@ -251,10 +251,11 @@ def invoice_merge_ctx(inv: Any, settings: Any) -> dict[str, Any]:
     }
 
 
-def email_invoice_to_client(conn, invoice_id: int, wid: int):
+def email_invoice_to_client(conn, invoice_id: int, wid: int, meta: dict[str, Any] | None = None):
     """Email the Invoice template. Drafts are marked sent and reminders scheduled.
 
     Returns a Flask (response, status) tuple on error, or None on success.
+    On success, meta (if provided) gets provider and to.
     """
     inv = conn.execute(
         """
@@ -294,20 +295,25 @@ def email_invoice_to_client(conn, invoice_id: int, wid: int):
     filename = pdf_filename(str(inv["number"] or "invoice"))
     attachments = [{"filename": filename, "content": pdf_bytes, "mime": "application/pdf"}]
 
+    provider = "fake"
     if not mail_configured():
         if not _allow_fake_email():
             return _email_not_configured_response()
     else:
         try:
-            send_email(
+            sent = send_email(
                 to=to,
                 subject=subject,
                 body=body,
                 from_name=settings["business_name"] if settings else None,
                 attachments=attachments,
             )
+            provider = (sent or {}).get("provider") or "smtp"
         except Exception as exc:  # noqa: BLE001
             return jsonify({"error": str(exc)}), 502
+    if meta is not None:
+        meta["provider"] = provider
+        meta["to"] = to
 
     now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
     today = date.today().isoformat()
@@ -838,8 +844,9 @@ def api_create_invoice():
         )
         invoice_id = cur.lastrowid
         emailed = False
+        mail_meta: dict[str, Any] = {}
         if want_send:
-            err = email_invoice_to_client(conn, invoice_id, wid)
+            err = email_invoice_to_client(conn, invoice_id, wid, meta=mail_meta)
             if err:
                 return err
             emailed = True
@@ -851,6 +858,8 @@ def api_create_invoice():
         data_out = invoice_detail(conn, invoice_id, wid)
     if data_out:
         data_out["emailed"] = emailed
+        if mail_meta.get("provider"):
+            data_out["mail_provider"] = mail_meta["provider"]
     return jsonify(data_out), 201
 
 
@@ -954,14 +963,17 @@ def api_update_invoice(invoice_id: int):
             workspace_id=wid,
         )
         emailed = False
+        mail_meta: dict[str, Any] = {}
         if want_send:
-            err = email_invoice_to_client(conn, invoice_id, wid)
+            err = email_invoice_to_client(conn, invoice_id, wid, meta=mail_meta)
             if err:
                 return err
             emailed = True
         out = invoice_detail(conn, invoice_id, wid)
     if out:
         out["emailed"] = emailed
+        if mail_meta.get("provider"):
+            out["mail_provider"] = mail_meta["provider"]
     return jsonify(out)
 
 
@@ -969,13 +981,16 @@ def api_update_invoice(invoice_id: int):
 @login_required
 def api_send_invoice(invoice_id: int):
     wid = require_workspace_id()
+    mail_meta: dict[str, Any] = {}
     with db_session(db_path()) as conn:
-        err = email_invoice_to_client(conn, invoice_id, wid)
+        err = email_invoice_to_client(conn, invoice_id, wid, meta=mail_meta)
         if err:
             return err
         out = invoice_detail(conn, invoice_id, wid)
     if out:
         out["emailed"] = True
+        if mail_meta.get("provider"):
+            out["mail_provider"] = mail_meta["provider"]
     return jsonify(out)
 
 

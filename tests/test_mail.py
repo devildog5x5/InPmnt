@@ -50,6 +50,14 @@ class MailConfigTests(unittest.TestCase):
         self.assertEqual(st["smtp_host"], "smtp.hostinger.com")
         self.assertEqual(st["smtp_port"], 465)
 
+    def test_smtp_without_password_is_not_configured(self) -> None:
+        os.environ["SMTP_HOST"] = "smtp.hostinger.com"
+        os.environ["SMTP_USER"] = "billing@example.com"
+        os.environ["MAIL_FROM"] = "billing@example.com"
+        os.environ.pop("SMTP_PASSWORD", None)
+        self.assertFalse(mail_configured())
+        self.assertEqual(mail_status()["provider"], "none")
+
     def test_both_providers_report_fallback(self) -> None:
         self._smtp()
         os.environ["RESEND_API_KEY"] = "re_not_a_placeholder_key_value"

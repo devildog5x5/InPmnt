@@ -538,10 +538,10 @@ index 0000000..2f8d0e8
 +        lines.append(cur)
 +    return lines or [""]
 diff --git a/app/mail.py b/app/mail.py
-index 3ab033a..5416708 100644
+index 3ab033a..9da0eb9 100644
 --- a/app/mail.py
 +++ b/app/mail.py
-@@ -5,52 +5,155 @@ import os
+@@ -5,52 +5,161 @@ import os
  import smtplib
  import ssl
  from email.message import EmailMessage
@@ -553,11 +553,6 @@ index 3ab033a..5416708 100644
 -def mail_configured() -> bool:
 -    if (os.environ.get("RESEND_API_KEY") or "").strip():
 -        return True
--    return bool(
--        (os.environ.get("SMTP_HOST") or "").strip()
--        and (os.environ.get("SMTP_USER") or "").strip()
--        and (os.environ.get("MAIL_FROM") or os.environ.get("SMTP_USER") or "").strip()
--    )
 +_PLACEHOLDER_RESEND = {"re_...", "re_your_api_key", "re_changeme"}
 +
 +
@@ -577,14 +572,23 @@ index 3ab033a..5416708 100644
 +
 +def _mail_from() -> str:
 +    return _clean(os.environ.get("MAIL_FROM") or os.environ.get("SMTP_USER"))
++
++
++def smtp_configured() -> bool:
++    # Hostinger SMTP rejects empty passwords after a long hang; treat as not configured.
+     return bool(
+-        (os.environ.get("SMTP_HOST") or "").strip()
+-        and (os.environ.get("SMTP_USER") or "").strip()
+-        and (os.environ.get("MAIL_FROM") or os.environ.get("SMTP_USER") or "").strip()
++        _clean(os.environ.get("SMTP_HOST"))
++        and _clean(os.environ.get("SMTP_USER"))
++        and _clean(os.environ.get("SMTP_PASSWORD"))
++        and _mail_from()
+     )
  
  
 -def send_email(*, to: str, subject: str, body: str, from_name: str | None = None) -> dict[str, Any]:
 -    """Send a plain-text email. Raises RuntimeError on failure / missing config."""
-+def smtp_configured() -> bool:
-+    return bool(_clean(os.environ.get("SMTP_HOST")) and _clean(os.environ.get("SMTP_USER")) and _mail_from())
-+
-+
 +def mail_configured() -> bool:
 +    return bool(_resend_key() or smtp_configured())
 +
@@ -723,7 +727,7 @@ index 3ab033a..5416708 100644
      req = urllib.request.Request(
          "https://api.resend.com/emails",
          data=payload,
-@@ -68,24 +171,44 @@ def _send_resend(api_key: str, from_header: str, to: str, subject: str, body: st
+@@ -68,24 +177,44 @@ def _send_resend(api_key: str, from_header: str, to: str, subject: str, body: st
      except urllib.error.HTTPError as exc:
          detail = exc.read().decode("utf-8", errors="replace")
          raise RuntimeError(f"Resend error {exc.code}: {detail}") from exc
@@ -773,7 +777,7 @@ index 3ab033a..5416708 100644
          with smtplib.SMTP_SSL(host, port, context=context, timeout=30) as smtp:
              if user:
                  smtp.login(user, password)
-@@ -93,12 +216,7 @@ def _send_smtp(
+@@ -93,12 +222,7 @@ def _send_smtp(
      else:
          with smtplib.SMTP(host, port, timeout=30) as smtp:
              smtp.ehlo()
@@ -788,7 +792,7 @@ index 3ab033a..5416708 100644
                  smtp.ehlo()
              if user:
 diff --git a/app/routes.py b/app/routes.py
-index e2233bc..2727125 100644
+index e2233bc..0435568 100644
 --- a/app/routes.py
 +++ b/app/routes.py
 @@ -7,6 +7,8 @@ from datetime import date, datetime, timedelta
@@ -823,7 +827,7 @@ index e2233bc..2727125 100644
  from .workspace import (
      assert_can_add_open_invoice,
      effective_plan,
-@@ -212,6 +221,139 @@ def invoice_balance(inv: dict[str, Any]) -> float:
+@@ -212,6 +221,145 @@ def invoice_balance(inv: dict[str, Any]) -> float:
      return round(float(inv["amount"]) - float(inv["amount_paid"]), 2)
  
  
@@ -857,10 +861,11 @@ index e2233bc..2727125 100644
 +    }
 +
 +
-+def email_invoice_to_client(conn, invoice_id: int, wid: int):
++def email_invoice_to_client(conn, invoice_id: int, wid: int, meta: dict[str, Any] | None = None):
 +    """Email the Invoice template. Drafts are marked sent and reminders scheduled.
 +
 +    Returns a Flask (response, status) tuple on error, or None on success.
++    On success, meta (if provided) gets provider and to.
 +    """
 +    inv = conn.execute(
 +        """
@@ -900,20 +905,25 @@ index e2233bc..2727125 100644
 +    filename = pdf_filename(str(inv["number"] or "invoice"))
 +    attachments = [{"filename": filename, "content": pdf_bytes, "mime": "application/pdf"}]
 +
++    provider = "fake"
 +    if not mail_configured():
 +        if not _allow_fake_email():
 +            return _email_not_configured_response()
 +    else:
 +        try:
-+            send_email(
++            sent = send_email(
 +                to=to,
 +                subject=subject,
 +                body=body,
 +                from_name=settings["business_name"] if settings else None,
 +                attachments=attachments,
 +            )
++            provider = (sent or {}).get("provider") or "smtp"
 +        except Exception as exc:  # noqa: BLE001
 +            return jsonify({"error": str(exc)}), 502
++    if meta is not None:
++        meta["provider"] = provider
++        meta["to"] = to
 +
 +    now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
 +    today = date.today().isoformat()
@@ -963,7 +973,7 @@ index e2233bc..2727125 100644
  def schedule_reminders_for_invoice(conn, invoice_id: int, due_date: str, force: bool = False) -> int:
      inv0 = conn.execute("SELECT workspace_id FROM invoices WHERE id = ?", (invoice_id,)).fetchone()
      if not inv0:
-@@ -259,6 +401,7 @@ def schedule_reminders_for_invoice(conn, invoice_id: int, due_date: str, force:
+@@ -259,6 +407,7 @@ def schedule_reminders_for_invoice(conn, invoice_id: int, due_date: str, force:
      ctx = {
          "number": inv["number"],
          "client_name": inv["client_name"],
@@ -971,7 +981,7 @@ index e2233bc..2727125 100644
          "amount_due": money(invoice_balance(dict(inv))),
          "due_date": inv["due_date"],
          "status": inv["status"],
-@@ -590,6 +733,33 @@ def api_invoices():
+@@ -590,6 +739,33 @@ def api_invoices():
      return jsonify(rows)
  
  
@@ -1005,7 +1015,7 @@ index e2233bc..2727125 100644
  @bp.get("/api/invoices/<int:invoice_id>")
  @login_required
  def api_invoice(invoice_id: int):
-@@ -626,6 +796,8 @@ def api_create_invoice():
+@@ -626,6 +802,8 @@ def api_create_invoice():
      status = data.get("status") or "draft"
      if status not in ("draft", "sent", "partial", "overdue", "paid"):
          status = "draft"
@@ -1014,7 +1024,7 @@ index e2233bc..2727125 100644
      now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
      wid = require_workspace_id()
  
-@@ -637,7 +809,7 @@ def api_create_invoice():
+@@ -637,7 +815,7 @@ def api_create_invoice():
          if not client:
              return jsonify({"error": "Client not found"}), 404
          settings = get_settings(conn, wid)
@@ -1023,7 +1033,7 @@ index e2233bc..2727125 100644
              blocked = assert_can_add_open_invoice(conn, wid, settings)
              if blocked:
                  return jsonify({"error": blocked}), 403
-@@ -658,28 +830,45 @@ def api_create_invoice():
+@@ -658,28 +836,48 @@ def api_create_invoice():
                  data.get("currency") or "USD",
                  issue,
                  due,
@@ -1037,8 +1047,9 @@ index e2233bc..2727125 100644
          invoice_id = cur.lastrowid
 -        if status in ("sent", "partial", "overdue"):
 +        emailed = False
++        mail_meta: dict[str, Any] = {}
 +        if want_send:
-+            err = email_invoice_to_client(conn, invoice_id, wid)
++            err = email_invoice_to_client(conn, invoice_id, wid, meta=mail_meta)
 +            if err:
 +                return err
 +            emailed = True
@@ -1050,6 +1061,8 @@ index e2233bc..2727125 100644
          data_out = invoice_detail(conn, invoice_id, wid)
 +    if data_out:
 +        data_out["emailed"] = emailed
++        if mail_meta.get("provider"):
++            data_out["mail_provider"] = mail_meta["provider"]
      return jsonify(data_out), 201
  
  
@@ -1071,7 +1084,7 @@ index e2233bc..2727125 100644
      with db_session(db_path()) as conn:
          existing = conn.execute(
              "SELECT * FROM invoices WHERE id=? AND workspace_id=?",
-@@ -687,15 +876,36 @@ def api_update_invoice(invoice_id: int):
+@@ -687,15 +885,36 @@ def api_update_invoice(invoice_id: int):
          ).fetchone()
          if not existing:
              return jsonify({"error": "Not found"}), 404
@@ -1112,19 +1125,22 @@ index e2233bc..2727125 100644
          client = conn.execute(
              "SELECT id FROM clients WHERE id=? AND workspace_id=?",
              (fields["client_id"], wid),
-@@ -743,46 +953,29 @@ def api_update_invoice(invoice_id: int):
+@@ -743,46 +962,35 @@ def api_update_invoice(invoice_id: int):
              invoice_id,
              workspace_id=wid,
          )
 +        emailed = False
++        mail_meta: dict[str, Any] = {}
 +        if want_send:
-+            err = email_invoice_to_client(conn, invoice_id, wid)
++            err = email_invoice_to_client(conn, invoice_id, wid, meta=mail_meta)
 +            if err:
 +                return err
 +            emailed = True
          out = invoice_detail(conn, invoice_id, wid)
 +    if out:
 +        out["emailed"] = emailed
++        if mail_meta.get("provider"):
++            out["mail_provider"] = mail_meta["provider"]
      return jsonify(out)
  
  
@@ -1133,6 +1149,7 @@ index e2233bc..2727125 100644
  def api_send_invoice(invoice_id: int):
 -    now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
      wid = require_workspace_id()
++    mail_meta: dict[str, Any] = {}
      with db_session(db_path()) as conn:
 -        inv = conn.execute(
 -            "SELECT * FROM invoices WHERE id=? AND workspace_id=?",
@@ -1163,16 +1180,18 @@ index e2233bc..2727125 100644
 -            invoice_id,
 -            workspace_id=wid,
 -        )
-+        err = email_invoice_to_client(conn, invoice_id, wid)
++        err = email_invoice_to_client(conn, invoice_id, wid, meta=mail_meta)
 +        if err:
 +            return err
          out = invoice_detail(conn, invoice_id, wid)
 +    if out:
 +        out["emailed"] = True
++        if mail_meta.get("provider"):
++            out["mail_provider"] = mail_meta["provider"]
      return jsonify(out)
  
  
-@@ -890,7 +1083,8 @@ def _email_not_configured_response():
+@@ -890,7 +1098,8 @@ def _email_not_configured_response():
                      "Email is not configured. Set RESEND_API_KEY or "
                      "SMTP_HOST/SMTP_USER/MAIL_FROM in .env "
                      "(or ALLOW_FAKE_EMAIL=1 for local testing)."
@@ -1182,7 +1201,7 @@ index e2233bc..2727125 100644
              }
          ),
          503,
-@@ -1210,6 +1404,50 @@ def api_get_settings():
+@@ -1210,6 +1419,50 @@ def api_get_settings():
      return jsonify(settings)
  
  
@@ -1651,7 +1670,7 @@ index 0000000..cc2849f
 +echo "Then in hPanel: Cache → Purge All (and CDN purge if you use it)."
 +echo "Also: WordPress → Delete this installation so Hostinger does not restore it."
 diff --git a/php/src/App.php b/php/src/App.php
-index 3acd2be..21d15c5 100644
+index 3acd2be..59fb6ad 100644
 --- a/php/src/App.php
 +++ b/php/src/App.php
 @@ -72,6 +72,10 @@ final class App
@@ -1714,7 +1733,7 @@ index 3acd2be..21d15c5 100644
              $blocked = Workspace::assertCanAddOpen($this->db, $wid, $settings);
              if ($blocked) {
                  Http::json(['error' => $blocked], 403);
-@@ -601,15 +617,23 @@ final class App
+@@ -601,15 +617,27 @@ final class App
               VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?)'
          )->execute([
              $wid, $number, (int) $clientId, $title, $amount,
@@ -1725,8 +1744,9 @@ index 3acd2be..21d15c5 100644
          $invoiceId = (int) $this->db->lastInsertId();
 -        if (in_array($status, ['sent', 'partial', 'overdue'], true)) {
 +        $emailed = false;
++        $provider = null;
 +        if ($wantSend) {
-+            $this->deliverInvoice($wid, $invoiceId);
++            $provider = $this->deliverInvoice($wid, $invoiceId);
 +            $emailed = true;
 +        } elseif (in_array($insertStatus, ['sent', 'partial', 'overdue'], true)) {
              $this->scheduleReminders($invoiceId, $due, true);
@@ -1736,12 +1756,15 @@ index 3acd2be..21d15c5 100644
 +        $out = $this->invoiceDetail($invoiceId, $wid);
 +        if (is_array($out)) {
 +            $out['emailed'] = $emailed;
++            if ($provider) {
++                $out['mail_provider'] = $provider;
++            }
 +        }
 +        Http::json($out, 201);
      }
  
      private function apiUpdateInvoice(int $wid, int $id): void
-@@ -621,14 +645,38 @@ final class App
+@@ -621,14 +649,38 @@ final class App
          if (!$existing) {
              Http::json(['error' => 'Not found'], 404);
          }
@@ -1784,19 +1807,23 @@ index 3acd2be..21d15c5 100644
          ];
          $c = $this->db->prepare('SELECT id FROM clients WHERE id=? AND workspace_id=?');
          $c->execute([$fields['client_id'], $wid]);
-@@ -655,34 +703,126 @@ final class App
+@@ -655,34 +707,135 @@ final class App
          }
          Db::refreshInvoiceStatus($this->db, $id);
          Db::log($this->db, 'invoice', "Updated invoice {$existing['number']}", 'invoice', $id, $wid);
 -        Http::json($this->invoiceDetail($id, $wid));
 +        $emailed = false;
++        $provider = null;
 +        if ($wantSend) {
-+            $this->deliverInvoice($wid, $id);
++            $provider = $this->deliverInvoice($wid, $id);
 +            $emailed = true;
 +        }
 +        $out = $this->invoiceDetail($id, $wid);
 +        if (is_array($out)) {
 +            $out['emailed'] = $emailed;
++            if ($provider) {
++                $out['mail_provider'] = $provider;
++            }
 +        }
 +        Http::json($out);
      }
@@ -1804,10 +1831,11 @@ index 3acd2be..21d15c5 100644
      private function apiSendInvoice(int $wid, int $id): void
      {
 -        $st = $this->db->prepare('SELECT * FROM invoices WHERE id=? AND workspace_id=?');
-+        $this->deliverInvoice($wid, $id);
++        $provider = $this->deliverInvoice($wid, $id);
 +        $out = $this->invoiceDetail($id, $wid);
 +        if (is_array($out)) {
 +            $out['emailed'] = true;
++            $out['mail_provider'] = $provider;
 +        }
 +        Http::json($out);
 +    }
@@ -1832,9 +1860,10 @@ index 3acd2be..21d15c5 100644
 +        Http::pdf($pdf, InvoicePdf::filename((string) ($inv['number'] ?? 'invoice')));
 +    }
 +
-+    /** Email the Invoice template with a PDF attachment. Drafts are marked sent and reminders are scheduled. */
-+    private function deliverInvoice(int $wid, int $id): void
++    /** Email the Invoice template with a PDF attachment. Drafts are marked sent and reminders are scheduled. @return string provider */
++    private function deliverInvoice(int $wid, int $id): string
 +    {
++        @set_time_limit(120);
 +        $st = $this->db->prepare(
 +            'SELECT i.*, c.name AS client_name, c.email AS client_email,
 +                    c.company AS client_company, c.phone AS client_phone
@@ -1886,22 +1915,19 @@ index 3acd2be..21d15c5 100644
 +        $pdf = InvoicePdf::build(InvoicePdf::payload($inv, $settings ?? []));
 +        $filename = InvoicePdf::filename((string) ($inv['number'] ?? 'invoice'));
 +        $attachments = [['filename' => $filename, 'content' => $pdf, 'mime' => 'application/pdf']];
++        $provider = 'fake';
 +        if (!Mailer::configured()) {
 +            if (!Env::truthy('ALLOW_FAKE_EMAIL')) {
 +                $this->emailNotConfigured();
 +            }
 +        } else {
 +            try {
-+                Mailer::send($to, $subject, $body, $settings['business_name'] ?? null, $attachments);
++                $sent = Mailer::send($to, $subject, $body, $settings['business_name'] ?? null, $attachments);
++                $provider = (string) ($sent['provider'] ?? 'smtp');
 +            } catch (Throwable $e) {
 +                Http::json(['error' => $e->getMessage()], 502);
 +            }
-         }
--        $this->db->prepare('UPDATE invoices SET status=?, updated_at=? WHERE id=? AND workspace_id=?')
--            ->execute([$status, Db::now(), $id, $wid]);
--        $this->scheduleReminders($id, $inv['due_date'], true);
--        Db::log($this->db, 'invoice', "Marked {$inv['number']} as sent — reminders scheduled", 'invoice', $id, $wid);
--        Http::json($this->invoiceDetail($id, $wid));
++        }
 +        $now = Db::now();
 +        $today = date('Y-m-d');
 +        if ($wasDraft) {
@@ -1914,7 +1940,12 @@ index 3acd2be..21d15c5 100644
 +            $this->db->prepare('UPDATE invoices SET status=?, updated_at=? WHERE id=? AND workspace_id=?')
 +                ->execute([$status, $now, $id, $wid]);
 +            $this->scheduleReminders($id, $inv['due_date'], true);
-+        }
+         }
+-        $this->db->prepare('UPDATE invoices SET status=?, updated_at=? WHERE id=? AND workspace_id=?')
+-            ->execute([$status, Db::now(), $id, $wid]);
+-        $this->scheduleReminders($id, $inv['due_date'], true);
+-        Db::log($this->db, 'invoice', "Marked {$inv['number']} as sent — reminders scheduled", 'invoice', $id, $wid);
+-        Http::json($this->invoiceDetail($id, $wid));
 +        $this->db->prepare(
 +            "INSERT INTO reminders (invoice_id, channel, scheduled_for, status, subject, body, sent_at, created_at)
 +             VALUES (?, 'email', ?, 'sent', ?, ?, ?, ?)"
@@ -1922,10 +1953,11 @@ index 3acd2be..21d15c5 100644
 +        $rid = (int) $this->db->lastInsertId();
 +        Db::log($this->db, 'invoice', "Emailed invoice {$inv['number']} to {$to}", 'invoice', $id, $wid);
 +        Db::log($this->db, 'reminder', "Sent INVOICE email for {$inv['number']} to {$to}", 'reminder', $rid, $wid);
++        return $provider;
      }
  
      private function apiRecordPayment(int $wid, int $id): void
-@@ -737,9 +877,41 @@ final class App
+@@ -737,9 +890,41 @@ final class App
      {
          Http::json([
              'error' => 'Email is not configured. Set RESEND_API_KEY or SMTP_HOST/SMTP_USER/MAIL_FROM in .env (or ALLOW_FAKE_EMAIL=1 for local testing).',
@@ -1967,7 +1999,7 @@ index 3acd2be..21d15c5 100644
      private function apiReminders(int $wid): void
      {
          $today = date('Y-m-d');
-@@ -894,6 +1066,7 @@ final class App
+@@ -894,6 +1079,7 @@ final class App
          $ctx = [
              'number' => $inv['number'],
              'client_name' => $inv['client_name'],
@@ -2542,10 +2574,10 @@ index 0000000..dfa3bd1
 +    }
 +}
 diff --git a/php/src/Mail.php b/php/src/Mail.php
-index 06bd0ec..e300bb4 100644
+index 06bd0ec..9221def 100644
 --- a/php/src/Mail.php
 +++ b/php/src/Mail.php
-@@ -5,49 +5,160 @@ final class Mailer
+@@ -5,49 +5,161 @@ final class Mailer
  {
      public static function configured(): bool
      {
@@ -2660,6 +2692,7 @@ index 06bd0ec..e300bb4 100644
 +    {
 +        return trim(Env::get('SMTP_HOST')) !== ''
 +            && trim(Env::get('SMTP_USER')) !== ''
++            && trim(Env::get('SMTP_PASSWORD')) !== ''
 +            && self::mailFrom() !== '';
 +    }
 +
@@ -2727,7 +2760,7 @@ index 06bd0ec..e300bb4 100644
          $ch = curl_init('https://api.resend.com/emails');
          curl_setopt_array($ch, [
              CURLOPT_POST => true,
-@@ -71,102 +182,183 @@ final class Mailer
+@@ -71,102 +183,183 @@ final class Mailer
          }
      }
  
@@ -3419,7 +3452,7 @@ index 0000000..46646b0
 +if __name__ == "__main__":
 +    main()
 diff --git a/static/css/app.css b/static/css/app.css
-index e1dba86..4d12ad1 100644
+index e1dba86..64c6bad 100644
 --- a/static/css/app.css
 +++ b/static/css/app.css
 @@ -530,7 +530,11 @@ td.mono, .mono {
@@ -3443,7 +3476,28 @@ index e1dba86..4d12ad1 100644
    gap: 10px;
    margin-top: 18px;
    padding-top: 16px;
-@@ -632,6 +637,7 @@ td.mono, .mono {
+@@ -604,6 +609,20 @@ td.mono, .mono {
+   font-size: 0.9rem;
+   line-height: 1.45;
+ }
++.flash {
++  margin: 0 0 14px;
++  padding: 12px 14px;
++  border-radius: 12px;
++  border: 1px solid var(--line);
++  background: var(--surface);
++  font-size: 0.9rem;
++  line-height: 1.45;
++}
++.flash.warn {
++  background: #fff8e8;
++  border-color: rgba(201, 148, 26, 0.35);
++}
++.flash a { font-weight: 650; color: var(--brand-dark); }
+ 
+ @keyframes rise {
+   from { opacity: 0; transform: translateY(8px); }
+@@ -632,6 +651,7 @@ td.mono, .mono {
      align-items: stretch;
      gap: 14px;
    }
@@ -3451,7 +3505,7 @@ index e1dba86..4d12ad1 100644
  }
  
  /* ---------- InPmnt extras ---------- */
-@@ -647,6 +653,54 @@ td.mono, .mono {
+@@ -647,6 +667,54 @@ td.mono, .mono {
    display: block;
  }
  
@@ -3587,10 +3641,10 @@ literal 0
 HcmV?d00001
 
 diff --git a/static/js/app.js b/static/js/app.js
-index ed9785a..d8e5b3d 100644
+index ed9785a..9c6274c 100644
 --- a/static/js/app.js
 +++ b/static/js/app.js
-@@ -11,12 +11,12 @@ const fmtDate = (d) => {
+@@ -11,24 +11,40 @@ const fmtDate = (d) => {
    return `${m}/${day}/${y}`;
  };
  
@@ -3606,7 +3660,37 @@ index ed9785a..d8e5b3d 100644
  }
  
  async function api(path, options = {}) {
-@@ -92,6 +92,20 @@ function empty(msg) {
+   const res = await fetch(path, {
+-    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
++    headers: { "Content-Type": "application/json", Accept: "application/json", ...(options.headers || {}) },
+     ...options,
+   });
+   if (res.status === 401) {
+     location.href = "/login";
+     throw new Error("Unauthorized");
+   }
+-  const data = await res.json().catch(() => ({}));
++  const ctype = (res.headers.get("content-type") || "").toLowerCase();
++  const text = await res.text();
++  let data = {};
++  if (text) {
++    try {
++      data = JSON.parse(text);
++    } catch {
++      throw new Error(
++        "The server did not return JSON (often leftover WordPress). In public_html run bash remove-wordpress.sh, then hPanel → Cache → Purge All."
++      );
++    }
++  }
++  if (!ctype.includes("json") && res.ok) {
++    throw new Error(
++      "The server did not return JSON (often leftover WordPress). In public_html run bash remove-wordpress.sh, then hPanel → Cache → Purge All."
++    );
++  }
+   if (!res.ok) throw new Error(data.error || "Request failed");
+   return data;
+ }
+@@ -92,6 +108,27 @@ function empty(msg) {
    return `<div class="empty">${msg}</div>`;
  }
  
@@ -3620,14 +3704,21 @@ index ed9785a..d8e5b3d 100644
 +
 +async function sendInvoiceNow(id) {
 +  const res = await api(`/api/invoices/${id}/send`, { method: "POST", body: "{}" });
-+  toast(res.emailed ? `Invoice emailed to ${res.client_email || "the client"}` : "Invoice sent");
++  if (!res || !res.id || res.emailed !== true) {
++    throw new Error(
++      res?.error ||
++        "Invoice was not emailed. Check Settings → Email delivery, and that the client has an email address."
++    );
++  }
++  const via = res.mail_provider && res.mail_provider !== "fake" ? ` via ${res.mail_provider}` : "";
++  toast(`Invoice emailed to ${res.client_email || "the client"}${via}`);
 +  return res;
 +}
 +
  /* ---------- Dashboard ---------- */
  async function renderDashboard() {
    const data = await api("/api/dashboard");
-@@ -222,9 +236,13 @@ async function renderDashboard() {
+@@ -222,9 +259,13 @@ async function renderDashboard() {
  
    appEl.querySelector("#btn-new-inv")?.addEventListener("click", () => openInvoiceModal());
    appEl.querySelector("#btn-send-due")?.addEventListener("click", async () => {
@@ -3644,7 +3735,16 @@ index ed9785a..d8e5b3d 100644
    });
    wireCommon(appEl);
  }
-@@ -245,7 +263,7 @@ async function renderInvoices(filter = "all") {
+@@ -240,14 +281,23 @@ function agingRow(label, value, max, cls) {
+ 
+ /* ---------- Invoices ---------- */
+ async function renderInvoices(filter = "all") {
+-  const invoices = await api(`/api/invoices?status=${filter}`);
++  const [invoices, mail] = await Promise.all([
++    api(`/api/invoices?status=${filter}`),
++    api("/api/mail/status").catch(() => ({ configured: false })),
++  ]);
+   appEl.innerHTML = `
      ${topbar({
        eyebrow: "Collections",
        title: "Invoices",
@@ -3652,32 +3752,37 @@ index ed9785a..d8e5b3d 100644
 +      subtitle: "Create a draft, edit it, then send now or send from this page.",
        actions: `<button class="btn" id="btn-new-inv">New invoice</button>`,
      })}
++    ${
++      mail.configured
++        ? ""
++        : `<div class="flash warn">Email is not configured, so <strong>Send now</strong> cannot deliver invoices.
++            Open <a href="#/settings">Settings → Email delivery</a> and send a test email, or set SMTP in <code>.env</code>.</div>`
++    }
      <div class="toolbar">
-@@ -282,13 +300,20 @@ async function renderInvoices(filter = "all") {
+       <div class="filters">
+         <select id="status-filter">
+@@ -281,14 +331,15 @@ async function renderInvoices(filter = "all") {
+                         <td class="mono">${money(i.balance)}</td>
                          <td>${badge(i.status)}</td>
                          <td class="row-actions">
++                          <button class="btn sm secondary" data-edit-inv="${i.id}">Edit</button>
                            ${
 -                            i.status !== "paid" && i.status !== "draft"
 -                              ? `<button class="btn sm secondary" data-pay="${i.id}">Pay</button>`
-+                            i.status !== "paid"
-+                              ? `<button class="btn sm secondary" data-edit-inv="${i.id}">Edit</button>`
-                               : ""
+-                              : ""
++                            i.status === "draft"
++                              ? `<button class="btn sm" data-send-inv="${i.id}">Send now</button>`
++                              : `<button class="btn sm secondary" data-send-inv="${i.id}">Email</button>`
                            }
                            ${
-                             i.status === "draft"
+-                            i.status === "draft"
 -                              ? `<button class="btn sm" data-send-inv="${i.id}">Send</button>`
-+                              ? `<button class="btn sm" data-send-inv="${i.id}">Send now</button>`
-+                              : i.status !== "paid"
-+                                ? `<button class="btn sm secondary" data-send-inv="${i.id}">Email</button>`
-+                                : ""
-+                          }
-+                          ${
 +                            i.status !== "paid" && i.status !== "draft"
 +                              ? `<button class="btn sm secondary" data-pay="${i.id}">Pay</button>`
                                : ""
                            }
                          </td>
-@@ -307,17 +332,31 @@ async function renderInvoices(filter = "all") {
+@@ -307,17 +358,31 @@ async function renderInvoices(filter = "all") {
    appEl.querySelectorAll("[data-pay]").forEach((btn) =>
      btn.addEventListener("click", () => openPaymentModal(+btn.dataset.pay))
    );
@@ -3713,12 +3818,12 @@ index ed9785a..d8e5b3d 100644
    appEl.innerHTML = `
      ${topbar({
        eyebrow: "Invoice",
-@@ -325,11 +364,26 @@ async function renderInvoiceDetail(id) {
+@@ -325,11 +390,26 @@ async function renderInvoiceDetail(id) {
        subtitle: `${inv.title} · ${inv.client_name}`,
        actions: `
          <button class="btn secondary" data-go="#/invoices">Back</button>
 -        ${inv.status === "draft" ? `<button class="btn" id="btn-send">Mark sent</button>` : ""}
-+        ${inv.status !== "paid" ? `<button class="btn secondary" id="btn-edit">Edit</button>` : ""}
++        <button class="btn secondary" id="btn-edit">Edit</button>
 +        ${inv.status === "draft" ? `<button class="btn" id="btn-send">Send now</button>` : `<button class="btn secondary" id="btn-send">Email invoice</button>`}
 +        <a class="btn secondary" href="/api/invoices/${id}/pdf">Download PDF</a>
          ${inv.status !== "paid" && inv.status !== "draft" ? `<button class="btn" id="btn-pay">Record payment</button>` : ""}
@@ -3741,7 +3846,7 @@ index ed9785a..d8e5b3d 100644
      <div class="grid-kpi">
        <div class="kpi"><div class="kpi-label">Amount</div><div class="kpi-value">${money(inv.amount)}</div></div>
        <div class="kpi"><div class="kpi-label">Paid</div><div class="kpi-value">${money(inv.amount_paid)}</div></div>
-@@ -386,66 +440,142 @@ async function renderInvoiceDetail(id) {
+@@ -386,51 +466,92 @@ async function renderInvoiceDetail(id) {
              </div>`
                  )
                  .join("")
@@ -3796,10 +3901,13 @@ index ed9785a..d8e5b3d 100644
 +  const saveLabel = isEdit ? "Save" : "Save draft";
 +  const sendLabel = isEdit && !isDraft ? "Save & email" : "Send now";
 +  const lead = isEdit
-+    ? isDraft
-+      ? "Update this invoice, then send now or send it from the Invoices page."
-+      : "Save changes for the next PDF, or save and email the updated invoice."
++    ? existing.status === "paid"
++      ? "Paid invoices can still be edited and emailed again."
++      : isDraft
++        ? "Update this invoice, then send now or send it from the Invoices page."
++        : "Save changes for the next PDF, or save and email the updated invoice."
 +    : "Save as a draft and send later from Invoices, or send now to email the client a PDF.";
++  const minAmt = existing ? Math.max(0.01, Number(existing.amount_paid || 0) || 0.01) : 0.01;
 +  const issueVal = existing?.issue_date ? String(existing.issue_date).slice(0, 10) : today;
 +  const dueVal = existing?.due_date ? String(existing.due_date).slice(0, 10) : defaultDue;
 +  const selectedClient = existing ? String(existing.client_id) : "";
@@ -3831,7 +3939,7 @@ index ed9785a..d8e5b3d 100644
 -        <div class="field"><label>Status</label>
 -          <select name="status"><option value="draft">Draft</option><option value="sent">Send now</option></select>
 +        <div class="field"><label>Amount</label>
-+          <input name="amount" type="number" min="0.01" step="0.01" required placeholder="0.00"
++          <input name="amount" type="number" min="${minAmt}" step="0.01" required placeholder="0.00"
 +            value="${existing ? esc(existing.amount) : ""}" />
 +        </div>
 +        <div class="field full"><label>Title / description</label>
@@ -3852,17 +3960,7 @@ index ed9785a..d8e5b3d 100644
          </div>
        </form>
      `,
-     onMount: (modal) => {
-       modal.querySelector("#m-cancel").onclick = closeModal;
-+      let intent = "save";
-+      modal.querySelectorAll("[data-intent]").forEach((btn) => {
-+        btn.addEventListener("click", () => {
-+          intent = btn.dataset.intent;
-+        });
-+      });
-       modal.querySelector("#inv-form").onsubmit = async (e) => {
-         e.preventDefault();
-         const fd = new FormData(e.target);
+@@ -442,10 +563,54 @@ async function openInvoiceModal() {
          const payload = Object.fromEntries(fd.entries());
          payload.client_id = +payload.client_id;
          payload.amount = +payload.amount;
@@ -3870,7 +3968,7 @@ index ed9785a..d8e5b3d 100644
 -        closeModal();
 -        toast(`Created ${inv.number}`);
 -        location.hash = `#/invoices/${inv.id}`;
-+        const sendNow = intent === "send";
++        const sendNow = (e.submitter && e.submitter.dataset && e.submitter.dataset.intent) === "send";
 +        const saveBtn = modal.querySelector("#m-save");
 +        const sendBtn = modal.querySelector("#m-send");
 +        saveBtn.disabled = true;
@@ -3883,16 +3981,28 @@ index ed9785a..d8e5b3d 100644
 +              method: "PUT",
 +              body: JSON.stringify(payload),
 +            });
-+            closeModal();
++          } else {
++            payload.status = sendNow ? "sent" : "draft";
++            inv = await api("/api/invoices", { method: "POST", body: JSON.stringify(payload) });
++          }
++          if (!inv || !inv.id) {
++            throw new Error(
++              "Could not save invoice. If you still see WordPress, run bash remove-wordpress.sh in public_html and purge cache."
++            );
++          }
++          if (sendNow && inv.emailed !== true) {
++            throw new Error(
++              "Invoice saved but was not emailed. Check Settings → Email delivery, and that the client has an email address."
++            );
++          }
++          closeModal();
++          if (isEdit) {
 +            toast(
 +              inv.emailed
 +                ? `Saved and emailed ${inv.number} to ${inv.client_email || "the client"}`
 +                : `Saved ${inv.number}`
 +            );
 +          } else {
-+            payload.status = sendNow ? "sent" : "draft";
-+            inv = await api("/api/invoices", { method: "POST", body: JSON.stringify(payload) });
-+            closeModal();
 +            toast(
 +              inv.emailed
 +                ? `Emailed ${inv.number} to ${inv.client_email || "the client"}`
@@ -3909,7 +4019,7 @@ index ed9785a..d8e5b3d 100644
        };
      },
    });
-@@ -604,9 +734,13 @@ async function renderReminders() {
+@@ -604,9 +769,13 @@ async function renderReminders() {
      </div>
    `;
    appEl.querySelector("#btn-send-due").onclick = async () => {
@@ -3926,7 +4036,7 @@ index ed9785a..d8e5b3d 100644
    };
    wireCommon(appEl);
  }
-@@ -618,7 +752,7 @@ async function renderTemplates() {
+@@ -618,7 +787,7 @@ async function renderTemplates() {
      ${topbar({
        eyebrow: "Workspace",
        title: "Message templates",
@@ -3935,7 +4045,7 @@ index ed9785a..d8e5b3d 100644
      })}
      <div class="stack">
        ${templates
-@@ -673,7 +807,20 @@ async function renderTemplates() {
+@@ -673,7 +842,20 @@ async function renderTemplates() {
  
  /* ---------- Settings ---------- */
  async function renderSettings() {
@@ -3957,7 +4067,7 @@ index ed9785a..d8e5b3d 100644
    appEl.innerHTML = `
      ${topbar({
        eyebrow: "Workspace",
-@@ -695,6 +842,13 @@ async function renderSettings() {
+@@ -695,6 +877,13 @@ async function renderSettings() {
          ${billing.has_customer ? `<button class="btn ghost sm" id="btn-portal">Manage billing</button>` : ""}
        </div>
      </div>
@@ -3971,7 +4081,7 @@ index ed9785a..d8e5b3d 100644
      <form id="settings-form" class="panel form-grid">
        <div class="field"><label>Business name</label><input name="business_name" value="${s.business_name || ""}" required /></div>
        <div class="field"><label>Owner</label><input name="owner_name" value="${s.owner_name || ""}" required /></div>
-@@ -713,7 +867,7 @@ async function renderSettings() {
+@@ -713,7 +902,7 @@ async function renderSettings() {
        </div>
        <div class="field full">
          <p class="settings-note">
@@ -3980,7 +4090,7 @@ index ed9785a..d8e5b3d 100644
          </p>
        </div>
        <div class="field full actions">
-@@ -748,7 +902,19 @@ async function renderSettings() {
+@@ -748,7 +937,19 @@ async function renderSettings() {
        const res = await api("/api/billing/portal", { method: "POST", body: "{}" });
        if (res.url) location.href = res.url;
      } catch (err) {
@@ -4001,7 +4111,7 @@ index ed9785a..d8e5b3d 100644
      }
    });
  }
-@@ -761,9 +927,13 @@ function wireCommon(root) {
+@@ -761,9 +962,13 @@ function wireCommon(root) {
    });
    root.querySelectorAll("[data-send-reminder]").forEach((btn) => {
      btn.addEventListener("click", async () => {
@@ -4018,7 +4128,7 @@ index ed9785a..d8e5b3d 100644
      });
    });
  }
-@@ -784,7 +954,7 @@ async function route() {
+@@ -784,7 +989,7 @@ async function route() {
      else await renderDashboard();
    } catch (err) {
      console.error(err);
@@ -4186,10 +4296,10 @@ index 0000000..413c214
 +    unittest.main()
 diff --git a/tests/test_invoice_send.py b/tests/test_invoice_send.py
 new file mode 100644
-index 0000000..65560c9
+index 0000000..9369725
 --- /dev/null
 +++ b/tests/test_invoice_send.py
-@@ -0,0 +1,221 @@
+@@ -0,0 +1,244 @@
 +"""Sending the invoice itself emails the client (not just reminders)."""
 +from __future__ import annotations
 +
@@ -4291,6 +4401,7 @@ index 0000000..65560c9
 +            self.assertTrue(body["emailed"])
 +            self.assertEqual(body["status"], "sent")
 +            self.assertEqual(body["client_email"], "maya@client.example")
++            self.assertEqual(body.get("mail_provider"), "smtp")
 +            send.assert_called_once()
 +            kwargs = send.call_args.kwargs
 +            self.assertEqual(kwargs["to"], "maya@client.example")
@@ -4387,6 +4498,7 @@ index 0000000..65560c9
 +            self.assertTrue(body["emailed"])
 +            self.assertEqual(body["status"], "sent")
 +            self.assertEqual(body["title"], "Patio reset")
++            self.assertEqual(body.get("mail_provider"), "smtp")
 +            send.assert_called_once()
 +            self.assertIn("Patio reset", send.call_args.kwargs["body"])
 +            self.assertIn("$400.00", send.call_args.kwargs["body"])
@@ -4402,6 +4514,27 @@ index 0000000..65560c9
 +        self.assertEqual(still["amount"], 250)
 +        self.assertEqual(still["status"], "draft")
 +
++    def test_update_paid_invoice_title(self) -> None:
++        inv = self._create_draft()
++        with patch("app.routes.send_email", return_value={"provider": "smtp", "id": None}):
++            sent = self.client.post(f"/api/invoices/{inv['id']}/send", json={})
++            self.assertEqual(sent.status_code, 200, sent.get_json())
++        pay = self.client.post(
++            f"/api/invoices/{inv['id']}/payments",
++            json={"amount": 250, "method": "ACH"},
++        )
++        self.assertEqual(pay.status_code, 200, pay.get_json())
++        self.assertEqual(pay.get_json()["status"], "paid")
++        res = self.client.put(
++            f"/api/invoices/{inv['id']}",
++            json={"title": "Spring cleanup (paid, corrected)"},
++        )
++        self.assertEqual(res.status_code, 200, res.get_json())
++        body = res.get_json()
++        self.assertEqual(body["title"], "Spring cleanup (paid, corrected)")
++        self.assertEqual(body["status"], "paid")
++        self.assertFalse(body.get("emailed"))
++
 +    def test_invoice_template_is_present(self) -> None:
 +        res = self.client.get("/api/templates")
 +        self.assertEqual(res.status_code, 200)
@@ -4413,10 +4546,10 @@ index 0000000..65560c9
 +    unittest.main()
 diff --git a/tests/test_mail.py b/tests/test_mail.py
 new file mode 100644
-index 0000000..33e81eb
+index 0000000..554b31c
 --- /dev/null
 +++ b/tests/test_mail.py
-@@ -0,0 +1,209 @@
+@@ -0,0 +1,217 @@
 +"""Mail provider selection and SMTP fallback."""
 +from __future__ import annotations
 +
@@ -4468,6 +4601,14 @@ index 0000000..33e81eb
 +        self.assertFalse(st["resend"])
 +        self.assertEqual(st["smtp_host"], "smtp.hostinger.com")
 +        self.assertEqual(st["smtp_port"], 465)
++
++    def test_smtp_without_password_is_not_configured(self) -> None:
++        os.environ["SMTP_HOST"] = "smtp.hostinger.com"
++        os.environ["SMTP_USER"] = "billing@example.com"
++        os.environ["MAIL_FROM"] = "billing@example.com"
++        os.environ.pop("SMTP_PASSWORD", None)
++        self.assertFalse(mail_configured())
++        self.assertEqual(mail_status()["provider"], "none")
 +
 +    def test_both_providers_report_fallback(self) -> None:
 +        self._smtp()

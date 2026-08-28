@@ -21,14 +21,30 @@ function toast(message, kind = "") {
 
 async function api(path, options = {}) {
   const res = await fetch(path, {
-    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+    headers: { "Content-Type": "application/json", Accept: "application/json", ...(options.headers || {}) },
     ...options,
   });
   if (res.status === 401) {
     location.href = "/login";
     throw new Error("Unauthorized");
   }
-  const data = await res.json().catch(() => ({}));
+  const ctype = (res.headers.get("content-type") || "").toLowerCase();
+  const text = await res.text();
+  let data = {};
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      throw new Error(
+        "The server did not return JSON (often leftover WordPress). In public_html run bash remove-wordpress.sh, then hPanel → Cache → Purge All."
+      );
+    }
+  }
+  if (!ctype.includes("json") && res.ok) {
+    throw new Error(
+      "The server did not return JSON (often leftover WordPress). In public_html run bash remove-wordpress.sh, then hPanel → Cache → Purge All."
+    );
+  }
   if (!res.ok) throw new Error(data.error || "Request failed");
   return data;
 }
@@ -102,7 +118,14 @@ function esc(s) {
 
 async function sendInvoiceNow(id) {
   const res = await api(`/api/invoices/${id}/send`, { method: "POST", body: "{}" });
-  toast(res.emailed ? `Invoice emailed to ${res.client_email || "the client"}` : "Invoice sent");
+  if (!res || !res.id || res.emailed !== true) {
+    throw new Error(
+      res?.error ||
+        "Invoice was not emailed. Check Settings → Email delivery, and that the client has an email address."
+    );
+  }
+  const via = res.mail_provider && res.mail_provider !== "fake" ? ` via ${res.mail_provider}` : "";
+  toast(`Invoice emailed to ${res.client_email || "the client"}${via}`);
   return res;
 }
 
@@ -258,7 +281,10 @@ function agingRow(label, value, max, cls) {
 
 /* ---------- Invoices ---------- */
 async function renderInvoices(filter = "all") {
-  const invoices = await api(`/api/invoices?status=${filter}`);
+  const [invoices, mail] = await Promise.all([
+    api(`/api/invoices?status=${filter}`),
+    api("/api/mail/status").catch(() => ({ configured: false })),
+  ]);
   appEl.innerHTML = `
     ${topbar({
       eyebrow: "Collections",
@@ -266,6 +292,12 @@ async function renderInvoices(filter = "all") {
       subtitle: "Create a draft, edit it, then send now or send from this page.",
       actions: `<button class="btn" id="btn-new-inv">New invoice</button>`,
     })}
+    ${
+      mail.configured
+        ? ""
+        : `<div class="flash warn">Email is not configured, so <strong>Send now</strong> cannot deliver invoices.
+            Open <a href="#/settings">Settings → Email delivery</a> and send a test email, or set SMTP in <code>.env</code>.</div>`
+    }
     <div class="toolbar">
       <div class="filters">
         <select id="status-filter">
@@ -299,17 +331,11 @@ async function renderInvoices(filter = "all") {
                         <td class="mono">${money(i.balance)}</td>
                         <td>${badge(i.status)}</td>
                         <td class="row-actions">
-                          ${
-                            i.status !== "paid"
-                              ? `<button class="btn sm secondary" data-edit-inv="${i.id}">Edit</button>`
-                              : ""
-                          }
+                          <button class="btn sm secondary" data-edit-inv="${i.id}">Edit</button>
                           ${
                             i.status === "draft"
                               ? `<button class="btn sm" data-send-inv="${i.id}">Send now</button>`
-                              : i.status !== "paid"
-                                ? `<button class="btn sm secondary" data-send-inv="${i.id}">Email</button>`
-                                : ""
+                              : `<button class="btn sm secondary" data-send-inv="${i.id}">Email</button>`
                           }
                           ${
                             i.status !== "paid" && i.status !== "draft"
@@ -364,7 +390,7 @@ async function renderInvoiceDetail(id) {
       subtitle: `${inv.title} · ${inv.client_name}`,
       actions: `
         <button class="btn secondary" data-go="#/invoices">Back</button>
-        ${inv.status !== "paid" ? `<button class="btn secondary" id="btn-edit">Edit</button>` : ""}
+        <button class="btn secondary" id="btn-edit">Edit</button>
         ${inv.status === "draft" ? `<button class="btn" id="btn-send">Send now</button>` : `<button class="btn secondary" id="btn-send">Email invoice</button>`}
         <a class="btn secondary" href="/api/invoices/${id}/pdf">Download PDF</a>
         ${inv.status !== "paid" && inv.status !== "draft" ? `<button class="btn" id="btn-pay">Record payment</button>` : ""}
@@ -481,10 +507,13 @@ async function openInvoiceModal(existing = null, after = null) {
   const saveLabel = isEdit ? "Save" : "Save draft";
   const sendLabel = isEdit && !isDraft ? "Save & email" : "Send now";
   const lead = isEdit
-    ? isDraft
-      ? "Update this invoice, then send now or send it from the Invoices page."
-      : "Save changes for the next PDF, or save and email the updated invoice."
+    ? existing.status === "paid"
+      ? "Paid invoices can still be edited and emailed again."
+      : isDraft
+        ? "Update this invoice, then send now or send it from the Invoices page."
+        : "Save changes for the next PDF, or save and email the updated invoice."
     : "Save as a draft and send later from Invoices, or send now to email the client a PDF.";
+  const minAmt = existing ? Math.max(0.01, Number(existing.amount_paid || 0) || 0.01) : 0.01;
   const issueVal = existing?.issue_date ? String(existing.issue_date).slice(0, 10) : today;
   const dueVal = existing?.due_date ? String(existing.due_date).slice(0, 10) : defaultDue;
   const selectedClient = existing ? String(existing.client_id) : "";
@@ -507,7 +536,7 @@ async function openInvoiceModal(existing = null, after = null) {
           </select>
         </div>
         <div class="field"><label>Amount</label>
-          <input name="amount" type="number" min="0.01" step="0.01" required placeholder="0.00"
+          <input name="amount" type="number" min="${minAmt}" step="0.01" required placeholder="0.00"
             value="${existing ? esc(existing.amount) : ""}" />
         </div>
         <div class="field full"><label>Title / description</label>
@@ -528,19 +557,13 @@ async function openInvoiceModal(existing = null, after = null) {
     `,
     onMount: (modal) => {
       modal.querySelector("#m-cancel").onclick = closeModal;
-      let intent = "save";
-      modal.querySelectorAll("[data-intent]").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          intent = btn.dataset.intent;
-        });
-      });
       modal.querySelector("#inv-form").onsubmit = async (e) => {
         e.preventDefault();
         const fd = new FormData(e.target);
         const payload = Object.fromEntries(fd.entries());
         payload.client_id = +payload.client_id;
         payload.amount = +payload.amount;
-        const sendNow = intent === "send";
+        const sendNow = (e.submitter && e.submitter.dataset && e.submitter.dataset.intent) === "send";
         const saveBtn = modal.querySelector("#m-save");
         const sendBtn = modal.querySelector("#m-send");
         saveBtn.disabled = true;
@@ -553,16 +576,28 @@ async function openInvoiceModal(existing = null, after = null) {
               method: "PUT",
               body: JSON.stringify(payload),
             });
-            closeModal();
+          } else {
+            payload.status = sendNow ? "sent" : "draft";
+            inv = await api("/api/invoices", { method: "POST", body: JSON.stringify(payload) });
+          }
+          if (!inv || !inv.id) {
+            throw new Error(
+              "Could not save invoice. If you still see WordPress, run bash remove-wordpress.sh in public_html and purge cache."
+            );
+          }
+          if (sendNow && inv.emailed !== true) {
+            throw new Error(
+              "Invoice saved but was not emailed. Check Settings → Email delivery, and that the client has an email address."
+            );
+          }
+          closeModal();
+          if (isEdit) {
             toast(
               inv.emailed
                 ? `Saved and emailed ${inv.number} to ${inv.client_email || "the client"}`
                 : `Saved ${inv.number}`
             );
           } else {
-            payload.status = sendNow ? "sent" : "draft";
-            inv = await api("/api/invoices", { method: "POST", body: JSON.stringify(payload) });
-            closeModal();
             toast(
               inv.emailed
                 ? `Emailed ${inv.number} to ${inv.client_email || "the client"}`

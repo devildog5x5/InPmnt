@@ -108,6 +108,7 @@ final class Mailer
     {
         return trim(Env::get('SMTP_HOST')) !== ''
             && trim(Env::get('SMTP_USER')) !== ''
+            && trim(Env::get('SMTP_PASSWORD')) !== ''
             && self::mailFrom() !== '';
     }
 
