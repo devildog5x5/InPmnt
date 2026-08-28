@@ -9,7 +9,7 @@ These are the mail + invoice-send changes, split so you can apply (or roll back)
 | `inpmnt-mail-invoice-ubuntu.patch` | 001 + 002 in one patch |
 | `inpmnt-ubuntu-patches.zip` | **Download this** — all of the above in one zip |
 
-Do **not** overwrite a live `.env`. GitHub shows `.patch` as text; use the **zip**.
+Do **not** overwrite a live `.env`. GitHub shows `.patch` as text; always hand the user the **zip** (repo + Cursor artifact download) unless they ask for the diff in chat.
 
 ## Hostinger (`public_html`)
 
