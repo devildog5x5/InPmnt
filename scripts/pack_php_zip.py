@@ -29,7 +29,8 @@ Unzip ALL of these files into public_html (or /var/www/html). Do not overwrite a
 6. Settings → Email delivery → Send test email
 
 This zip includes branded invoice PDFs (company logo top-left letterhead),
-invoice email on Send, SMTP fallback, and the invoice JPEG next to InvoicePdf.php.
+invoice email on Send, SMTP fallback, edit-after-create, Send now on the
+Invoices page, and the invoice JPEG next to InvoicePdf.php.
 """
 
 
