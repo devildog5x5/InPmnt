@@ -325,7 +325,8 @@ async function renderInvoices(filter = "all") {
 }
 
 async function renderInvoiceDetail(id) {
-  const inv = await api(`/api/invoices/${id}`);
+  const [inv, s] = await Promise.all([api(`/api/invoices/${id}`), api("/api/settings")]);
+  const bizMeta = [s.owner_name, s.email, s.phone].filter(Boolean).join(" · ");
   appEl.innerHTML = `
     ${topbar({
       eyebrow: "Invoice",
@@ -339,6 +340,19 @@ async function renderInvoiceDetail(id) {
         ${inv.status === "overdue" || inv.status === "partial" ? `<button class="btn danger" id="btn-final">Final notice</button>` : ""}
       `,
     })}
+    <div class="invoice-sheet">
+      <div class="invoice-letterhead">
+        <img class="invoice-logo" src="/static/img/inpmnt-icon.png" alt="Company logo" />
+        <div class="invoice-letterhead-copy">
+          <div class="invoice-biz">${s.business_name || "InPmnt"}</div>
+          ${bizMeta ? `<div class="invoice-biz-meta">${bizMeta}</div>` : ""}
+        </div>
+        <div class="invoice-letterhead-right">
+          <div class="invoice-word">INVOICE</div>
+          <div class="mono">${inv.number}</div>
+        </div>
+      </div>
+    </div>
     <div class="grid-kpi">
       <div class="kpi"><div class="kpi-label">Amount</div><div class="kpi-value">${money(inv.amount)}</div></div>
       <div class="kpi"><div class="kpi-label">Paid</div><div class="kpi-value">${money(inv.amount_paid)}</div></div>

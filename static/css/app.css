@@ -636,6 +636,7 @@ td.mono, .mono {
     align-items: stretch;
     gap: 14px;
   }
+  .invoice-letterhead { flex-wrap: wrap; }
 }
 
 /* ---------- InPmnt extras ---------- */
@@ -649,6 +650,54 @@ td.mono, .mono {
   height: 100%;
   object-fit: cover;
   display: block;
+}
+
+.invoice-sheet {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+.invoice-sheet::before {
+  content: "";
+  display: block;
+  height: 6px;
+  background: var(--brand);
+}
+.invoice-letterhead {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 20px 16px;
+}
+.invoice-logo {
+  width: 88px;
+  height: 88px;
+  border-radius: 12px;
+  object-fit: cover;
+  background: #000;
+  flex-shrink: 0;
+}
+.invoice-letterhead-copy { flex: 1; min-width: 0; }
+.invoice-biz {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+.invoice-biz-meta {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin-top: 4px;
+}
+.invoice-letterhead-right { text-align: right; }
+.invoice-word {
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--brand);
+  letter-spacing: 0.04em;
 }
 
 .toolbar {

@@ -51,6 +51,12 @@ class InvoicePdfTests(unittest.TestCase):
         self.assertTrue(logo_path() is not None)
         self.assertIn(b"/Im1", pdf)
         self.assertIn(b"/DCTDecode", pdf)
+        # Company logo sits top-left on the letterhead (88pt at x=40, y=680), not the old 52pt dark-header slot.
+        self.assertIn(b"q 88.00 0 0 88.00 40.00 680.00 cm /Im1 Do Q", pdf)
+        self.assertNotIn(b"q 52 0 0 52 40 698", pdf)
+        self.assertIn(b"/Width 160", pdf)
+        self.assertIn(b"/Height 160", pdf)
+        self.assertNotIn(b"endstreamendobj", pdf)
 
     def test_payload_and_filename(self) -> None:
         payload = invoice_pdf_payload(

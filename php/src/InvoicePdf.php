@@ -50,43 +50,44 @@ final class InvoicePdf
         $website = (string) ($data['website'] ?? '');
         $currency = (string) ($data['currency'] ?? 'USD');
 
-        $fill(0, $H - 118, $W, 118, '101920');
-        $fill(0, $H - 122, $W, 4, '1a8a84');
+        $fill(0, $H - 8, $W, 8, '0d6b66');
 
         $jpeg = self::logoJpeg();
         $imgW = 160;
         $imgH = 160;
+        $logoPt = 88.0;
+        $logoX = 40.0;
+        $logoY = 680.0;
         if ($jpeg !== null) {
-            $ops[] = 'q 52 0 0 52 40 698 cm /Im1 Do Q';
+            [$imgW, $imgH] = self::jpegSize($jpeg);
+            $ops[] = sprintf('q %.2f 0 0 %.2f %.2f %.2f cm /Im1 Do Q', $logoPt, $logoPt, $logoX, $logoY);
         }
-        $text($jpeg !== null ? 102.0 : 48.0, 748, 'InPmnt', 16, true, 'ffffff');
-        $text($jpeg !== null ? 102.0 : 48.0, 730, 'Get paid without the chase.', 8, false, '8a99a8');
-        $textRight(564, 748, 'INVOICE', 22, true, '5ee0d8');
-        $textRight(564, 728, $number, 12, true, 'ffffff');
-        $textRight(564, 712, $status, 8, true, '1a8a84');
-
-        $yFrom = 650.0;
-        $text(48, $yFrom, 'FROM', 8, true, '667888');
-        $text(320, $yFrom, 'BILL TO', 8, true, '667888');
-        $yFrom -= 16;
-        $yTo = $yFrom;
-        $text(48, $yFrom, $biz, 12, true);
-        $text(320, $yTo, $client, 12, true);
-        $yFrom -= 14;
-        $yTo -= 14;
+        $textX = $jpeg !== null ? ($logoX + $logoPt + 16) : 48.0;
+        $text($textX, 752, $biz, 16, true);
+        $yInfo = 732.0;
         foreach ([$owner, $bizEmail, $bizPhone, $website] as $line) {
             if ($line !== '') {
-                $text(48, $yFrom, $line, 9, false, '2a3a48');
-                $yFrom -= 12;
+                $text($textX, $yInfo, $line, 9, false, '2a3a48');
+                $yInfo -= 12;
             }
         }
+        $textRight(564, 752, 'INVOICE', 22, true, '0d6b66');
+        $textRight(564, 732, $number, 12, true);
+        $textRight(564, 716, $status, 8, true, '1a8a84');
+        $fill(40, 664, 532, 1.0, 'e2e8ee');
+
+        $yTo = 640.0;
+        $text(48, $yTo, 'BILL TO', 8, true, '667888');
+        $yTo -= 16;
+        $text(48, $yTo, $client, 12, true);
+        $yTo -= 14;
         if ($company !== '') {
-            $text(320, $yTo, $company, 9, false, '2a3a48');
+            $text(48, $yTo, $company, 9, false, '2a3a48');
             $yTo -= 12;
         }
         foreach ([$clientEmail, $clientPhone] as $line) {
             if ($line !== '') {
-                $text(320, $yTo, $line, 9, false, '2a3a48');
+                $text(48, $yTo, $line, 9, false, '2a3a48');
                 $yTo -= 12;
             }
         }
@@ -149,9 +150,9 @@ final class InvoicePdf
         if ($jpeg !== null) {
             $objects[] = '<< /Type /XObject /Subtype /Image /Width ' . $imgW . ' /Height ' . $imgH
                 . ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' . strlen($jpeg)
-                . " >>\nstream\n" . $jpeg . "\nendstream";
+                . " >>\nstream\n" . $jpeg . 'endstream';
         }
-        $objects[] = '<< /Length ' . strlen($contentB) . " >>\nstream\n" . $contentB . "\nendstream";
+        $objects[] = '<< /Length ' . strlen($contentB) . " >>\nstream\n" . $contentB . 'endstream';
 
         $out = "%PDF-1.4\n%\xE2\xE3\xCF\xD3\n";
         $offsets = [0];
@@ -159,7 +160,7 @@ final class InvoicePdf
             $offsets[] = strlen($out);
             $n = $i + 1;
             $out .= "{$n} 0 obj\n" . $obj;
-            if (!str_ends_with($obj, 'endstream')) {
+            if (!str_ends_with($obj, "\n")) {
                 $out .= "\n";
             }
             $out .= "endobj\n";
@@ -245,6 +246,33 @@ final class InvoicePdf
         }
         $raw = file_get_contents($p);
         return $raw === false ? null : $raw;
+    }
+
+    /** @return array{0:int,1:int} */
+    private static function jpegSize(string $jpeg): array
+    {
+        $len = strlen($jpeg);
+        $i = 0;
+        while ($i < $len - 8) {
+            if (ord($jpeg[$i]) !== 0xFF) {
+                $i++;
+                continue;
+            }
+            $marker = ord($jpeg[$i + 1]);
+            if ($marker === 0xD8 || $marker === 0xD9 || $marker === 0x01
+                || ($marker >= 0xD0 && $marker <= 0xD7)) {
+                $i += 2;
+                continue;
+            }
+            $seglen = (ord($jpeg[$i + 2]) << 8) | ord($jpeg[$i + 3]);
+            if ($marker === 0xC0 || $marker === 0xC1 || $marker === 0xC2 || $marker === 0xC3) {
+                $h = (ord($jpeg[$i + 5]) << 8) | ord($jpeg[$i + 6]);
+                $w = (ord($jpeg[$i + 7]) << 8) | ord($jpeg[$i + 8]);
+                return [$w, $h];
+            }
+            $i += 2 + max($seglen, 0);
+        }
+        return [160, 160];
     }
 
     private static function rgb(string $hex): string

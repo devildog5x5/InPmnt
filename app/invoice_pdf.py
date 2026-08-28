@@ -71,6 +71,27 @@ def logo_path() -> Path | None:
     return None
 
 
+def _jpeg_size(data: bytes) -> tuple[int, int]:
+    """Read SOF width/height from a baseline or progressive JPEG."""
+    i = 0
+    n = len(data)
+    while i < n - 8:
+        if data[i] != 0xFF:
+            i += 1
+            continue
+        marker = data[i + 1]
+        if marker in (0xD8, 0xD9, 0x01) or 0xD0 <= marker <= 0xD7:
+            i += 2
+            continue
+        seglen = (data[i + 2] << 8) | data[i + 3]
+        if marker in (0xC0, 0xC1, 0xC2, 0xC3):
+            height = (data[i + 5] << 8) | data[i + 6]
+            width = (data[i + 7] << 8) | data[i + 8]
+            return width, height
+        i += 2 + max(seglen, 0)
+    return 160, 160
+
+
 def _money(n: float) -> str:
     return f"${n:,.2f}"
 
@@ -172,43 +193,42 @@ def build_invoice_pdf(data: dict[str, Any]) -> bytes:
     website = str(data.get("website") or "")
     currency = str(data.get("currency") or "USD")
 
-    # Header
-    fill_rect(0, H - 118, W, 118, "101920")
-    fill_rect(0, H - 122, W, 4, "1a8a84")
+    # Letterhead: teal rule + company logo top-left on white (not a dark bar).
+    fill_rect(0, H - 8, W, 8, "0d6b66")
     jpeg = b""
     img_w = img_h = 0
+    logo_pt = 88.0
+    logo_x = 40.0
+    logo_y = 680.0  # 88pt tall → top at 768, 16pt under the teal rule
     lp = logo_path()
     if lp:
         jpeg = lp.read_bytes()
-        img_w, img_h = 160, 160
-        # 52pt square in header
-        ops.append("q 52 0 0 52 40 698 cm /Im1 Do Q")
-    text(102 if jpeg else 48, 748, "InPmnt", size=16, bold=True, color="ffffff")
-    text(102 if jpeg else 48, 730, "Get paid without the chase.", size=8, color="8a99a8")
-    text_right(564, 748, "INVOICE", size=22, bold=True, color="5ee0d8")
-    text_right(564, 728, number, size=12, bold=True, color="ffffff")
-    text_right(564, 712, status, size=8, bold=True, color="1a8a84")
-
-    # Parties
-    y_from = 650
-    text(48, y_from, "FROM", size=8, bold=True, color="667888")
-    text(320, y_from, "BILL TO", size=8, bold=True, color="667888")
-    y_from -= 16
-    y_to = y_from
-    text(48, y_from, biz, size=12, bold=True)
-    text(320, y_to, client, size=12, bold=True)
-    y_from -= 14
-    y_to -= 14
+        img_w, img_h = _jpeg_size(jpeg)
+        ops.append(f"q {logo_pt:.2f} 0 0 {logo_pt:.2f} {logo_x:.2f} {logo_y:.2f} cm /Im1 Do Q")
+    text_x = (logo_x + logo_pt + 16) if jpeg else 48.0
+    text(text_x, 752, biz, size=16, bold=True)
+    y_info = 732
     for line in (owner, biz_email, biz_phone, website):
         if line:
-            text(48, y_from, line, size=9, color="2a3a48")
-            y_from -= 12
+            text(text_x, y_info, line, size=9, color="2a3a48")
+            y_info -= 12
+    text_right(564, 752, "INVOICE", size=22, bold=True, color="0d6b66")
+    text_right(564, 732, number, size=12, bold=True)
+    text_right(564, 716, status, size=8, bold=True, color="1a8a84")
+    hline(40, 664, 532, "e2e8ee", 1.0)
+
+    # BILL TO — FROM is the letterhead (logo + business name)
+    y_to = 640
+    text(48, y_to, "BILL TO", size=8, bold=True, color="667888")
+    y_to -= 16
+    text(48, y_to, client, size=12, bold=True)
+    y_to -= 14
     if company:
-        text(320, y_to, company, size=9, color="2a3a48")
+        text(48, y_to, company, size=9, color="2a3a48")
         y_to -= 12
     for line in (client_email, client_phone):
         if line:
-            text(320, y_to, line, size=9, color="2a3a48")
+            text(48, y_to, line, size=9, color="2a3a48")
             y_to -= 12
 
     # Meta strip
@@ -285,19 +305,12 @@ def build_invoice_pdf(data: dict[str, Any]) -> bytes:
             f"/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length {len(jpeg)} >>\n"
             f"stream\n".encode("ascii")
             + jpeg
-            + b"\nendstream"
+            + b"endstream"
         )
         stream_num = 7
     else:
         stream_num = 6
-    add(
-        f"<< /Length {len(content_b)} >>\nstream\n".encode("ascii") + content_b + b"\nendstream"
-    )
-
-    # Object numbers: 1 catalog, 2 pages, 3 page, 4 F1, 5 F2, [6 image], stream
-    # If no jpeg, page Contents should be 6. Fix page object if no jpeg — already handled.
-    # If jpeg, Contents 7 0 R — but we added catalog, pages, page, f1, f2, image, stream = 7. Good.
-    # If no jpeg, objects: catalog, pages, page, f1, f2, stream = 6. Page says Contents 6. Good.
+    add(f"<< /Length {len(content_b)} >>\nstream\n".encode("ascii") + content_b + b"endstream")
 
     out = bytearray(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
     offsets = [0]
@@ -305,7 +318,7 @@ def build_invoice_pdf(data: dict[str, Any]) -> bytes:
         offsets.append(len(out))
         out += f"{i} 0 obj\n".encode("ascii")
         out += obj
-        if not obj.endswith(b"endstream"):
+        if not obj.endswith(b"\n"):
             out += b"\n"
         out += b"endobj\n"
     xref = len(out)
