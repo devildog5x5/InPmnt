@@ -1,0 +1,776 @@
+diff --git a/app/database.py b/app/database.py
+index 38975aa..356e813 100644
+--- a/app/database.py
++++ b/app/database.py
+@@ -30,6 +30,18 @@ RESERVED_SIGNUP_EMAILS = frozenset(
+ )
+ 
+ DEFAULT_TEMPLATE_DEFS = [
++    (
++        "Invoice",
++        "email",
++        "Invoice {{number}} from {{business_name}}",
++        "Hi {{client_name}},\n\n"
++        "Invoice {{number}} is ready for {{title}}.\n\n"
++        "Amount due: {{amount_due}}\n"
++        "Due date: {{due_date}}\n\n"
++        "Please reply to this email if you have any questions.\n\n"
++        "Thanks,\n{{business_name}}",
++        0,
++    ),
+     (
+         "Friendly nudge",
+         "email",
+@@ -221,6 +233,7 @@ def init_db(db_path: str) -> None:
+             _seed(conn)
+         else:
+             _ensure_system_accounts(conn)
++        ensure_missing_templates(conn)
+ 
+ 
+ def _table_sql(conn: sqlite3.Connection, name: str) -> str:
+@@ -483,6 +496,26 @@ def insert_default_templates(conn: sqlite3.Connection, workspace_id: int) -> Non
+         )
+ 
+ 
++def ensure_missing_templates(conn: sqlite3.Connection) -> None:
++    """Add any newly shipped templates to existing workspaces."""
++    for row in conn.execute("SELECT id FROM settings").fetchall():
++        wid = int(row["id"])
++        for name, channel, subject, body, is_default in DEFAULT_TEMPLATE_DEFS:
++            exists = conn.execute(
++                "SELECT id FROM templates WHERE workspace_id=? AND name=?",
++                (wid, name),
++            ).fetchone()
++            if exists:
++                continue
++            conn.execute(
++                """
++                INSERT INTO templates (workspace_id, name, channel, subject, body, is_default)
++                VALUES (?, ?, ?, ?, ?, ?)
++                """,
++                (wid, name, channel, subject, body, is_default),
++            )
++
++
+ def create_workspace(
+     conn: sqlite3.Connection,
+     *,
+diff --git a/app/routes.py b/app/routes.py
+index 29b7424..a9879c9 100644
+--- a/app/routes.py
++++ b/app/routes.py
+@@ -212,6 +212,131 @@ def invoice_balance(inv: dict[str, Any]) -> float:
+     return round(float(inv["amount"]) - float(inv["amount_paid"]), 2)
+ 
+ 
++INVOICE_TEMPLATE_NAME = "Invoice"
++DEFAULT_INVOICE_SUBJECT = "Invoice {{number}} from {{business_name}}"
++DEFAULT_INVOICE_BODY = (
++    "Hi {{client_name}},\n\n"
++    "Invoice {{number}} is ready for {{title}}.\n\n"
++    "Amount due: {{amount_due}}\n"
++    "Due date: {{due_date}}\n\n"
++    "Please reply to this email if you have any questions.\n\n"
++    "Thanks,\n{{business_name}}"
++)
++
++
++def invoice_merge_ctx(inv: Any, settings: Any) -> dict[str, Any]:
++    data = dict(inv)
++    biz = settings["business_name"] if settings else "InPmnt"
++    return {
++        "number": data.get("number") or "",
++        "client_name": data.get("client_name") or "",
++        "title": data.get("title") or "",
++        "amount_due": money(invoice_balance(data)),
++        "amount": money(float(data.get("amount") or 0)),
++        "due_date": data.get("due_date") or "",
++        "issue_date": data.get("issue_date") or "",
++        "status": data.get("status") or "",
++        "notes": data.get("notes") or "",
++        "business_name": biz,
++    }
++
++
++def email_invoice_to_client(conn, invoice_id: int, wid: int):
++    """Email the Invoice template. Drafts are marked sent and reminders scheduled.
++
++    Returns a Flask (response, status) tuple on error, or None on success.
++    """
++    inv = conn.execute(
++        """
++        SELECT i.*, c.name AS client_name, c.email AS client_email
++        FROM invoices i JOIN clients c ON c.id = i.client_id
++        WHERE i.id = ? AND i.workspace_id = ?
++        """,
++        (invoice_id, wid),
++    ).fetchone()
++    if not inv:
++        return jsonify({"error": "Not found"}), 404
++
++    to = (inv["client_email"] or "").strip()
++    if not to or "@" not in to:
++        return jsonify({"error": "Client has no email address. Add one on the client, then send again."}), 400
++
++    settings = get_settings(conn, wid)
++    was_draft = (inv["status"] or "") == "draft"
++    if was_draft:
++        blocked = assert_can_add_open_invoice(conn, wid, settings)
++        if blocked:
++            return jsonify({"error": blocked}), 403
++
++    tmpl = conn.execute(
++        "SELECT * FROM templates WHERE workspace_id=? AND name=? LIMIT 1",
++        (wid, INVOICE_TEMPLATE_NAME),
++    ).fetchone()
++    ctx = invoice_merge_ctx(inv, settings)
++    subject = render_template_vars(
++        tmpl["subject"] if tmpl else DEFAULT_INVOICE_SUBJECT, ctx
++    )
++    body = render_template_vars(tmpl["body"] if tmpl else DEFAULT_INVOICE_BODY, ctx)
++
++    if not mail_configured():
++        if not _allow_fake_email():
++            return _email_not_configured_response()
++    else:
++        try:
++            send_email(
++                to=to,
++                subject=subject,
++                body=body,
++                from_name=settings["business_name"] if settings else None,
++            )
++        except Exception as exc:  # noqa: BLE001
++            return jsonify({"error": str(exc)}), 502
++
++    now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
++    today = date.today().isoformat()
++    if was_draft:
++        if (inv["due_date"] or "") < today and float(inv["amount_paid"] or 0) < float(inv["amount"] or 0):
++            status = "overdue" if float(inv["amount_paid"] or 0) == 0 else "partial"
++        elif float(inv["amount_paid"] or 0) >= float(inv["amount"] or 0):
++            status = "paid"
++        elif float(inv["amount_paid"] or 0) > 0:
++            status = "partial"
++        else:
++            status = "sent"
++        conn.execute(
++            "UPDATE invoices SET status=?, updated_at=? WHERE id=? AND workspace_id=?",
++            (status, now, invoice_id, wid),
++        )
++        schedule_reminders_for_invoice(conn, invoice_id, inv["due_date"], force=True)
++
++    cur = conn.execute(
++        """
++        INSERT INTO reminders (
++            invoice_id, channel, scheduled_for, status, subject, body, sent_at, created_at
++        ) VALUES (?, 'email', ?, 'sent', ?, ?, ?, ?)
++        """,
++        (invoice_id, today, subject, body, now, now),
++    )
++    rid = cur.lastrowid
++    log_activity(
++        conn,
++        "invoice",
++        f"Emailed invoice {inv['number']} to {to}",
++        "invoice",
++        invoice_id,
++        workspace_id=wid,
++    )
++    log_activity(
++        conn,
++        "reminder",
++        f"Sent INVOICE email for {inv['number']} to {to}",
++        "reminder",
++        rid,
++        workspace_id=wid,
++    )
++    return None
++
++
+ def schedule_reminders_for_invoice(conn, invoice_id: int, due_date: str, force: bool = False) -> int:
+     inv0 = conn.execute("SELECT workspace_id FROM invoices WHERE id = ?", (invoice_id,)).fetchone()
+     if not inv0:
+@@ -259,6 +384,7 @@ def schedule_reminders_for_invoice(conn, invoice_id: int, due_date: str, force:
+     ctx = {
+         "number": inv["number"],
+         "client_name": inv["client_name"],
++        "title": inv["title"] if "title" in inv.keys() else "",
+         "amount_due": money(invoice_balance(dict(inv))),
+         "due_date": inv["due_date"],
+         "status": inv["status"],
+@@ -626,6 +752,8 @@ def api_create_invoice():
+     status = data.get("status") or "draft"
+     if status not in ("draft", "sent", "partial", "overdue", "paid"):
+         status = "draft"
++    want_send = status == "sent"
++    insert_status = "draft" if want_send else status
+     now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+     wid = require_workspace_id()
+ 
+@@ -637,7 +765,7 @@ def api_create_invoice():
+         if not client:
+             return jsonify({"error": "Client not found"}), 404
+         settings = get_settings(conn, wid)
+-        if status in ("sent", "partial", "overdue"):
++        if insert_status in ("sent", "partial", "overdue") or want_send:
+             blocked = assert_can_add_open_invoice(conn, wid, settings)
+             if blocked:
+                 return jsonify({"error": blocked}), 403
+@@ -658,19 +786,27 @@ def api_create_invoice():
+                 data.get("currency") or "USD",
+                 issue,
+                 due,
+-                status,
++                insert_status,
+                 (data.get("notes") or "").strip(),
+                 now,
+                 now,
+             ),
+         )
+         invoice_id = cur.lastrowid
+-        if status in ("sent", "partial", "overdue"):
++        emailed = False
++        if want_send:
++            err = email_invoice_to_client(conn, invoice_id, wid)
++            if err:
++                return err
++            emailed = True
++        elif insert_status in ("sent", "partial", "overdue"):
+             schedule_reminders_for_invoice(conn, invoice_id, due, force=True)
+         log_activity(
+             conn, "invoice", f"Created invoice {number}", "invoice", invoice_id, workspace_id=wid
+         )
+         data_out = invoice_detail(conn, invoice_id, wid)
++    if data_out:
++        data_out["emailed"] = emailed
+     return jsonify(data_out), 201
+ 
+ 
+@@ -750,39 +886,14 @@ def api_update_invoice(invoice_id: int):
+ @bp.post("/api/invoices/<int:invoice_id>/send")
+ @login_required
+ def api_send_invoice(invoice_id: int):
+-    now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+     wid = require_workspace_id()
+     with db_session(db_path()) as conn:
+-        inv = conn.execute(
+-            "SELECT * FROM invoices WHERE id=? AND workspace_id=?",
+-            (invoice_id, wid),
+-        ).fetchone()
+-        if not inv:
+-            return jsonify({"error": "Not found"}), 404
+-        if inv["status"] == "draft":
+-            settings = get_settings(conn, wid)
+-            blocked = assert_can_add_open_invoice(conn, wid, settings)
+-            if blocked:
+-                return jsonify({"error": blocked}), 403
+-        status = "paid" if inv["amount_paid"] >= inv["amount"] else (
+-            "partial" if inv["amount_paid"] > 0 else "sent"
+-        )
+-        if inv["due_date"] < date.today().isoformat() and status != "paid":
+-            status = "overdue" if inv["amount_paid"] == 0 else "partial"
+-        conn.execute(
+-            "UPDATE invoices SET status=?, updated_at=? WHERE id=? AND workspace_id=?",
+-            (status, now, invoice_id, wid),
+-        )
+-        schedule_reminders_for_invoice(conn, invoice_id, inv["due_date"], force=True)
+-        log_activity(
+-            conn,
+-            "invoice",
+-            f"Marked {inv['number']} as sent — reminders scheduled",
+-            "invoice",
+-            invoice_id,
+-            workspace_id=wid,
+-        )
++        err = email_invoice_to_client(conn, invoice_id, wid)
++        if err:
++            return err
+         out = invoice_detail(conn, invoice_id, wid)
++    if out:
++        out["emailed"] = True
+     return jsonify(out)
+ 
+ 
+diff --git a/php/src/App.php b/php/src/App.php
+index 401d427..5ab2c2c 100644
+--- a/php/src/App.php
++++ b/php/src/App.php
+@@ -505,6 +505,7 @@ final class App
+         $ctx = [
+             'number' => $inv['number'],
+             'client_name' => $inv['client_name'],
++            'title' => $inv['title'] ?? '',
+             'amount_due' => Db::money(Db::invoiceBalance($inv)),
+             'due_date' => $inv['due_date'],
+             'status' => $inv['status'],
+@@ -587,6 +588,8 @@ final class App
+         if (!in_array($status, ['draft', 'sent', 'partial', 'overdue', 'paid'], true)) {
+             $status = 'draft';
+         }
++        $wantSend = $status === 'sent';
++        $insertStatus = $wantSend ? 'draft' : $status;
+         $now = Db::now();
+         $c = $this->db->prepare('SELECT id FROM clients WHERE id=? AND workspace_id=?');
+         $c->execute([(int) $clientId, $wid]);
+@@ -594,7 +597,7 @@ final class App
+             Http::json(['error' => 'Client not found'], 404);
+         }
+         $settings = Workspace::settings($this->db, $wid);
+-        if (in_array($status, ['sent', 'partial', 'overdue'], true)) {
++        if (in_array($insertStatus, ['sent', 'partial', 'overdue'], true) || $wantSend) {
+             $blocked = Workspace::assertCanAddOpen($this->db, $wid, $settings);
+             if ($blocked) {
+                 Http::json(['error' => $blocked], 403);
+@@ -607,15 +610,23 @@ final class App
+              VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?)'
+         )->execute([
+             $wid, $number, (int) $clientId, $title, $amount,
+-            $data['currency'] ?? 'USD', $issue, $due, $status,
++            $data['currency'] ?? 'USD', $issue, $due, $insertStatus,
+             trim((string) ($data['notes'] ?? '')), $now, $now,
+         ]);
+         $invoiceId = (int) $this->db->lastInsertId();
+-        if (in_array($status, ['sent', 'partial', 'overdue'], true)) {
++        $emailed = false;
++        if ($wantSend) {
++            $this->deliverInvoice($wid, $invoiceId);
++            $emailed = true;
++        } elseif (in_array($insertStatus, ['sent', 'partial', 'overdue'], true)) {
+             $this->scheduleReminders($invoiceId, $due, true);
+         }
+         Db::log($this->db, 'invoice', "Created invoice {$number}", 'invoice', $invoiceId, $wid);
+-        Http::json($this->invoiceDetail($invoiceId, $wid), 201);
++        $out = $this->invoiceDetail($invoiceId, $wid);
++        if (is_array($out)) {
++            $out['emailed'] = $emailed;
++        }
++        Http::json($out, 201);
+     }
+ 
+     private function apiUpdateInvoice(int $wid, int $id): void
+@@ -666,29 +677,90 @@ final class App
+ 
+     private function apiSendInvoice(int $wid, int $id): void
+     {
+-        $st = $this->db->prepare('SELECT * FROM invoices WHERE id=? AND workspace_id=?');
++        $this->deliverInvoice($wid, $id);
++        $out = $this->invoiceDetail($id, $wid);
++        if (is_array($out)) {
++            $out['emailed'] = true;
++        }
++        Http::json($out);
++    }
++
++    /** Email the Invoice template. Drafts are marked sent and reminders are scheduled. */
++    private function deliverInvoice(int $wid, int $id): void
++    {
++        $st = $this->db->prepare(
++            'SELECT i.*, c.name AS client_name, c.email AS client_email
++             FROM invoices i JOIN clients c ON c.id = i.client_id
++             WHERE i.id=? AND i.workspace_id=?'
++        );
+         $st->execute([$id, $wid]);
+         $inv = $st->fetch();
+         if (!$inv) {
+             Http::json(['error' => 'Not found'], 404);
+         }
+-        if ($inv['status'] === 'draft') {
+-            $blocked = Workspace::assertCanAddOpen($this->db, $wid, Workspace::settings($this->db, $wid));
++        $to = trim((string) ($inv['client_email'] ?? ''));
++        if ($to === '' || !str_contains($to, '@')) {
++            Http::json(['error' => 'Client has no email address. Add one on the client, then send again.'], 400);
++        }
++        $settings = Workspace::settings($this->db, $wid);
++        $wasDraft = ($inv['status'] ?? '') === 'draft';
++        if ($wasDraft) {
++            $blocked = Workspace::assertCanAddOpen($this->db, $wid, $settings);
+             if ($blocked) {
+                 Http::json(['error' => $blocked], 403);
+             }
+         }
+-        $status = ((float) $inv['amount_paid'] >= (float) $inv['amount'])
+-            ? 'paid'
+-            : (((float) $inv['amount_paid'] > 0) ? 'partial' : 'sent');
+-        if ($inv['due_date'] < date('Y-m-d') && $status !== 'paid') {
+-            $status = ((float) $inv['amount_paid'] == 0.0) ? 'overdue' : 'partial';
++        $t = $this->db->prepare("SELECT * FROM templates WHERE workspace_id=? AND name='Invoice' LIMIT 1");
++        $t->execute([$wid]);
++        $tmpl = $t->fetch();
++        $ctx = [
++            'number' => $inv['number'],
++            'client_name' => $inv['client_name'],
++            'title' => $inv['title'] ?? '',
++            'amount_due' => Db::money(Db::invoiceBalance($inv)),
++            'amount' => Db::money((float) $inv['amount']),
++            'due_date' => $inv['due_date'],
++            'issue_date' => $inv['issue_date'],
++            'status' => $inv['status'],
++            'notes' => $inv['notes'] ?? '',
++            'business_name' => $settings['business_name'] ?? 'InPmnt',
++        ];
++        $subject = Db::renderVars($tmpl['subject'] ?? 'Invoice {{number}} from {{business_name}}', $ctx);
++        $body = Db::renderVars(
++            $tmpl['body'] ?? "Hi {{client_name}},\n\nInvoice {{number}} is ready for {{title}}.\n\nAmount due: {{amount_due}}\nDue date: {{due_date}}\n\nPlease reply to this email if you have any questions.\n\nThanks,\n{{business_name}}",
++            $ctx
++        );
++        if (!Mailer::configured()) {
++            if (!Env::truthy('ALLOW_FAKE_EMAIL')) {
++                $this->emailNotConfigured();
++            }
++        } else {
++            try {
++                Mailer::send($to, $subject, $body, $settings['business_name'] ?? null);
++            } catch (Throwable $e) {
++                Http::json(['error' => $e->getMessage()], 502);
++            }
++        }
++        $now = Db::now();
++        $today = date('Y-m-d');
++        if ($wasDraft) {
++            $status = ((float) $inv['amount_paid'] >= (float) $inv['amount'])
++                ? 'paid'
++                : (((float) $inv['amount_paid'] > 0) ? 'partial' : 'sent');
++            if ($inv['due_date'] < $today && $status !== 'paid') {
++                $status = ((float) $inv['amount_paid'] == 0.0) ? 'overdue' : 'partial';
++            }
++            $this->db->prepare('UPDATE invoices SET status=?, updated_at=? WHERE id=? AND workspace_id=?')
++                ->execute([$status, $now, $id, $wid]);
++            $this->scheduleReminders($id, $inv['due_date'], true);
+         }
+-        $this->db->prepare('UPDATE invoices SET status=?, updated_at=? WHERE id=? AND workspace_id=?')
+-            ->execute([$status, Db::now(), $id, $wid]);
+-        $this->scheduleReminders($id, $inv['due_date'], true);
+-        Db::log($this->db, 'invoice', "Marked {$inv['number']} as sent — reminders scheduled", 'invoice', $id, $wid);
+-        Http::json($this->invoiceDetail($id, $wid));
++        $this->db->prepare(
++            "INSERT INTO reminders (invoice_id, channel, scheduled_for, status, subject, body, sent_at, created_at)
++             VALUES (?, 'email', ?, 'sent', ?, ?, ?, ?)"
++        )->execute([$id, $today, $subject, $body, $now, $now]);
++        $rid = (int) $this->db->lastInsertId();
++        Db::log($this->db, 'invoice', "Emailed invoice {$inv['number']} to {$to}", 'invoice', $id, $wid);
++        Db::log($this->db, 'reminder', "Sent INVOICE email for {$inv['number']} to {$to}", 'reminder', $rid, $wid);
+     }
+ 
+     private function apiRecordPayment(int $wid, int $id): void
+@@ -932,6 +1004,7 @@ final class App
+         $ctx = [
+             'number' => $inv['number'],
+             'client_name' => $inv['client_name'],
++            'title' => $inv['title'] ?? '',
+             'amount_due' => Db::money(Db::invoiceBalance($inv)),
+             'due_date' => $inv['due_date'],
+             'status' => $inv['status'],
+diff --git a/php/src/Db.php b/php/src/Db.php
+index bde9a3a..dddd223 100644
+--- a/php/src/Db.php
++++ b/php/src/Db.php
+@@ -131,6 +131,7 @@ final class Db
+         } else {
+             self::ensureSystemAccounts($db);
+         }
++        self::ensureMissingTemplates($db);
+     }
+ 
+     public static function now(): string
+@@ -154,9 +155,12 @@ final class Db
+         $st->execute([$wid, $kind, $message, $entityType, $entityId, self::now()]);
+     }
+ 
+-    public static function insertDefaultTemplates(PDO $db, int $workspaceId): void
++    /** @return list<array{0:string,1:string,2:?string,3:string,4:int}> */
++    public static function defaultTemplateDefs(): array
+     {
+-        $defs = [
++        return [
++            ['Invoice', 'email', 'Invoice {{number}} from {{business_name}}',
++                "Hi {{client_name}},\n\nInvoice {{number}} is ready for {{title}}.\n\nAmount due: {{amount_due}}\nDue date: {{due_date}}\n\nPlease reply to this email if you have any questions.\n\nThanks,\n{{business_name}}", 0],
+             ['Friendly nudge', 'email', 'Quick reminder about invoice {{number}}',
+                 "Hi {{client_name}},\n\nJust a friendly reminder that invoice {{number}} for {{amount_due}} is due on {{due_date}}.\n\nYou can reply to this email if you have any questions.\n\nThanks,\n{{business_name}}", 1],
+             ['Due today', 'email', 'Invoice {{number}} is due today',
+@@ -168,14 +172,37 @@ final class Db
+             ['Final notice', 'email', 'Final notice: invoice {{number}}',
+                 "Hi {{client_name}},\n\nThis is a final notice regarding unpaid invoice {{number}} ({{amount_due}}), originally due {{due_date}}.\n\nPlease remit payment promptly to avoid further collection steps.\n\n{{business_name}}", 0],
+         ];
++    }
++
++    public static function insertDefaultTemplates(PDO $db, int $workspaceId): void
++    {
+         $st = $db->prepare(
+             'INSERT INTO templates (workspace_id, name, channel, subject, body, is_default) VALUES (?, ?, ?, ?, ?, ?)'
+         );
+-        foreach ($defs as $d) {
++        foreach (self::defaultTemplateDefs() as $d) {
+             $st->execute([$workspaceId, $d[0], $d[1], $d[2], $d[3], $d[4]]);
+         }
+     }
+ 
++    public static function ensureMissingTemplates(PDO $db): void
++    {
++        $wids = $db->query('SELECT id FROM settings')->fetchAll();
++        $ins = $db->prepare(
++            'INSERT INTO templates (workspace_id, name, channel, subject, body, is_default) VALUES (?, ?, ?, ?, ?, ?)'
++        );
++        $find = $db->prepare('SELECT id FROM templates WHERE workspace_id=? AND name=?');
++        foreach ($wids as $row) {
++            $wid = (int) $row['id'];
++            foreach (self::defaultTemplateDefs() as $d) {
++                $find->execute([$wid, $d[0]]);
++                if ($find->fetch()) {
++                    continue;
++                }
++                $ins->execute([$wid, $d[0], $d[1], $d[2], $d[3], $d[4]]);
++            }
++        }
++    }
++
+     public static function createWorkspace(
+         PDO $db,
+         string $email,
+diff --git a/static/js/app.js b/static/js/app.js
+index 2355db2..888328c 100644
+--- a/static/js/app.js
++++ b/static/js/app.js
+@@ -314,8 +314,8 @@ async function renderInvoices(filter = "all") {
+   appEl.querySelectorAll("[data-send-inv]").forEach((btn) =>
+     btn.addEventListener("click", async () => {
+       try {
+-        await api(`/api/invoices/${btn.dataset.sendInv}/send`, { method: "POST", body: "{}" });
+-        toast("Invoice sent — reminders scheduled");
++        const res = await api(`/api/invoices/${btn.dataset.sendInv}/send`, { method: "POST", body: "{}" });
++        toast(res.emailed ? `Invoice emailed to ${res.client_email || "the client"}` : "Invoice sent");
+         renderInvoices(filter);
+       } catch (err) {
+         toast(err.message || "Send failed", "error");
+@@ -333,7 +333,7 @@ async function renderInvoiceDetail(id) {
+       subtitle: `${inv.title} · ${inv.client_name}`,
+       actions: `
+         <button class="btn secondary" data-go="#/invoices">Back</button>
+-        ${inv.status === "draft" ? `<button class="btn" id="btn-send">Mark sent</button>` : ""}
++        ${inv.status === "draft" ? `<button class="btn" id="btn-send">Send invoice</button>` : `<button class="btn secondary" id="btn-send">Email invoice</button>`}
+         ${inv.status !== "paid" && inv.status !== "draft" ? `<button class="btn" id="btn-pay">Record payment</button>` : ""}
+         ${inv.status === "overdue" || inv.status === "partial" ? `<button class="btn danger" id="btn-final">Final notice</button>` : ""}
+       `,
+@@ -394,7 +394,7 @@ async function renderInvoiceDetail(id) {
+             </div>`
+                 )
+                 .join("")
+-            : empty("No reminders scheduled. Mark the invoice as sent to generate a schedule.")
++            : empty("No reminders scheduled. Send the invoice to email the client and generate a schedule.")
+         }
+       </div>
+     </div>
+@@ -402,8 +402,8 @@ async function renderInvoiceDetail(id) {
+   wireCommon(appEl);
+   appEl.querySelector("#btn-send")?.addEventListener("click", async () => {
+     try {
+-      await api(`/api/invoices/${id}/send`, { method: "POST", body: "{}" });
+-      toast("Invoice sent — reminders scheduled");
++      const res = await api(`/api/invoices/${id}/send`, { method: "POST", body: "{}" });
++      toast(res.emailed ? `Invoice emailed to ${res.client_email || "the client"}` : "Invoice sent");
+       renderInvoiceDetail(id);
+     } catch (err) {
+       toast(err.message || "Send failed", "error");
+@@ -427,7 +427,7 @@ async function openInvoiceModal() {
+   const due = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);
+   openModal({
+     title: "New invoice",
+-    lead: "Create an invoice. Mark it sent to schedule reminders.",
++    lead: "Create an invoice. Send now emails the client and schedules reminders.",
+     body: `
+       <form id="inv-form" class="form-grid">
+         <div class="field"><label>Client</label>
+@@ -441,7 +441,7 @@ async function openInvoiceModal() {
+         <div class="field"><label>Issue date</label><input name="issue_date" type="date" value="${today}" /></div>
+         <div class="field"><label>Due date</label><input name="due_date" type="date" value="${due}" /></div>
+         <div class="field"><label>Status</label>
+-          <select name="status"><option value="draft">Draft</option><option value="sent">Send now</option></select>
++          <select name="status"><option value="draft">Save as draft</option><option value="sent">Email to client now</option></select>
+         </div>
+         <div class="field"><label>Notes</label><input name="notes" placeholder="Optional" /></div>
+         <div class="modal-actions field full">
+@@ -458,10 +458,14 @@ async function openInvoiceModal() {
+         const payload = Object.fromEntries(fd.entries());
+         payload.client_id = +payload.client_id;
+         payload.amount = +payload.amount;
+-        const inv = await api("/api/invoices", { method: "POST", body: JSON.stringify(payload) });
+-        closeModal();
+-        toast(`Created ${inv.number}`);
+-        location.hash = `#/invoices/${inv.id}`;
++        try {
++          const inv = await api("/api/invoices", { method: "POST", body: JSON.stringify(payload) });
++          closeModal();
++          toast(inv.emailed ? `Emailed ${inv.number} to ${inv.client_email || "the client"}` : `Created ${inv.number}`);
++          location.hash = `#/invoices/${inv.id}`;
++        } catch (err) {
++          toast(err.message || "Could not create invoice", "error");
++        }
+       };
+     },
+   });
+@@ -638,7 +642,7 @@ async function renderTemplates() {
+     ${topbar({
+       eyebrow: "Workspace",
+       title: "Message templates",
+-      subtitle: "Use {{client_name}}, {{number}}, {{amount_due}}, {{due_date}}, {{business_name}}.",
++      subtitle: "Use {{client_name}}, {{number}}, {{title}}, {{amount_due}}, {{due_date}}, {{business_name}}. The Invoice template is what Send invoice emails.",
+     })}
+     <div class="stack">
+       ${templates
+diff --git a/tests/test_invoice_send.py b/tests/test_invoice_send.py
+new file mode 100644
+index 0000000..7b6856c
+--- /dev/null
++++ b/tests/test_invoice_send.py
+@@ -0,0 +1,150 @@
++"""Sending the invoice itself emails the client (not just reminders)."""
++from __future__ import annotations
++
++import os
++import tempfile
++import unittest
++from unittest.mock import patch
++
++from app import create_app
++from app.database import init_db
++
++
++class InvoiceSendTests(unittest.TestCase):
++    def setUp(self) -> None:
++        self._saved = {
++            k: os.environ.get(k)
++            for k in (
++                "DATABASE_PATH",
++                "SMTP_HOST",
++                "SMTP_USER",
++                "MAIL_FROM",
++                "SMTP_PASSWORD",
++                "SMTP_PORT",
++                "SMTP_SSL",
++                "RESEND_API_KEY",
++                "MAIL_PROVIDER",
++            )
++        }
++        fd, self.db_path = tempfile.mkstemp(suffix=".db")
++        os.close(fd)
++        os.environ["DATABASE_PATH"] = self.db_path
++        os.environ["SMTP_HOST"] = "smtp.hostinger.com"
++        os.environ["SMTP_PORT"] = "465"
++        os.environ["SMTP_USER"] = "billing@example.com"
++        os.environ["SMTP_PASSWORD"] = "secret"
++        os.environ["SMTP_SSL"] = "1"
++        os.environ["MAIL_FROM"] = "billing@example.com"
++        os.environ["MAIL_PROVIDER"] = "smtp"
++        os.environ.pop("RESEND_API_KEY", None)
++        init_db(self.db_path)
++        app = create_app()
++        app.config["TESTING"] = True
++        app.config["DATABASE"] = self.db_path
++        self.client = app.test_client()
++        signup = self.client.post(
++            "/signup",
++            data={
++                "name": "Pat",
++                "business_name": "Pat Co",
++                "email": "pat@example.com",
++                "password": "password123",
++            },
++        )
++        self.assertIn(signup.status_code, (302, 303))
++        created = self.client.post(
++            "/api/clients",
++            json={
++                "name": "Maya Chen",
++                "email": "maya@client.example",
++                "company": "Chen Landscape",
++            },
++        )
++        self.assertEqual(created.status_code, 201, created.get_json())
++        self.client_id = created.get_json()["id"]
++
++    def tearDown(self) -> None:
++        try:
++            os.remove(self.db_path)
++        except OSError:
++            pass
++        for key, value in self._saved.items():
++            if value is None:
++                os.environ.pop(key, None)
++            else:
++                os.environ[key] = value
++
++    def _create_draft(self) -> dict:
++        res = self.client.post(
++            "/api/invoices",
++            json={
++                "client_id": self.client_id,
++                "title": "Spring cleanup",
++                "amount": 250,
++                "status": "draft",
++            },
++        )
++        self.assertEqual(res.status_code, 201, res.get_json())
++        body = res.get_json()
++        self.assertFalse(body.get("emailed"))
++        self.assertEqual(body["status"], "draft")
++        return body
++
++    def test_send_emails_client_and_marks_sent(self) -> None:
++        inv = self._create_draft()
++        with patch("app.routes.send_email", return_value={"provider": "smtp", "id": None}) as send:
++            res = self.client.post(f"/api/invoices/{inv['id']}/send", json={})
++            self.assertEqual(res.status_code, 200, res.get_json())
++            body = res.get_json()
++            self.assertTrue(body["emailed"])
++            self.assertEqual(body["status"], "sent")
++            self.assertEqual(body["client_email"], "maya@client.example")
++            send.assert_called_once()
++            kwargs = send.call_args.kwargs
++            self.assertEqual(kwargs["to"], "maya@client.example")
++            self.assertIn(inv["number"], kwargs["subject"])
++            self.assertIn("Spring cleanup", kwargs["body"])
++            self.assertIn("$250.00", kwargs["body"])
++
++    def test_create_send_now_emails(self) -> None:
++        with patch("app.routes.send_email", return_value={"provider": "smtp", "id": None}) as send:
++            res = self.client.post(
++                "/api/invoices",
++                json={
++                    "client_id": self.client_id,
++                    "title": "Fence repair",
++                    "amount": 80,
++                    "status": "sent",
++                },
++            )
++            self.assertEqual(res.status_code, 201, res.get_json())
++            body = res.get_json()
++            self.assertTrue(body["emailed"])
++            self.assertEqual(body["status"], "sent")
++            send.assert_called_once()
++            self.assertEqual(send.call_args.kwargs["to"], "maya@client.example")
++            self.assertIn("Fence repair", send.call_args.kwargs["body"])
++
++    def test_missing_client_email_blocks_send(self) -> None:
++        no_mail = self.client.post("/api/clients", json={"name": "No Email Co"})
++        self.assertEqual(no_mail.status_code, 201)
++        cid = no_mail.get_json()["id"]
++        inv = self.client.post(
++            "/api/invoices",
++            json={"client_id": cid, "title": "Job", "amount": 10, "status": "draft"},
++        ).get_json()
++        res = self.client.post(f"/api/invoices/{inv['id']}/send", json={})
++        self.assertEqual(res.status_code, 400)
++        self.assertIn("email", (res.get_json().get("error") or "").lower())
++        still = self.client.get(f"/api/invoices/{inv['id']}").get_json()
++        self.assertEqual(still["status"], "draft")
++
++    def test_invoice_template_is_present(self) -> None:
++        res = self.client.get("/api/templates")
++        self.assertEqual(res.status_code, 200)
++        names = {t["name"] for t in res.get_json()}
++        self.assertIn("Invoice", names)
++
++
++if __name__ == "__main__":
++    unittest.main()

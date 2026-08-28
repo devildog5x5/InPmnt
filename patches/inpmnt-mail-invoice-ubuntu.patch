@@ -1,0 +1,2109 @@
+diff --git a/.env.example b/.env.example
+index f8cfb00..8f75f80 100644
+--- a/.env.example
++++ b/.env.example
+@@ -18,16 +18,28 @@ SHOW_DEMO_LOGIN=0
+ # Allow reminder "send" without real email (marks sent + logs only).
+ ALLOW_FAKE_EMAIL=0
+ 
+-# Email — Resend (preferred) or SMTP
++# Email — Resend (optional) or SMTP (Hostinger mailbox).
++# If both are set, Resend is tried first and SMTP is the fallback.
++# A dummy RESEND_API_KEY used to block SMTP entirely — that is fixed, but
++# you can still force Hostinger SMTP with:
++# MAIL_PROVIDER=smtp
++#
++# Hostinger mailbox (recommended on shared hosting):
++# MAIL_FROM must be the same mailbox as SMTP_USER (exact address in hPanel).
++# SMTP_HOST=smtp.hostinger.com
++# SMTP_PORT=465
++# SMTP_SSL=1
++# SMTP_STARTTLS=0
++#
+ # RESEND_API_KEY=re_...
+ MAIL_FROM=billing@yourdomain.com
+ MAIL_FROM_NAME=InPmnt
+-# SMTP_HOST=smtp.example.com
+-# SMTP_PORT=587
+-# SMTP_USER=
++# SMTP_HOST=smtp.hostinger.com
++# SMTP_PORT=465
++# SMTP_USER=billing@yourdomain.com
+ # SMTP_PASSWORD=
+-# SMTP_SSL=0
+-# SMTP_STARTTLS=1
++# SMTP_SSL=1
++# SMTP_STARTTLS=0
+ 
+ # Stripe (https://dashboard.stripe.com/apikeys)
+ STRIPE_SECRET_KEY=sk_test_...
+diff --git a/README.md b/README.md
+index faf59ad..6ff4c94 100644
+--- a/README.md
++++ b/README.md
+@@ -105,6 +105,25 @@ InPmnt now ships a **PHP** build you can drop on Hostinger Web/Cloud (no VPS).
+ 4. hPanel → **Advanced → PHP Configuration**: PHP **8.2+**, enable **pdo_sqlite**.
+ 5. Open `https://yourdomain.com` and sign up.
+ 
++### Email on Hostinger
++
++Reminders send from `.env`, not from the Settings form. Use the Hostinger mailbox:
++
++```env
++MAIL_FROM=billing@yourdomain.com
++MAIL_FROM_NAME=InPmnt
++SMTP_HOST=smtp.hostinger.com
++SMTP_PORT=465
++SMTP_USER=billing@yourdomain.com
++SMTP_PASSWORD=your-mailbox-password
++SMTP_SSL=1
++SMTP_STARTTLS=0
++```
++
++`MAIL_FROM` and `SMTP_USER` must be the same mailbox you created in hPanel. Leave `RESEND_API_KEY` blank (or set `MAIL_PROVIDER=smtp`) unless you have a real Resend key **and** have verified `yourdomain.com` in Resend. A placeholder Resend key used to block SMTP; the app now falls back, but SMTP-only is simpler on shared hosting.
++
++After upload, open **Settings → Email delivery → Send test email to me**.
++
+ Stripe webhook: `https://yourdomain.com/api/billing/webhook`  
+ SQLite is created at `data/inpmnt.db` (blocked from the web).
+ 
+diff --git a/app/database.py b/app/database.py
+index 38975aa..356e813 100644
+--- a/app/database.py
++++ b/app/database.py
+@@ -30,6 +30,18 @@ RESERVED_SIGNUP_EMAILS = frozenset(
+ )
+ 
+ DEFAULT_TEMPLATE_DEFS = [
++    (
++        "Invoice",
++        "email",
++        "Invoice {{number}} from {{business_name}}",
++        "Hi {{client_name}},\n\n"
++        "Invoice {{number}} is ready for {{title}}.\n\n"
++        "Amount due: {{amount_due}}\n"
++        "Due date: {{due_date}}\n\n"
++        "Please reply to this email if you have any questions.\n\n"
++        "Thanks,\n{{business_name}}",
++        0,
++    ),
+     (
+         "Friendly nudge",
+         "email",
+@@ -221,6 +233,7 @@ def init_db(db_path: str) -> None:
+             _seed(conn)
+         else:
+             _ensure_system_accounts(conn)
++        ensure_missing_templates(conn)
+ 
+ 
+ def _table_sql(conn: sqlite3.Connection, name: str) -> str:
+@@ -483,6 +496,26 @@ def insert_default_templates(conn: sqlite3.Connection, workspace_id: int) -> Non
+         )
+ 
+ 
++def ensure_missing_templates(conn: sqlite3.Connection) -> None:
++    """Add any newly shipped templates to existing workspaces."""
++    for row in conn.execute("SELECT id FROM settings").fetchall():
++        wid = int(row["id"])
++        for name, channel, subject, body, is_default in DEFAULT_TEMPLATE_DEFS:
++            exists = conn.execute(
++                "SELECT id FROM templates WHERE workspace_id=? AND name=?",
++                (wid, name),
++            ).fetchone()
++            if exists:
++                continue
++            conn.execute(
++                """
++                INSERT INTO templates (workspace_id, name, channel, subject, body, is_default)
++                VALUES (?, ?, ?, ?, ?, ?)
++                """,
++                (wid, name, channel, subject, body, is_default),
++            )
++
++
+ def create_workspace(
+     conn: sqlite3.Connection,
+     *,
+diff --git a/app/mail.py b/app/mail.py
+index 3ab033a..7da32bd 100644
+--- a/app/mail.py
++++ b/app/mail.py
+@@ -5,17 +5,64 @@ import os
+ import smtplib
+ import ssl
+ from email.message import EmailMessage
++from email.utils import formataddr
+ from typing import Any
+ 
+ 
++_PLACEHOLDER_RESEND = {"re_...", "re_your_api_key", "re_changeme"}
++
++
++def _clean(value: str | None) -> str:
++    return (value or "").strip().strip('"').strip("'")
++
++
++def _resend_key() -> str:
++    key = _clean(os.environ.get("RESEND_API_KEY"))
++    if not key:
++        return ""
++    lower = key.lower()
++    if lower in _PLACEHOLDER_RESEND or lower.startswith("re_...") or "changeme" in lower:
++        return ""
++    return key
++
++
++def _mail_from() -> str:
++    return _clean(os.environ.get("MAIL_FROM") or os.environ.get("SMTP_USER"))
++
++
++def smtp_configured() -> bool:
++    return bool(_clean(os.environ.get("SMTP_HOST")) and _clean(os.environ.get("SMTP_USER")) and _mail_from())
++
++
+ def mail_configured() -> bool:
+-    if (os.environ.get("RESEND_API_KEY") or "").strip():
+-        return True
+-    return bool(
+-        (os.environ.get("SMTP_HOST") or "").strip()
+-        and (os.environ.get("SMTP_USER") or "").strip()
+-        and (os.environ.get("MAIL_FROM") or os.environ.get("SMTP_USER") or "").strip()
+-    )
++    return bool(_resend_key() or smtp_configured())
++
++
++def mail_status() -> dict[str, Any]:
++    resend = bool(_resend_key())
++    smtp = smtp_configured()
++    force = _clean(os.environ.get("MAIL_PROVIDER")).lower()
++    provider = "none"
++    if force == "smtp" and smtp:
++        provider = "smtp"
++    elif force == "resend" and resend:
++        provider = "resend"
++    elif resend and smtp:
++        provider = "resend_then_smtp"
++    elif resend:
++        provider = "resend"
++    elif smtp:
++        provider = "smtp"
++    port = int(_clean(os.environ.get("SMTP_PORT")) or "587") if smtp else 0
++    return {
++        "configured": mail_configured(),
++        "provider": provider,
++        "resend": resend,
++        "smtp": smtp,
++        "mail_from": _mail_from() if mail_configured() else "",
++        "smtp_host": _clean(os.environ.get("SMTP_HOST")) if smtp else "",
++        "smtp_port": port,
++    }
+ 
+ 
+ def send_email(*, to: str, subject: str, body: str, from_name: str | None = None) -> dict[str, Any]:
+@@ -24,23 +71,44 @@ def send_email(*, to: str, subject: str, body: str, from_name: str | None = None
+     if not to or "@" not in to:
+         raise RuntimeError("Client has no email address")
+ 
+-    mail_from = (os.environ.get("MAIL_FROM") or os.environ.get("SMTP_USER") or "").strip()
++    mail_from = _mail_from()
+     if not mail_from:
+         raise RuntimeError("MAIL_FROM is not set")
+ 
+     display = (from_name or os.environ.get("MAIL_FROM_NAME") or "InPmnt").strip()
+-    from_header = f"{display} <{mail_from}>"
+-
+-    resend_key = (os.environ.get("RESEND_API_KEY") or "").strip()
+-    if resend_key:
+-        return _send_resend(resend_key, from_header, to, subject, body)
+-
+-    host = (os.environ.get("SMTP_HOST") or "").strip()
+-    if not host:
+-        raise RuntimeError(
+-            "Email is not configured. Set RESEND_API_KEY or SMTP_HOST/SMTP_USER/MAIL_FROM in .env"
+-        )
+-    return _send_smtp(host, from_header, mail_from, to, subject, body)
++    from_header = formataddr((display, mail_from)) if display else mail_from
++
++    force = _clean(os.environ.get("MAIL_PROVIDER")).lower()
++    resend_key = _resend_key()
++    smtp_ok = smtp_configured()
++    try_resend = bool(resend_key) and force != "smtp"
++    try_smtp = smtp_ok and (force == "smtp" or not try_resend)
++
++    errors: list[str] = []
++    if try_resend:
++        try:
++            return _send_resend(resend_key, from_header, to, subject, body)
++        except Exception as exc:  # noqa: BLE001
++            errors.append(str(exc))
++            if not smtp_ok or force == "resend":
++                if isinstance(exc, RuntimeError):
++                    raise
++                raise RuntimeError(str(exc)) from exc
++            try_smtp = True
++
++    if try_smtp:
++        host = _clean(os.environ.get("SMTP_HOST"))
++        try:
++            return _send_smtp(host, from_header, mail_from, to, subject, body)
++        except Exception as exc:  # noqa: BLE001
++            detail = str(exc)
++            if errors:
++                raise RuntimeError(f"{errors[0]}; SMTP fallback: {detail}") from exc
++            raise RuntimeError(detail) from exc
++
++    raise RuntimeError(
++        "Email is not configured. Set RESEND_API_KEY or SMTP_HOST/SMTP_USER/MAIL_FROM in .env"
++    )
+ 
+ 
+ def _send_resend(api_key: str, from_header: str, to: str, subject: str, body: str) -> dict[str, Any]:
+@@ -68,24 +136,29 @@ def _send_resend(api_key: str, from_header: str, to: str, subject: str, body: st
+     except urllib.error.HTTPError as exc:
+         detail = exc.read().decode("utf-8", errors="replace")
+         raise RuntimeError(f"Resend error {exc.code}: {detail}") from exc
++    except urllib.error.URLError as exc:
++        raise RuntimeError(f"Resend error: {exc.reason}") from exc
+ 
+ 
+ def _send_smtp(
+     host: str, from_header: str, mail_from: str, to: str, subject: str, body: str
+ ) -> dict[str, Any]:
+-    port = int(os.environ.get("SMTP_PORT") or "587")
+-    user = (os.environ.get("SMTP_USER") or "").strip()
++    port = int(_clean(os.environ.get("SMTP_PORT")) or "587")
++    user = _clean(os.environ.get("SMTP_USER"))
+     password = os.environ.get("SMTP_PASSWORD") or ""
+-    use_ssl = (os.environ.get("SMTP_SSL") or "").strip().lower() in ("1", "true", "yes")
++    if password.startswith('"') and password.endswith('"') and len(password) >= 2:
++        password = password[1:-1]
++    use_ssl = _clean(os.environ.get("SMTP_SSL")).lower() in ("1", "true", "yes", "on")
+ 
+     msg = EmailMessage()
+     msg["Subject"] = subject or "(no subject)"
+     msg["From"] = from_header
+     msg["To"] = to
++    msg["Reply-To"] = mail_from
+     msg.set_content(body or "")
+ 
++    context = ssl.create_default_context()
+     if use_ssl or port == 465:
+-        context = ssl.create_default_context()
+         with smtplib.SMTP_SSL(host, port, context=context, timeout=30) as smtp:
+             if user:
+                 smtp.login(user, password)
+@@ -93,12 +166,7 @@ def _send_smtp(
+     else:
+         with smtplib.SMTP(host, port, timeout=30) as smtp:
+             smtp.ehlo()
+-            if (os.environ.get("SMTP_STARTTLS") or "1").strip().lower() not in (
+-                "0",
+-                "false",
+-                "no",
+-            ):
+-                context = ssl.create_default_context()
++            if _clean(os.environ.get("SMTP_STARTTLS") or "1").lower() not in ("0", "false", "no"):
+                 smtp.starttls(context=context)
+                 smtp.ehlo()
+             if user:
+diff --git a/app/routes.py b/app/routes.py
+index e2233bc..a9879c9 100644
+--- a/app/routes.py
++++ b/app/routes.py
+@@ -37,7 +37,7 @@ from .database import (
+     row_to_dict,
+     rows_to_list,
+ )
+-from .mail import mail_configured, send_email
++from .mail import mail_configured, mail_status, send_email
+ from .workspace import (
+     assert_can_add_open_invoice,
+     effective_plan,
+@@ -212,6 +212,131 @@ def invoice_balance(inv: dict[str, Any]) -> float:
+     return round(float(inv["amount"]) - float(inv["amount_paid"]), 2)
+ 
+ 
++INVOICE_TEMPLATE_NAME = "Invoice"
++DEFAULT_INVOICE_SUBJECT = "Invoice {{number}} from {{business_name}}"
++DEFAULT_INVOICE_BODY = (
++    "Hi {{client_name}},\n\n"
++    "Invoice {{number}} is ready for {{title}}.\n\n"
++    "Amount due: {{amount_due}}\n"
++    "Due date: {{due_date}}\n\n"
++    "Please reply to this email if you have any questions.\n\n"
++    "Thanks,\n{{business_name}}"
++)
++
++
++def invoice_merge_ctx(inv: Any, settings: Any) -> dict[str, Any]:
++    data = dict(inv)
++    biz = settings["business_name"] if settings else "InPmnt"
++    return {
++        "number": data.get("number") or "",
++        "client_name": data.get("client_name") or "",
++        "title": data.get("title") or "",
++        "amount_due": money(invoice_balance(data)),
++        "amount": money(float(data.get("amount") or 0)),
++        "due_date": data.get("due_date") or "",
++        "issue_date": data.get("issue_date") or "",
++        "status": data.get("status") or "",
++        "notes": data.get("notes") or "",
++        "business_name": biz,
++    }
++
++
++def email_invoice_to_client(conn, invoice_id: int, wid: int):
++    """Email the Invoice template. Drafts are marked sent and reminders scheduled.
++
++    Returns a Flask (response, status) tuple on error, or None on success.
++    """
++    inv = conn.execute(
++        """
++        SELECT i.*, c.name AS client_name, c.email AS client_email
++        FROM invoices i JOIN clients c ON c.id = i.client_id
++        WHERE i.id = ? AND i.workspace_id = ?
++        """,
++        (invoice_id, wid),
++    ).fetchone()
++    if not inv:
++        return jsonify({"error": "Not found"}), 404
++
++    to = (inv["client_email"] or "").strip()
++    if not to or "@" not in to:
++        return jsonify({"error": "Client has no email address. Add one on the client, then send again."}), 400
++
++    settings = get_settings(conn, wid)
++    was_draft = (inv["status"] or "") == "draft"
++    if was_draft:
++        blocked = assert_can_add_open_invoice(conn, wid, settings)
++        if blocked:
++            return jsonify({"error": blocked}), 403
++
++    tmpl = conn.execute(
++        "SELECT * FROM templates WHERE workspace_id=? AND name=? LIMIT 1",
++        (wid, INVOICE_TEMPLATE_NAME),
++    ).fetchone()
++    ctx = invoice_merge_ctx(inv, settings)
++    subject = render_template_vars(
++        tmpl["subject"] if tmpl else DEFAULT_INVOICE_SUBJECT, ctx
++    )
++    body = render_template_vars(tmpl["body"] if tmpl else DEFAULT_INVOICE_BODY, ctx)
++
++    if not mail_configured():
++        if not _allow_fake_email():
++            return _email_not_configured_response()
++    else:
++        try:
++            send_email(
++                to=to,
++                subject=subject,
++                body=body,
++                from_name=settings["business_name"] if settings else None,
++            )
++        except Exception as exc:  # noqa: BLE001
++            return jsonify({"error": str(exc)}), 502
++
++    now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
++    today = date.today().isoformat()
++    if was_draft:
++        if (inv["due_date"] or "") < today and float(inv["amount_paid"] or 0) < float(inv["amount"] or 0):
++            status = "overdue" if float(inv["amount_paid"] or 0) == 0 else "partial"
++        elif float(inv["amount_paid"] or 0) >= float(inv["amount"] or 0):
++            status = "paid"
++        elif float(inv["amount_paid"] or 0) > 0:
++            status = "partial"
++        else:
++            status = "sent"
++        conn.execute(
++            "UPDATE invoices SET status=?, updated_at=? WHERE id=? AND workspace_id=?",
++            (status, now, invoice_id, wid),
++        )
++        schedule_reminders_for_invoice(conn, invoice_id, inv["due_date"], force=True)
++
++    cur = conn.execute(
++        """
++        INSERT INTO reminders (
++            invoice_id, channel, scheduled_for, status, subject, body, sent_at, created_at
++        ) VALUES (?, 'email', ?, 'sent', ?, ?, ?, ?)
++        """,
++        (invoice_id, today, subject, body, now, now),
++    )
++    rid = cur.lastrowid
++    log_activity(
++        conn,
++        "invoice",
++        f"Emailed invoice {inv['number']} to {to}",
++        "invoice",
++        invoice_id,
++        workspace_id=wid,
++    )
++    log_activity(
++        conn,
++        "reminder",
++        f"Sent INVOICE email for {inv['number']} to {to}",
++        "reminder",
++        rid,
++        workspace_id=wid,
++    )
++    return None
++
++
+ def schedule_reminders_for_invoice(conn, invoice_id: int, due_date: str, force: bool = False) -> int:
+     inv0 = conn.execute("SELECT workspace_id FROM invoices WHERE id = ?", (invoice_id,)).fetchone()
+     if not inv0:
+@@ -259,6 +384,7 @@ def schedule_reminders_for_invoice(conn, invoice_id: int, due_date: str, force:
+     ctx = {
+         "number": inv["number"],
+         "client_name": inv["client_name"],
++        "title": inv["title"] if "title" in inv.keys() else "",
+         "amount_due": money(invoice_balance(dict(inv))),
+         "due_date": inv["due_date"],
+         "status": inv["status"],
+@@ -626,6 +752,8 @@ def api_create_invoice():
+     status = data.get("status") or "draft"
+     if status not in ("draft", "sent", "partial", "overdue", "paid"):
+         status = "draft"
++    want_send = status == "sent"
++    insert_status = "draft" if want_send else status
+     now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+     wid = require_workspace_id()
+ 
+@@ -637,7 +765,7 @@ def api_create_invoice():
+         if not client:
+             return jsonify({"error": "Client not found"}), 404
+         settings = get_settings(conn, wid)
+-        if status in ("sent", "partial", "overdue"):
++        if insert_status in ("sent", "partial", "overdue") or want_send:
+             blocked = assert_can_add_open_invoice(conn, wid, settings)
+             if blocked:
+                 return jsonify({"error": blocked}), 403
+@@ -658,19 +786,27 @@ def api_create_invoice():
+                 data.get("currency") or "USD",
+                 issue,
+                 due,
+-                status,
++                insert_status,
+                 (data.get("notes") or "").strip(),
+                 now,
+                 now,
+             ),
+         )
+         invoice_id = cur.lastrowid
+-        if status in ("sent", "partial", "overdue"):
++        emailed = False
++        if want_send:
++            err = email_invoice_to_client(conn, invoice_id, wid)
++            if err:
++                return err
++            emailed = True
++        elif insert_status in ("sent", "partial", "overdue"):
+             schedule_reminders_for_invoice(conn, invoice_id, due, force=True)
+         log_activity(
+             conn, "invoice", f"Created invoice {number}", "invoice", invoice_id, workspace_id=wid
+         )
+         data_out = invoice_detail(conn, invoice_id, wid)
++    if data_out:
++        data_out["emailed"] = emailed
+     return jsonify(data_out), 201
+ 
+ 
+@@ -750,39 +886,14 @@ def api_update_invoice(invoice_id: int):
+ @bp.post("/api/invoices/<int:invoice_id>/send")
+ @login_required
+ def api_send_invoice(invoice_id: int):
+-    now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+     wid = require_workspace_id()
+     with db_session(db_path()) as conn:
+-        inv = conn.execute(
+-            "SELECT * FROM invoices WHERE id=? AND workspace_id=?",
+-            (invoice_id, wid),
+-        ).fetchone()
+-        if not inv:
+-            return jsonify({"error": "Not found"}), 404
+-        if inv["status"] == "draft":
+-            settings = get_settings(conn, wid)
+-            blocked = assert_can_add_open_invoice(conn, wid, settings)
+-            if blocked:
+-                return jsonify({"error": blocked}), 403
+-        status = "paid" if inv["amount_paid"] >= inv["amount"] else (
+-            "partial" if inv["amount_paid"] > 0 else "sent"
+-        )
+-        if inv["due_date"] < date.today().isoformat() and status != "paid":
+-            status = "overdue" if inv["amount_paid"] == 0 else "partial"
+-        conn.execute(
+-            "UPDATE invoices SET status=?, updated_at=? WHERE id=? AND workspace_id=?",
+-            (status, now, invoice_id, wid),
+-        )
+-        schedule_reminders_for_invoice(conn, invoice_id, inv["due_date"], force=True)
+-        log_activity(
+-            conn,
+-            "invoice",
+-            f"Marked {inv['number']} as sent — reminders scheduled",
+-            "invoice",
+-            invoice_id,
+-            workspace_id=wid,
+-        )
++        err = email_invoice_to_client(conn, invoice_id, wid)
++        if err:
++            return err
+         out = invoice_detail(conn, invoice_id, wid)
++    if out:
++        out["emailed"] = True
+     return jsonify(out)
+ 
+ 
+@@ -890,7 +1001,8 @@ def _email_not_configured_response():
+                     "Email is not configured. Set RESEND_API_KEY or "
+                     "SMTP_HOST/SMTP_USER/MAIL_FROM in .env "
+                     "(or ALLOW_FAKE_EMAIL=1 for local testing)."
+-                )
++                ),
++                "status": mail_status(),
+             }
+         ),
+         503,
+@@ -1210,6 +1322,50 @@ def api_get_settings():
+     return jsonify(settings)
+ 
+ 
++@bp.get("/api/mail/status")
++@login_required
++def api_mail_status():
++    return jsonify(mail_status())
++
++
++@bp.post("/api/mail/test")
++@login_required
++def api_mail_test():
++    user = g.user or {}
++    to = (user.get("email") or "").strip()
++    wid = require_workspace_id()
++    with db_session(db_path()) as conn:
++        settings = get_settings(conn, wid)
++        if not to:
++            to = ((settings["email"] if settings else "") or "").strip()
++        if not to or "@" not in to:
++            return jsonify(
++                {"error": "No mailbox to send a test to. Add an email on this account or in Settings."}
++            ), 400
++        if not mail_configured():
++            if not _allow_fake_email():
++                return _email_not_configured_response()
++            return jsonify({"ok": True, "provider": "fake", "to": to, "status": mail_status()})
++        try:
++            result = send_email(
++                to=to,
++                subject="InPmnt test email",
++                body="This is a test from InPmnt.\n\nIf you received this, outbound mail is working.\n",
++                from_name=settings["business_name"] if settings else None,
++            )
++        except Exception as exc:  # noqa: BLE001
++            return jsonify({"error": str(exc), "status": mail_status()}), 502
++        log_activity(
++            conn,
++            "reminder",
++            f"Sent test email to {to}",
++            "settings",
++            wid,
++            workspace_id=wid,
++        )
++    return jsonify({"ok": True, "to": to, "status": mail_status(), **result})
++
++
+ @bp.put("/api/settings")
+ @login_required
+ def api_put_settings():
+diff --git a/build_release.ps1 b/build_release.ps1
+index 32f83a0..b20f09e 100644
+--- a/build_release.ps1
++++ b/build_release.ps1
+@@ -62,9 +62,14 @@ InPmnt PHP — Hostinger / shared hosting
+ ========================================
+ 1. Unzip ALL of these files into public_html (File Manager or FTP).
+ 2. Copy .env.example to .env and set APP_SECRET and BASE_URL=https://yourdomain.com
+-3. In hPanel → Advanced → PHP Configuration: PHP 8.2+ and enable pdo_sqlite
+-4. Open https://yourdomain.com  → Sign up
+-5. Stripe webhook: https://yourdomain.com/api/billing/webhook
++3. For email: set SMTP_HOST=smtp.hostinger.com, SMTP_PORT=465, SMTP_SSL=1,
++   SMTP_USER and MAIL_FROM to your Hostinger mailbox, and SMTP_PASSWORD.
++   Leave RESEND_API_KEY blank unless you have a real Resend key + verified domain.
++   Optional: MAIL_PROVIDER=smtp to force the mailbox even if a Resend key is set.
++4. In hPanel → Advanced → PHP Configuration: PHP 8.2+ and enable pdo_sqlite
++5. Open https://yourdomain.com  → Sign up
++6. In the app: Settings → Email delivery → Send test email to me
++7. Stripe webhook: https://yourdomain.com/api/billing/webhook
+ 
+ Do not upload into a subfolder unless that subfolder is the site document root.
+ The SQLite database is created automatically at data/inpmnt.db (blocked from the web).
+diff --git a/php/.env.example b/php/.env.example
+index 487a386..015d305 100644
+--- a/php/.env.example
++++ b/php/.env.example
+@@ -10,16 +10,28 @@ BASE_URL=https://yourdomain.com
+ SHOW_DEMO_LOGIN=0
+ ALLOW_FAKE_EMAIL=0
+ 
+-# Email — Resend (preferred) or SMTP
++# Email — Resend (optional) or SMTP (Hostinger mailbox).
++# If both are set, Resend is tried first and SMTP is the fallback.
++# A dummy RESEND_API_KEY used to block SMTP entirely — that is fixed, but
++# you can still force Hostinger SMTP with:
++# MAIL_PROVIDER=smtp
++#
++# Hostinger mailbox (recommended on shared hosting):
++# MAIL_FROM must be the same mailbox as SMTP_USER (exact address in hPanel).
++# SMTP_HOST=smtp.hostinger.com
++# SMTP_PORT=465
++# SMTP_SSL=1
++# SMTP_STARTTLS=0
++#
+ # RESEND_API_KEY=re_...
+ MAIL_FROM=billing@yourdomain.com
+ MAIL_FROM_NAME=InPmnt
+-# SMTP_HOST=smtp.example.com
+-# SMTP_PORT=587
+-# SMTP_USER=
++# SMTP_HOST=smtp.hostinger.com
++# SMTP_PORT=465
++# SMTP_USER=billing@yourdomain.com
+ # SMTP_PASSWORD=
+-# SMTP_SSL=0
+-# SMTP_STARTTLS=1
++# SMTP_SSL=1
++# SMTP_STARTTLS=0
+ 
+ # Stripe (https://dashboard.stripe.com/apikeys)
+ STRIPE_SECRET_KEY=sk_test_...
+diff --git a/php/src/App.php b/php/src/App.php
+index 3acd2be..5ab2c2c 100644
+--- a/php/src/App.php
++++ b/php/src/App.php
+@@ -257,6 +257,12 @@ final class App
+         if ($method === 'POST' && $path === '/api/billing/portal') {
+             $this->apiBillingPortal($wid);
+         }
++        if ($method === 'GET' && $path === '/api/mail/status') {
++            Http::json(Mailer::status());
++        }
++        if ($method === 'POST' && $path === '/api/mail/test') {
++            $this->apiMailTest($wid);
++        }
+         Http::json(['error' => 'Not found'], 404);
+     }
+ 
+@@ -499,6 +505,7 @@ final class App
+         $ctx = [
+             'number' => $inv['number'],
+             'client_name' => $inv['client_name'],
++            'title' => $inv['title'] ?? '',
+             'amount_due' => Db::money(Db::invoiceBalance($inv)),
+             'due_date' => $inv['due_date'],
+             'status' => $inv['status'],
+@@ -581,6 +588,8 @@ final class App
+         if (!in_array($status, ['draft', 'sent', 'partial', 'overdue', 'paid'], true)) {
+             $status = 'draft';
+         }
++        $wantSend = $status === 'sent';
++        $insertStatus = $wantSend ? 'draft' : $status;
+         $now = Db::now();
+         $c = $this->db->prepare('SELECT id FROM clients WHERE id=? AND workspace_id=?');
+         $c->execute([(int) $clientId, $wid]);
+@@ -588,7 +597,7 @@ final class App
+             Http::json(['error' => 'Client not found'], 404);
+         }
+         $settings = Workspace::settings($this->db, $wid);
+-        if (in_array($status, ['sent', 'partial', 'overdue'], true)) {
++        if (in_array($insertStatus, ['sent', 'partial', 'overdue'], true) || $wantSend) {
+             $blocked = Workspace::assertCanAddOpen($this->db, $wid, $settings);
+             if ($blocked) {
+                 Http::json(['error' => $blocked], 403);
+@@ -601,15 +610,23 @@ final class App
+              VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?)'
+         )->execute([
+             $wid, $number, (int) $clientId, $title, $amount,
+-            $data['currency'] ?? 'USD', $issue, $due, $status,
++            $data['currency'] ?? 'USD', $issue, $due, $insertStatus,
+             trim((string) ($data['notes'] ?? '')), $now, $now,
+         ]);
+         $invoiceId = (int) $this->db->lastInsertId();
+-        if (in_array($status, ['sent', 'partial', 'overdue'], true)) {
++        $emailed = false;
++        if ($wantSend) {
++            $this->deliverInvoice($wid, $invoiceId);
++            $emailed = true;
++        } elseif (in_array($insertStatus, ['sent', 'partial', 'overdue'], true)) {
+             $this->scheduleReminders($invoiceId, $due, true);
+         }
+         Db::log($this->db, 'invoice', "Created invoice {$number}", 'invoice', $invoiceId, $wid);
+-        Http::json($this->invoiceDetail($invoiceId, $wid), 201);
++        $out = $this->invoiceDetail($invoiceId, $wid);
++        if (is_array($out)) {
++            $out['emailed'] = $emailed;
++        }
++        Http::json($out, 201);
+     }
+ 
+     private function apiUpdateInvoice(int $wid, int $id): void
+@@ -660,29 +677,90 @@ final class App
+ 
+     private function apiSendInvoice(int $wid, int $id): void
+     {
+-        $st = $this->db->prepare('SELECT * FROM invoices WHERE id=? AND workspace_id=?');
++        $this->deliverInvoice($wid, $id);
++        $out = $this->invoiceDetail($id, $wid);
++        if (is_array($out)) {
++            $out['emailed'] = true;
++        }
++        Http::json($out);
++    }
++
++    /** Email the Invoice template. Drafts are marked sent and reminders are scheduled. */
++    private function deliverInvoice(int $wid, int $id): void
++    {
++        $st = $this->db->prepare(
++            'SELECT i.*, c.name AS client_name, c.email AS client_email
++             FROM invoices i JOIN clients c ON c.id = i.client_id
++             WHERE i.id=? AND i.workspace_id=?'
++        );
+         $st->execute([$id, $wid]);
+         $inv = $st->fetch();
+         if (!$inv) {
+             Http::json(['error' => 'Not found'], 404);
+         }
+-        if ($inv['status'] === 'draft') {
+-            $blocked = Workspace::assertCanAddOpen($this->db, $wid, Workspace::settings($this->db, $wid));
++        $to = trim((string) ($inv['client_email'] ?? ''));
++        if ($to === '' || !str_contains($to, '@')) {
++            Http::json(['error' => 'Client has no email address. Add one on the client, then send again.'], 400);
++        }
++        $settings = Workspace::settings($this->db, $wid);
++        $wasDraft = ($inv['status'] ?? '') === 'draft';
++        if ($wasDraft) {
++            $blocked = Workspace::assertCanAddOpen($this->db, $wid, $settings);
+             if ($blocked) {
+                 Http::json(['error' => $blocked], 403);
+             }
+         }
+-        $status = ((float) $inv['amount_paid'] >= (float) $inv['amount'])
+-            ? 'paid'
+-            : (((float) $inv['amount_paid'] > 0) ? 'partial' : 'sent');
+-        if ($inv['due_date'] < date('Y-m-d') && $status !== 'paid') {
+-            $status = ((float) $inv['amount_paid'] == 0.0) ? 'overdue' : 'partial';
++        $t = $this->db->prepare("SELECT * FROM templates WHERE workspace_id=? AND name='Invoice' LIMIT 1");
++        $t->execute([$wid]);
++        $tmpl = $t->fetch();
++        $ctx = [
++            'number' => $inv['number'],
++            'client_name' => $inv['client_name'],
++            'title' => $inv['title'] ?? '',
++            'amount_due' => Db::money(Db::invoiceBalance($inv)),
++            'amount' => Db::money((float) $inv['amount']),
++            'due_date' => $inv['due_date'],
++            'issue_date' => $inv['issue_date'],
++            'status' => $inv['status'],
++            'notes' => $inv['notes'] ?? '',
++            'business_name' => $settings['business_name'] ?? 'InPmnt',
++        ];
++        $subject = Db::renderVars($tmpl['subject'] ?? 'Invoice {{number}} from {{business_name}}', $ctx);
++        $body = Db::renderVars(
++            $tmpl['body'] ?? "Hi {{client_name}},\n\nInvoice {{number}} is ready for {{title}}.\n\nAmount due: {{amount_due}}\nDue date: {{due_date}}\n\nPlease reply to this email if you have any questions.\n\nThanks,\n{{business_name}}",
++            $ctx
++        );
++        if (!Mailer::configured()) {
++            if (!Env::truthy('ALLOW_FAKE_EMAIL')) {
++                $this->emailNotConfigured();
++            }
++        } else {
++            try {
++                Mailer::send($to, $subject, $body, $settings['business_name'] ?? null);
++            } catch (Throwable $e) {
++                Http::json(['error' => $e->getMessage()], 502);
++            }
+         }
+-        $this->db->prepare('UPDATE invoices SET status=?, updated_at=? WHERE id=? AND workspace_id=?')
+-            ->execute([$status, Db::now(), $id, $wid]);
+-        $this->scheduleReminders($id, $inv['due_date'], true);
+-        Db::log($this->db, 'invoice', "Marked {$inv['number']} as sent — reminders scheduled", 'invoice', $id, $wid);
+-        Http::json($this->invoiceDetail($id, $wid));
++        $now = Db::now();
++        $today = date('Y-m-d');
++        if ($wasDraft) {
++            $status = ((float) $inv['amount_paid'] >= (float) $inv['amount'])
++                ? 'paid'
++                : (((float) $inv['amount_paid'] > 0) ? 'partial' : 'sent');
++            if ($inv['due_date'] < $today && $status !== 'paid') {
++                $status = ((float) $inv['amount_paid'] == 0.0) ? 'overdue' : 'partial';
++            }
++            $this->db->prepare('UPDATE invoices SET status=?, updated_at=? WHERE id=? AND workspace_id=?')
++                ->execute([$status, $now, $id, $wid]);
++            $this->scheduleReminders($id, $inv['due_date'], true);
++        }
++        $this->db->prepare(
++            "INSERT INTO reminders (invoice_id, channel, scheduled_for, status, subject, body, sent_at, created_at)
++             VALUES (?, 'email', ?, 'sent', ?, ?, ?, ?)"
++        )->execute([$id, $today, $subject, $body, $now, $now]);
++        $rid = (int) $this->db->lastInsertId();
++        Db::log($this->db, 'invoice', "Emailed invoice {$inv['number']} to {$to}", 'invoice', $id, $wid);
++        Db::log($this->db, 'reminder', "Sent INVOICE email for {$inv['number']} to {$to}", 'reminder', $rid, $wid);
+     }
+ 
+     private function apiRecordPayment(int $wid, int $id): void
+@@ -737,9 +815,41 @@ final class App
+     {
+         Http::json([
+             'error' => 'Email is not configured. Set RESEND_API_KEY or SMTP_HOST/SMTP_USER/MAIL_FROM in .env (or ALLOW_FAKE_EMAIL=1 for local testing).',
++            'status' => Mailer::status(),
+         ], 503);
+     }
+ 
++    private function apiMailTest(int $wid): void
++    {
++        $user = $GLOBALS['inpmnt_user'] ?? [];
++        $settings = Workspace::settings($this->db, $wid) ?: [];
++        $to = trim((string) ($user['email'] ?? ''));
++        if ($to === '') {
++            $to = trim((string) ($settings['email'] ?? ''));
++        }
++        if ($to === '' || !str_contains($to, '@')) {
++            Http::json(['error' => 'No mailbox to send a test to. Add an email on this account or in Settings.'], 400);
++        }
++        if (!Mailer::configured()) {
++            if (!Env::truthy('ALLOW_FAKE_EMAIL')) {
++                $this->emailNotConfigured();
++            }
++            Http::json(['ok' => true, 'provider' => 'fake', 'to' => $to, 'status' => Mailer::status()]);
++        }
++        try {
++            $result = Mailer::send(
++                $to,
++                'InPmnt test email',
++                "This is a test from InPmnt.\n\nIf you received this, outbound mail is working.\n",
++                $settings['business_name'] ?? null
++            );
++            Db::log($this->db, 'reminder', "Sent test email to {$to}", 'settings', $wid, $wid);
++            Http::json(['ok' => true, 'to' => $to, 'status' => Mailer::status()] + $result);
++        } catch (Throwable $e) {
++            Http::json(['error' => $e->getMessage(), 'status' => Mailer::status()], 502);
++        }
++    }
++
+     private function apiReminders(int $wid): void
+     {
+         $today = date('Y-m-d');
+@@ -894,6 +1004,7 @@ final class App
+         $ctx = [
+             'number' => $inv['number'],
+             'client_name' => $inv['client_name'],
++            'title' => $inv['title'] ?? '',
+             'amount_due' => Db::money(Db::invoiceBalance($inv)),
+             'due_date' => $inv['due_date'],
+             'status' => $inv['status'],
+diff --git a/php/src/Db.php b/php/src/Db.php
+index bde9a3a..dddd223 100644
+--- a/php/src/Db.php
++++ b/php/src/Db.php
+@@ -131,6 +131,7 @@ final class Db
+         } else {
+             self::ensureSystemAccounts($db);
+         }
++        self::ensureMissingTemplates($db);
+     }
+ 
+     public static function now(): string
+@@ -154,9 +155,12 @@ final class Db
+         $st->execute([$wid, $kind, $message, $entityType, $entityId, self::now()]);
+     }
+ 
+-    public static function insertDefaultTemplates(PDO $db, int $workspaceId): void
++    /** @return list<array{0:string,1:string,2:?string,3:string,4:int}> */
++    public static function defaultTemplateDefs(): array
+     {
+-        $defs = [
++        return [
++            ['Invoice', 'email', 'Invoice {{number}} from {{business_name}}',
++                "Hi {{client_name}},\n\nInvoice {{number}} is ready for {{title}}.\n\nAmount due: {{amount_due}}\nDue date: {{due_date}}\n\nPlease reply to this email if you have any questions.\n\nThanks,\n{{business_name}}", 0],
+             ['Friendly nudge', 'email', 'Quick reminder about invoice {{number}}',
+                 "Hi {{client_name}},\n\nJust a friendly reminder that invoice {{number}} for {{amount_due}} is due on {{due_date}}.\n\nYou can reply to this email if you have any questions.\n\nThanks,\n{{business_name}}", 1],
+             ['Due today', 'email', 'Invoice {{number}} is due today',
+@@ -168,14 +172,37 @@ final class Db
+             ['Final notice', 'email', 'Final notice: invoice {{number}}',
+                 "Hi {{client_name}},\n\nThis is a final notice regarding unpaid invoice {{number}} ({{amount_due}}), originally due {{due_date}}.\n\nPlease remit payment promptly to avoid further collection steps.\n\n{{business_name}}", 0],
+         ];
++    }
++
++    public static function insertDefaultTemplates(PDO $db, int $workspaceId): void
++    {
+         $st = $db->prepare(
+             'INSERT INTO templates (workspace_id, name, channel, subject, body, is_default) VALUES (?, ?, ?, ?, ?, ?)'
+         );
+-        foreach ($defs as $d) {
++        foreach (self::defaultTemplateDefs() as $d) {
+             $st->execute([$workspaceId, $d[0], $d[1], $d[2], $d[3], $d[4]]);
+         }
+     }
+ 
++    public static function ensureMissingTemplates(PDO $db): void
++    {
++        $wids = $db->query('SELECT id FROM settings')->fetchAll();
++        $ins = $db->prepare(
++            'INSERT INTO templates (workspace_id, name, channel, subject, body, is_default) VALUES (?, ?, ?, ?, ?, ?)'
++        );
++        $find = $db->prepare('SELECT id FROM templates WHERE workspace_id=? AND name=?');
++        foreach ($wids as $row) {
++            $wid = (int) $row['id'];
++            foreach (self::defaultTemplateDefs() as $d) {
++                $find->execute([$wid, $d[0]]);
++                if ($find->fetch()) {
++                    continue;
++                }
++                $ins->execute([$wid, $d[0], $d[1], $d[2], $d[3], $d[4]]);
++            }
++        }
++    }
++
+     public static function createWorkspace(
+         PDO $db,
+         string $email,
+diff --git a/php/src/Env.php b/php/src/Env.php
+index 84a6b08..a5f7441 100644
+--- a/php/src/Env.php
++++ b/php/src/Env.php
+@@ -12,14 +12,17 @@ final class Env
+         if ($lines === false) {
+             return;
+         }
+-        foreach ($lines as $line) {
++        foreach ($lines as $i => $line) {
++            if ($i === 0) {
++                $line = preg_replace('/^\xEF\xBB\xBF/', '', $line) ?? $line;
++            }
+             $trim = trim($line);
+             if ($trim === '' || str_starts_with($trim, '#') || !str_contains($trim, '=')) {
+                 continue;
+             }
+             [$k, $v] = explode('=', $trim, 2);
+             $k = trim($k);
+-            $v = trim($v);
++            $v = self::unquote(trim($v));
+             if ($k === '') {
+                 continue;
+             }
+@@ -37,7 +40,19 @@ final class Env
+         if ($v === false || $v === '') {
+             $v = $_ENV[$key] ?? $default;
+         }
+-        return is_string($v) ? $v : $default;
++        return is_string($v) ? self::unquote($v) : $default;
++    }
++
++    private static function unquote(string $v): string
++    {
++        $v = trim($v);
++        if (strlen($v) >= 2) {
++            $q = $v[0];
++            if (($q === '"' || $q === "'") && str_ends_with($v, $q)) {
++                return substr($v, 1, -1);
++            }
++        }
++        return $v;
+     }
+ 
+     public static function truthy(string $key): bool
+diff --git a/php/src/Mail.php b/php/src/Mail.php
+index 06bd0ec..23fa803 100644
+--- a/php/src/Mail.php
++++ b/php/src/Mail.php
+@@ -5,43 +5,144 @@ final class Mailer
+ {
+     public static function configured(): bool
+     {
+-        if (trim(Env::get('RESEND_API_KEY')) !== '') {
+-            return true;
++        return self::resendKey() !== '' || self::smtpConfigured();
++    }
++
++    /** @return array{configured:bool,provider:string,resend:bool,smtp:bool,mail_from:string,smtp_host:string,smtp_port:int} */
++    public static function status(): array
++    {
++        $resend = self::resendKey() !== '';
++        $smtp = self::smtpConfigured();
++        $force = strtolower(trim(Env::get('MAIL_PROVIDER')));
++        $provider = 'none';
++        if ($force === 'smtp' && $smtp) {
++            $provider = 'smtp';
++        } elseif ($force === 'resend' && $resend) {
++            $provider = 'resend';
++        } elseif ($resend && $smtp) {
++            $provider = 'resend_then_smtp';
++        } elseif ($resend) {
++            $provider = 'resend';
++        } elseif ($smtp) {
++            $provider = 'smtp';
+         }
+-        return trim(Env::get('SMTP_HOST')) !== ''
+-            && trim(Env::get('SMTP_USER')) !== ''
+-            && (trim(Env::get('MAIL_FROM')) !== '' || trim(Env::get('SMTP_USER')) !== '');
++        return [
++            'configured' => self::configured(),
++            'provider' => $provider,
++            'resend' => $resend,
++            'smtp' => $smtp,
++            'mail_from' => self::mailFrom(),
++            'smtp_host' => $smtp ? trim(Env::get('SMTP_HOST')) : '',
++            'smtp_port' => $smtp ? self::smtpPort() : 0,
++        ];
+     }
+ 
+-    public static function send(string $to, string $subject, string $body, ?string $fromName = null): void
++    public static function send(string $to, string $subject, string $body, ?string $fromName = null): array
+     {
+         $to = trim($to);
+         if ($to === '' || !str_contains($to, '@')) {
+             throw new RuntimeException('Client has no email address');
+         }
+-        $mailFrom = trim(Env::get('MAIL_FROM') ?: Env::get('SMTP_USER'));
++        $mailFrom = self::mailFrom();
+         if ($mailFrom === '') {
+             throw new RuntimeException('MAIL_FROM is not set');
+         }
+         $display = trim($fromName ?: Env::get('MAIL_FROM_NAME', 'InPmnt'));
+-        $fromHeader = "{$display} <{$mailFrom}>";
++        $fromHeader = self::fromHeader($display, $mailFrom);
++
++        $force = strtolower(trim(Env::get('MAIL_PROVIDER')));
++        $resend = self::resendKey();
++        $smtpOk = self::smtpConfigured();
++        $tryResend = $resend !== '' && $force !== 'smtp';
++        $trySmtp = $smtpOk && ($force === 'smtp' || !$tryResend);
+ 
+-        $resend = trim(Env::get('RESEND_API_KEY'));
+-        if ($resend !== '') {
+-            self::resend($resend, $fromHeader, $to, $subject, $body);
+-            return;
++        $errors = [];
++        if ($tryResend) {
++            try {
++                self::resend($resend, $fromHeader, $to, $subject, $body);
++                return ['provider' => 'resend', 'id' => null];
++            } catch (Throwable $e) {
++                $errors[] = $e->getMessage();
++                if (!$smtpOk || $force === 'resend') {
++                    throw $e;
++                }
++                $trySmtp = true;
++            }
+         }
+-        $host = trim(Env::get('SMTP_HOST'));
+-        if ($host === '') {
+-            throw new RuntimeException(
+-                'Email is not configured. Set RESEND_API_KEY or SMTP_HOST/SMTP_USER/MAIL_FROM in .env'
+-            );
++        if ($trySmtp) {
++            $host = trim(Env::get('SMTP_HOST'));
++            try {
++                self::smtpSocket($host, $fromHeader, $mailFrom, $to, $subject, $body);
++                return ['provider' => 'smtp', 'id' => null];
++            } catch (Throwable $e) {
++                if ($errors) {
++                    throw new RuntimeException($errors[0] . '; SMTP fallback: ' . $e->getMessage());
++                }
++                throw $e;
++            }
+         }
+-        self::smtp($host, $fromHeader, $mailFrom, $to, $subject, $body);
++        throw new RuntimeException(
++            'Email is not configured. Set RESEND_API_KEY or SMTP_HOST/SMTP_USER/MAIL_FROM in .env'
++        );
++    }
++
++    private static function mailFrom(): string
++    {
++        return trim(Env::get('MAIL_FROM') ?: Env::get('SMTP_USER'));
++    }
++
++    private static function resendKey(): string
++    {
++        $key = trim(Env::get('RESEND_API_KEY'));
++        if ($key === '' || str_starts_with($key, 're_...')) {
++            return '';
++        }
++        $lower = strtolower($key);
++        if ($lower === 're_your_api_key' || str_contains($lower, 'changeme')) {
++            return '';
++        }
++        return $key;
++    }
++
++    private static function smtpConfigured(): bool
++    {
++        return trim(Env::get('SMTP_HOST')) !== ''
++            && trim(Env::get('SMTP_USER')) !== ''
++            && self::mailFrom() !== '';
++    }
++
++    private static function smtpPort(): int
++    {
++        return (int) (Env::get('SMTP_PORT', '587') ?: '587');
++    }
++
++    private static function fromHeader(string $display, string $mailFrom): string
++    {
++        $display = str_replace(["\r", "\n"], '', $display);
++        if ($display === '') {
++            return $mailFrom;
++        }
++        if (preg_match('/[^\x20-\x7E]/', $display) || strpbrk($display, '",<>') !== false) {
++            $encoded = '=?UTF-8?B?' . base64_encode($display) . '?=';
++            return "{$encoded} <{$mailFrom}>";
++        }
++        return "{$display} <{$mailFrom}>";
++    }
++
++    private static function headerSafe(string $value): string
++    {
++        $value = str_replace(["\r", "\n"], '', $value);
++        if ($value !== '' && preg_match('/[^\x20-\x7E]/', $value)) {
++            return '=?UTF-8?B?' . base64_encode($value) . '?=';
++        }
++        return $value;
+     }
+ 
+     private static function resend(string $apiKey, string $from, string $to, string $subject, string $body): void
+     {
++        if (!function_exists('curl_init')) {
++            throw new RuntimeException('Resend error: PHP curl extension is not enabled');
++        }
+         $payload = json_encode([
+             'from' => $from,
+             'to' => [$to],
+@@ -71,7 +172,7 @@ final class Mailer
+         }
+     }
+ 
+-    private static function smtp(
++    private static function smtpSocket(
+         string $host,
+         string $fromHeader,
+         string $mailFrom,
+@@ -79,94 +180,135 @@ final class Mailer
+         string $subject,
+         string $body
+     ): void {
+-        $port = (int) (Env::get('SMTP_PORT', '587') ?: '587');
++        $port = self::smtpPort();
+         $user = trim(Env::get('SMTP_USER'));
+         $password = Env::get('SMTP_PASSWORD');
+         $useSsl = Env::truthy('SMTP_SSL') || $port === 465;
+-        $headers = [
+-            'From: ' . $fromHeader,
+-            'Reply-To: ' . $mailFrom,
+-            'Content-Type: text/plain; charset=UTF-8',
+-        ];
+-        $extra = '';
+-        if ($useSsl) {
+-            $extra = 'ssl://';
+-        }
+-        ini_set('SMTP', $host);
+-        ini_set('smtp_port', (string) $port);
+-        if ($user !== '') {
+-            ini_set('username', $user);
+-            ini_set('password', $password);
+-        }
+-        $ok = @mail($to, $subject !== '' ? $subject : '(no subject)', $body, implode("\r\n", $headers), '-f' . $mailFrom);
+-        if (!$ok) {
+-            // Fallback socket SMTP for hosts where mail() is disabled
+-            self::smtpSocket($host, $port, $user, $password, $fromHeader, $mailFrom, $to, $subject, $body, $useSsl);
+-        }
+-        unset($extra);
+-    }
++        $wantStartTls = !$useSsl && Env::get('SMTP_STARTTLS', '1') !== '0';
+ 
+-    private static function smtpSocket(
+-        string $host,
+-        int $port,
+-        string $user,
+-        string $password,
+-        string $fromHeader,
+-        string $mailFrom,
+-        string $to,
+-        string $subject,
+-        string $body,
+-        bool $ssl
+-    ): void {
+-        $remote = ($ssl ? 'ssl://' : '') . $host . ':' . $port;
+-        $fp = @stream_socket_client($remote, $errno, $errstr, 30);
+-        if (!$fp) {
+-            throw new RuntimeException("SMTP connect failed: {$errstr}");
+-        }
+-        $read = static function () use ($fp): string {
+-            $line = '';
+-            while (!feof($fp)) {
+-                $chunk = fgets($fp, 515);
+-                if ($chunk === false) {
+-                    break;
++        $err = '';
++        $fp = self::smtpConnect($host, $port, $useSsl, true, $err);
++        if ($fp === false) {
++            $fp = self::smtpConnect($host, $port, $useSsl, false, $err);
++        }
++        if ($fp === false) {
++            throw new RuntimeException("SMTP connect failed: {$host}:{$port} {$err}");
++        }
++        stream_set_timeout($fp, 30);
++
++        try {
++            $read = static function () use ($fp): string {
++                $line = '';
++                while (!feof($fp)) {
++                    $chunk = fgets($fp, 515);
++                    if ($chunk === false) {
++                        break;
++                    }
++                    $line .= $chunk;
++                    if (isset($chunk[3]) && $chunk[3] === ' ') {
++                        break;
++                    }
++                }
++                return $line;
++            };
++            $cmd = static function (string $c) use ($fp, $read): string {
++                fwrite($fp, $c . "\r\n");
++                return $read();
++            };
++            $expect = static function (string $resp, string $okPrefix, string $what): string {
++                if (!str_starts_with(ltrim($resp), $okPrefix)) {
++                    $trim = trim(str_replace(["\r", "\n"], ' ', $resp));
++                    throw new RuntimeException("SMTP {$what} failed: {$trim}");
+                 }
+-                $line .= $chunk;
+-                if (isset($chunk[3]) && $chunk[3] === ' ') {
+-                    break;
++                return $resp;
++            };
++
++            $greeting = $read();
++            $expect($greeting, '220', 'connect');
++            $ehlo = $cmd('EHLO inpmnt.local');
++            if (!str_starts_with(ltrim($ehlo), '250')) {
++                $ehlo = $cmd('HELO inpmnt.local');
++                $expect($ehlo, '250', 'HELO');
++            }
++            if ($wantStartTls) {
++                $tls = $cmd('STARTTLS');
++                $expect($tls, '220', 'STARTTLS');
++                $cryptoOk = @stream_socket_enable_crypto($fp, true, STREAM_CRYPTO_METHOD_TLS_CLIENT);
++                if ($cryptoOk !== true) {
++                    throw new RuntimeException('SMTP STARTTLS handshake failed');
+                 }
++                $cmd('EHLO inpmnt.local');
+             }
+-            return $line;
+-        };
+-        $cmd = static function (string $c) use ($fp, $read): string {
+-            fwrite($fp, $c . "\r\n");
+-            return $read();
+-        };
+-        $read();
+-        $cmd('EHLO inpmnt');
+-        if (!$ssl && Env::get('SMTP_STARTTLS', '1') !== '0') {
+-            $cmd('STARTTLS');
+-            stream_socket_enable_crypto($fp, true, STREAM_CRYPTO_METHOD_TLS_CLIENT);
+-            $cmd('EHLO inpmnt');
+-        }
+-        if ($user !== '') {
+-            $cmd('AUTH LOGIN');
++            if ($user !== '') {
++                self::smtpAuth($cmd, $expect, $user, $password);
++            }
++            $expect($cmd('MAIL FROM:<' . $mailFrom . '>'), '250', 'MAIL FROM');
++            $expect($cmd('RCPT TO:<' . $to . '>'), '25', 'RCPT TO');
++            $expect($cmd('DATA'), '354', 'DATA');
++            $safeSubject = self::headerSafe($subject !== '' ? $subject : '(no subject)');
++            $dotBody = preg_replace('/^\./m', '..', str_replace(["\r\n", "\r"], "\n", $body)) ?? $body;
++            $dotBody = str_replace("\n", "\r\n", $dotBody);
++            $msg = 'Subject: ' . $safeSubject . "\r\n"
++                . 'From: ' . $fromHeader . "\r\n"
++                . 'To: ' . $to . "\r\n"
++                . 'Reply-To: ' . $mailFrom . "\r\n"
++                . "MIME-Version: 1.0\r\n"
++                . "Content-Type: text/plain; charset=UTF-8\r\n"
++                . "Content-Transfer-Encoding: 8bit\r\n\r\n"
++                . $dotBody . "\r\n.";
++            $expect($cmd($msg), '250', 'message');
++            $cmd('QUIT');
++        } finally {
++            fclose($fp);
++        }
++    }
++
++    /** @param callable(string):string $cmd */
++    private static function smtpAuth(callable $cmd, callable $expect, string $user, string $password): void
++    {
++        $login = $cmd('AUTH LOGIN');
++        if (str_starts_with(ltrim($login), '334')) {
+             $cmd(base64_encode($user));
+             $resp = $cmd(base64_encode($password));
+-            if (!str_starts_with($resp, '235')) {
+-                fclose($fp);
+-                throw new RuntimeException('SMTP login failed');
++            if (str_starts_with(ltrim($resp), '235')) {
++                return;
++            }
++            $plain = $cmd('AUTH PLAIN ' . base64_encode("\0{$user}\0{$password}"));
++            if (str_starts_with(ltrim($plain), '235')) {
++                return;
+             }
++            throw new RuntimeException('SMTP login failed: ' . trim(str_replace(["\r", "\n"], ' ', $resp)));
++        }
++        $plain = $cmd('AUTH PLAIN ' . base64_encode("\0{$user}\0{$password}"));
++        $expect($plain, '235', 'AUTH PLAIN');
++    }
++
++    /** @param-out string $err @return resource|false */
++    private static function smtpConnect(string $host, int $port, bool $ssl, bool $verify, string &$err)
++    {
++        $remote = ($ssl ? 'ssl://' : 'tcp://') . $host . ':' . $port;
++        $ctx = stream_context_create([
++            'ssl' => [
++                'verify_peer' => $verify,
++                'verify_peer_name' => $verify,
++                'allow_self_signed' => !$verify,
++                'SNI_enabled' => true,
++                'peer_name' => $host,
++            ],
++        ]);
++        $errno = 0;
++        $errstr = '';
++        $fp = @stream_socket_client(
++            $remote,
++            $errno,
++            $errstr,
++            30,
++            STREAM_CLIENT_CONNECT,
++            $ctx
++        );
++        if ($fp === false) {
++            $err = trim($errstr . ($errno ? " ({$errno})" : ''));
+         }
+-        $cmd('MAIL FROM:<' . $mailFrom . '>');
+-        $cmd('RCPT TO:<' . $to . '>');
+-        $cmd('DATA');
+-        $msg = 'Subject: ' . ($subject !== '' ? $subject : '(no subject)') . "\r\n"
+-            . 'From: ' . $fromHeader . "\r\n"
+-            . 'To: ' . $to . "\r\n"
+-            . "Content-Type: text/plain; charset=UTF-8\r\n\r\n"
+-            . $body . "\r\n.";
+-        $cmd($msg);
+-        $cmd('QUIT');
+-        fclose($fp);
++        return $fp;
+     }
+ }
+diff --git a/static/css/app.css b/static/css/app.css
+index e1dba86..26a763e 100644
+--- a/static/css/app.css
++++ b/static/css/app.css
+@@ -530,7 +530,11 @@ td.mono, .mono {
+   border: 1px solid rgba(255,255,255,0.08);
+   animation: rise 220ms ease;
+   font-size: 0.9rem;
+-  max-width: 360px;
++  max-width: 420px;
++}
++.toast.error {
++  background: #7a1f2b;
++  border-color: rgba(255,255,255,0.12);
+ }
+ 
+ .modal-backdrop {
+diff --git a/static/js/app.js b/static/js/app.js
+index ed9785a..888328c 100644
+--- a/static/js/app.js
++++ b/static/js/app.js
+@@ -11,12 +11,12 @@ const fmtDate = (d) => {
+   return `${m}/${day}/${y}`;
+ };
+ 
+-function toast(message) {
++function toast(message, kind = "") {
+   const el = document.createElement("div");
+-  el.className = "toast";
++  el.className = kind ? `toast ${kind}` : "toast";
+   el.textContent = message;
+   toastHost.appendChild(el);
+-  setTimeout(() => el.remove(), 3200);
++  setTimeout(() => el.remove(), kind === "error" ? 8000 : 3200);
+ }
+ 
+ async function api(path, options = {}) {
+@@ -222,9 +222,13 @@ async function renderDashboard() {
+ 
+   appEl.querySelector("#btn-new-inv")?.addEventListener("click", () => openInvoiceModal());
+   appEl.querySelector("#btn-send-due")?.addEventListener("click", async () => {
+-    const res = await api("/api/reminders/send-due", { method: "POST", body: "{}" });
+-    toast(`Sent ${res.sent} reminder${res.sent === 1 ? "" : "s"}`);
+-    renderDashboard();
++    try {
++      const res = await api("/api/reminders/send-due", { method: "POST", body: "{}" });
++      toast(`Sent ${res.sent} reminder${res.sent === 1 ? "" : "s"}`);
++      renderDashboard();
++    } catch (err) {
++      toast(err.message || "Send failed", "error");
++    }
+   });
+   wireCommon(appEl);
+ }
+@@ -309,9 +313,13 @@ async function renderInvoices(filter = "all") {
+   );
+   appEl.querySelectorAll("[data-send-inv]").forEach((btn) =>
+     btn.addEventListener("click", async () => {
+-      await api(`/api/invoices/${btn.dataset.sendInv}/send`, { method: "POST", body: "{}" });
+-      toast("Invoice sent — reminders scheduled");
+-      renderInvoices(filter);
++      try {
++        const res = await api(`/api/invoices/${btn.dataset.sendInv}/send`, { method: "POST", body: "{}" });
++        toast(res.emailed ? `Invoice emailed to ${res.client_email || "the client"}` : "Invoice sent");
++        renderInvoices(filter);
++      } catch (err) {
++        toast(err.message || "Send failed", "error");
++      }
+     })
+   );
+ }
+@@ -325,7 +333,7 @@ async function renderInvoiceDetail(id) {
+       subtitle: `${inv.title} · ${inv.client_name}`,
+       actions: `
+         <button class="btn secondary" data-go="#/invoices">Back</button>
+-        ${inv.status === "draft" ? `<button class="btn" id="btn-send">Mark sent</button>` : ""}
++        ${inv.status === "draft" ? `<button class="btn" id="btn-send">Send invoice</button>` : `<button class="btn secondary" id="btn-send">Email invoice</button>`}
+         ${inv.status !== "paid" && inv.status !== "draft" ? `<button class="btn" id="btn-pay">Record payment</button>` : ""}
+         ${inv.status === "overdue" || inv.status === "partial" ? `<button class="btn danger" id="btn-final">Final notice</button>` : ""}
+       `,
+@@ -386,22 +394,30 @@ async function renderInvoiceDetail(id) {
+             </div>`
+                 )
+                 .join("")
+-            : empty("No reminders scheduled. Mark the invoice as sent to generate a schedule.")
++            : empty("No reminders scheduled. Send the invoice to email the client and generate a schedule.")
+         }
+       </div>
+     </div>
+   `;
+   wireCommon(appEl);
+   appEl.querySelector("#btn-send")?.addEventListener("click", async () => {
+-    await api(`/api/invoices/${id}/send`, { method: "POST", body: "{}" });
+-    toast("Invoice sent — reminders scheduled");
+-    renderInvoiceDetail(id);
++    try {
++      const res = await api(`/api/invoices/${id}/send`, { method: "POST", body: "{}" });
++      toast(res.emailed ? `Invoice emailed to ${res.client_email || "the client"}` : "Invoice sent");
++      renderInvoiceDetail(id);
++    } catch (err) {
++      toast(err.message || "Send failed", "error");
++    }
+   });
+   appEl.querySelector("#btn-pay")?.addEventListener("click", () => openPaymentModal(id, () => renderInvoiceDetail(id)));
+   appEl.querySelector("#btn-final")?.addEventListener("click", async () => {
+-    await api(`/api/invoices/${id}/final-notice`, { method: "POST", body: "{}" });
+-    toast("Final notice sent");
+-    renderInvoiceDetail(id);
++    try {
++      await api(`/api/invoices/${id}/final-notice`, { method: "POST", body: "{}" });
++      toast("Final notice sent");
++      renderInvoiceDetail(id);
++    } catch (err) {
++      toast(err.message || "Send failed", "error");
++    }
+   });
+ }
+ 
+@@ -411,7 +427,7 @@ async function openInvoiceModal() {
+   const due = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);
+   openModal({
+     title: "New invoice",
+-    lead: "Create an invoice. Mark it sent to schedule reminders.",
++    lead: "Create an invoice. Send now emails the client and schedules reminders.",
+     body: `
+       <form id="inv-form" class="form-grid">
+         <div class="field"><label>Client</label>
+@@ -425,7 +441,7 @@ async function openInvoiceModal() {
+         <div class="field"><label>Issue date</label><input name="issue_date" type="date" value="${today}" /></div>
+         <div class="field"><label>Due date</label><input name="due_date" type="date" value="${due}" /></div>
+         <div class="field"><label>Status</label>
+-          <select name="status"><option value="draft">Draft</option><option value="sent">Send now</option></select>
++          <select name="status"><option value="draft">Save as draft</option><option value="sent">Email to client now</option></select>
+         </div>
+         <div class="field"><label>Notes</label><input name="notes" placeholder="Optional" /></div>
+         <div class="modal-actions field full">
+@@ -442,10 +458,14 @@ async function openInvoiceModal() {
+         const payload = Object.fromEntries(fd.entries());
+         payload.client_id = +payload.client_id;
+         payload.amount = +payload.amount;
+-        const inv = await api("/api/invoices", { method: "POST", body: JSON.stringify(payload) });
+-        closeModal();
+-        toast(`Created ${inv.number}`);
+-        location.hash = `#/invoices/${inv.id}`;
++        try {
++          const inv = await api("/api/invoices", { method: "POST", body: JSON.stringify(payload) });
++          closeModal();
++          toast(inv.emailed ? `Emailed ${inv.number} to ${inv.client_email || "the client"}` : `Created ${inv.number}`);
++          location.hash = `#/invoices/${inv.id}`;
++        } catch (err) {
++          toast(err.message || "Could not create invoice", "error");
++        }
+       };
+     },
+   });
+@@ -604,9 +624,13 @@ async function renderReminders() {
+     </div>
+   `;
+   appEl.querySelector("#btn-send-due").onclick = async () => {
+-    const res = await api("/api/reminders/send-due", { method: "POST", body: "{}" });
+-    toast(`Sent ${res.sent} reminder${res.sent === 1 ? "" : "s"}`);
+-    renderReminders();
++    try {
++      const res = await api("/api/reminders/send-due", { method: "POST", body: "{}" });
++      toast(`Sent ${res.sent} reminder${res.sent === 1 ? "" : "s"}`);
++      renderReminders();
++    } catch (err) {
++      toast(err.message || "Send failed", "error");
++    }
+   };
+   wireCommon(appEl);
+ }
+@@ -618,7 +642,7 @@ async function renderTemplates() {
+     ${topbar({
+       eyebrow: "Workspace",
+       title: "Message templates",
+-      subtitle: "Use {{client_name}}, {{number}}, {{amount_due}}, {{due_date}}, {{business_name}}.",
++      subtitle: "Use {{client_name}}, {{number}}, {{title}}, {{amount_due}}, {{due_date}}, {{business_name}}. The Invoice template is what Send invoice emails.",
+     })}
+     <div class="stack">
+       ${templates
+@@ -673,7 +697,20 @@ async function renderTemplates() {
+ 
+ /* ---------- Settings ---------- */
+ async function renderSettings() {
+-  const [s, billing] = await Promise.all([api("/api/settings"), api("/api/billing/status")]);
++  const [s, billing, mail] = await Promise.all([
++    api("/api/settings"),
++    api("/api/billing/status"),
++    api("/api/mail/status").catch(() => ({ configured: false, provider: "none" })),
++  ]);
++  const mailLabel = mail.configured
++    ? mail.provider === "smtp"
++      ? `SMTP ready (${mail.smtp_host}:${mail.smtp_port}) sending as ${mail.mail_from}`
++      : mail.provider === "resend"
++        ? `Resend ready, sending as ${mail.mail_from}`
++        : mail.provider === "resend_then_smtp"
++          ? `Resend first, Hostinger SMTP fallback (${mail.smtp_host}) as ${mail.mail_from}`
++          : `Mail ready (${mail.provider})`
++    : "Not configured — add SMTP or RESEND_API_KEY in .env on the server.";
+   appEl.innerHTML = `
+     ${topbar({
+       eyebrow: "Workspace",
+@@ -695,6 +732,13 @@ async function renderSettings() {
+         ${billing.has_customer ? `<button class="btn ghost sm" id="btn-portal">Manage billing</button>` : ""}
+       </div>
+     </div>
++    <div class="panel" style="margin-bottom:14px">
++      <div class="panel-header"><h2>Email delivery</h2></div>
++      <p class="settings-note" style="margin-bottom:14px">${mailLabel}</p>
++      <div class="actions">
++        <button class="btn sm" type="button" id="btn-mail-test">Send test email to me</button>
++      </div>
++    </div>
+     <form id="settings-form" class="panel form-grid">
+       <div class="field"><label>Business name</label><input name="business_name" value="${s.business_name || ""}" required /></div>
+       <div class="field"><label>Owner</label><input name="owner_name" value="${s.owner_name || ""}" required /></div>
+@@ -713,7 +757,7 @@ async function renderSettings() {
+       </div>
+       <div class="field full">
+         <p class="settings-note">
+-          Reminder sends are logged in-app until SMTP/Twilio are connected (see GO_TO_MARKET.md).
++          Email reminders send through .env (Resend or Hostinger SMTP). SMS still requires Pro and is not wired yet.
+         </p>
+       </div>
+       <div class="field full actions">
+@@ -748,7 +792,19 @@ async function renderSettings() {
+       const res = await api("/api/billing/portal", { method: "POST", body: "{}" });
+       if (res.url) location.href = res.url;
+     } catch (err) {
+-      toast(err.message || "Portal unavailable");
++      toast(err.message || "Portal unavailable", "error");
++    }
++  });
++  appEl.querySelector("#btn-mail-test")?.addEventListener("click", async () => {
++    const btn = appEl.querySelector("#btn-mail-test");
++    btn.disabled = true;
++    try {
++      const res = await api("/api/mail/test", { method: "POST", body: "{}" });
++      toast(`Test email sent to ${res.to} via ${res.provider || "mail"}`);
++    } catch (err) {
++      toast(err.message || "Test email failed", "error");
++    } finally {
++      btn.disabled = false;
+     }
+   });
+ }
+@@ -761,9 +817,13 @@ function wireCommon(root) {
+   });
+   root.querySelectorAll("[data-send-reminder]").forEach((btn) => {
+     btn.addEventListener("click", async () => {
+-      await api(`/api/reminders/${btn.dataset.sendReminder}/send`, { method: "POST", body: "{}" });
+-      toast("Reminder sent");
+-      route();
++      try {
++        await api(`/api/reminders/${btn.dataset.sendReminder}/send`, { method: "POST", body: "{}" });
++        toast("Reminder sent");
++        route();
++      } catch (err) {
++        toast(err.message || "Send failed", "error");
++      }
+     });
+   });
+ }
+@@ -784,7 +844,7 @@ async function route() {
+     else await renderDashboard();
+   } catch (err) {
+     console.error(err);
+-    toast(err.message || "Something went wrong");
++    toast(err.message || "Something went wrong", "error");
+   }
+ }
+ 
+diff --git a/tests/test_invoice_send.py b/tests/test_invoice_send.py
+new file mode 100644
+index 0000000..7b6856c
+--- /dev/null
++++ b/tests/test_invoice_send.py
+@@ -0,0 +1,150 @@
++"""Sending the invoice itself emails the client (not just reminders)."""
++from __future__ import annotations
++
++import os
++import tempfile
++import unittest
++from unittest.mock import patch
++
++from app import create_app
++from app.database import init_db
++
++
++class InvoiceSendTests(unittest.TestCase):
++    def setUp(self) -> None:
++        self._saved = {
++            k: os.environ.get(k)
++            for k in (
++                "DATABASE_PATH",
++                "SMTP_HOST",
++                "SMTP_USER",
++                "MAIL_FROM",
++                "SMTP_PASSWORD",
++                "SMTP_PORT",
++                "SMTP_SSL",
++                "RESEND_API_KEY",
++                "MAIL_PROVIDER",
++            )
++        }
++        fd, self.db_path = tempfile.mkstemp(suffix=".db")
++        os.close(fd)
++        os.environ["DATABASE_PATH"] = self.db_path
++        os.environ["SMTP_HOST"] = "smtp.hostinger.com"
++        os.environ["SMTP_PORT"] = "465"
++        os.environ["SMTP_USER"] = "billing@example.com"
++        os.environ["SMTP_PASSWORD"] = "secret"
++        os.environ["SMTP_SSL"] = "1"
++        os.environ["MAIL_FROM"] = "billing@example.com"
++        os.environ["MAIL_PROVIDER"] = "smtp"
++        os.environ.pop("RESEND_API_KEY", None)
++        init_db(self.db_path)
++        app = create_app()
++        app.config["TESTING"] = True
++        app.config["DATABASE"] = self.db_path
++        self.client = app.test_client()
++        signup = self.client.post(
++            "/signup",
++            data={
++                "name": "Pat",
++                "business_name": "Pat Co",
++                "email": "pat@example.com",
++                "password": "password123",
++            },
++        )
++        self.assertIn(signup.status_code, (302, 303))
++        created = self.client.post(
++            "/api/clients",
++            json={
++                "name": "Maya Chen",
++                "email": "maya@client.example",
++                "company": "Chen Landscape",
++            },
++        )
++        self.assertEqual(created.status_code, 201, created.get_json())
++        self.client_id = created.get_json()["id"]
++
++    def tearDown(self) -> None:
++        try:
++            os.remove(self.db_path)
++        except OSError:
++            pass
++        for key, value in self._saved.items():
++            if value is None:
++                os.environ.pop(key, None)
++            else:
++                os.environ[key] = value
++
++    def _create_draft(self) -> dict:
++        res = self.client.post(
++            "/api/invoices",
++            json={
++                "client_id": self.client_id,
++                "title": "Spring cleanup",
++                "amount": 250,
++                "status": "draft",
++            },
++        )
++        self.assertEqual(res.status_code, 201, res.get_json())
++        body = res.get_json()
++        self.assertFalse(body.get("emailed"))
++        self.assertEqual(body["status"], "draft")
++        return body
++
++    def test_send_emails_client_and_marks_sent(self) -> None:
++        inv = self._create_draft()
++        with patch("app.routes.send_email", return_value={"provider": "smtp", "id": None}) as send:
++            res = self.client.post(f"/api/invoices/{inv['id']}/send", json={})
++            self.assertEqual(res.status_code, 200, res.get_json())
++            body = res.get_json()
++            self.assertTrue(body["emailed"])
++            self.assertEqual(body["status"], "sent")
++            self.assertEqual(body["client_email"], "maya@client.example")
++            send.assert_called_once()
++            kwargs = send.call_args.kwargs
++            self.assertEqual(kwargs["to"], "maya@client.example")
++            self.assertIn(inv["number"], kwargs["subject"])
++            self.assertIn("Spring cleanup", kwargs["body"])
++            self.assertIn("$250.00", kwargs["body"])
++
++    def test_create_send_now_emails(self) -> None:
++        with patch("app.routes.send_email", return_value={"provider": "smtp", "id": None}) as send:
++            res = self.client.post(
++                "/api/invoices",
++                json={
++                    "client_id": self.client_id,
++                    "title": "Fence repair",
++                    "amount": 80,
++                    "status": "sent",
++                },
++            )
++            self.assertEqual(res.status_code, 201, res.get_json())
++            body = res.get_json()
++            self.assertTrue(body["emailed"])
++            self.assertEqual(body["status"], "sent")
++            send.assert_called_once()
++            self.assertEqual(send.call_args.kwargs["to"], "maya@client.example")
++            self.assertIn("Fence repair", send.call_args.kwargs["body"])
++
++    def test_missing_client_email_blocks_send(self) -> None:
++        no_mail = self.client.post("/api/clients", json={"name": "No Email Co"})
++        self.assertEqual(no_mail.status_code, 201)
++        cid = no_mail.get_json()["id"]
++        inv = self.client.post(
++            "/api/invoices",
++            json={"client_id": cid, "title": "Job", "amount": 10, "status": "draft"},
++        ).get_json()
++        res = self.client.post(f"/api/invoices/{inv['id']}/send", json={})
++        self.assertEqual(res.status_code, 400)
++        self.assertIn("email", (res.get_json().get("error") or "").lower())
++        still = self.client.get(f"/api/invoices/{inv['id']}").get_json()
++        self.assertEqual(still["status"], "draft")
++
++    def test_invoice_template_is_present(self) -> None:
++        res = self.client.get("/api/templates")
++        self.assertEqual(res.status_code, 200)
++        names = {t["name"] for t in res.get_json()}
++        self.assertIn("Invoice", names)
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/tests/test_mail.py b/tests/test_mail.py
+new file mode 100644
+index 0000000..33e81eb
+--- /dev/null
++++ b/tests/test_mail.py
+@@ -0,0 +1,209 @@
++"""Mail provider selection and SMTP fallback."""
++from __future__ import annotations
++
++import io
++import os
++import unittest
++import urllib.error
++from unittest.mock import MagicMock, patch
++
++from app.mail import mail_configured, mail_status, send_email
++
++
++class MailConfigTests(unittest.TestCase):
++    def setUp(self) -> None:
++        self._saved = dict(os.environ)
++        for key in list(os.environ):
++            if key.startswith(("RESEND", "SMTP_", "MAIL_")):
++                del os.environ[key]
++
++    def tearDown(self) -> None:
++        os.environ.clear()
++        os.environ.update(self._saved)
++
++    def _smtp(self) -> None:
++        os.environ["SMTP_HOST"] = "smtp.hostinger.com"
++        os.environ["SMTP_PORT"] = "465"
++        os.environ["SMTP_USER"] = "billing@example.com"
++        os.environ["SMTP_PASSWORD"] = "secret"
++        os.environ["SMTP_SSL"] = "1"
++        os.environ["MAIL_FROM"] = "billing@example.com"
++        os.environ["MAIL_FROM_NAME"] = "InPmnt"
++
++    def test_unconfigured(self) -> None:
++        self.assertFalse(mail_configured())
++        self.assertEqual(mail_status()["provider"], "none")
++
++    def test_placeholder_resend_ignored(self) -> None:
++        os.environ["RESEND_API_KEY"] = "re_..."
++        self.assertFalse(mail_configured())
++        os.environ["RESEND_API_KEY"] = "re_your_api_key"
++        self.assertFalse(mail_configured())
++
++    def test_smtp_only_status(self) -> None:
++        self._smtp()
++        self.assertTrue(mail_configured())
++        st = mail_status()
++        self.assertEqual(st["provider"], "smtp")
++        self.assertTrue(st["smtp"])
++        self.assertFalse(st["resend"])
++        self.assertEqual(st["smtp_host"], "smtp.hostinger.com")
++        self.assertEqual(st["smtp_port"], 465)
++
++    def test_both_providers_report_fallback(self) -> None:
++        self._smtp()
++        os.environ["RESEND_API_KEY"] = "re_not_a_placeholder_key_value"
++        st = mail_status()
++        self.assertEqual(st["provider"], "resend_then_smtp")
++        self.assertTrue(st["resend"])
++        self.assertTrue(st["smtp"])
++
++    def test_mail_provider_smtp_forces_smtp(self) -> None:
++        self._smtp()
++        os.environ["RESEND_API_KEY"] = "re_not_a_placeholder_key_value"
++        os.environ["MAIL_PROVIDER"] = "smtp"
++        self.assertEqual(mail_status()["provider"], "smtp")
++
++    @patch("app.mail._send_smtp")
++    @patch("app.mail._send_resend")
++    def test_invalid_resend_falls_back_to_smtp(self, resend: MagicMock, smtp: MagicMock) -> None:
++        self._smtp()
++        os.environ["RESEND_API_KEY"] = "re_not_a_placeholder_key_value"
++        resend.side_effect = RuntimeError("Resend error 401: invalid api key")
++        smtp.return_value = {"provider": "smtp", "id": None}
++        out = send_email(to="client@example.com", subject="Due", body="Please pay")
++        self.assertEqual(out["provider"], "smtp")
++        resend.assert_called_once()
++        smtp.assert_called_once()
++
++    @patch("app.mail._send_smtp")
++    @patch("app.mail._send_resend")
++    def test_mail_provider_smtp_skips_resend(self, resend: MagicMock, smtp: MagicMock) -> None:
++        self._smtp()
++        os.environ["RESEND_API_KEY"] = "re_not_a_placeholder_key_value"
++        os.environ["MAIL_PROVIDER"] = "smtp"
++        smtp.return_value = {"provider": "smtp", "id": None}
++        out = send_email(to="client@example.com", subject="Due", body="Please pay")
++        self.assertEqual(out["provider"], "smtp")
++        resend.assert_not_called()
++        smtp.assert_called_once()
++
++    @patch("app.mail._send_resend")
++    def test_resend_only_does_not_invent_smtp(self, resend: MagicMock) -> None:
++        os.environ["RESEND_API_KEY"] = "re_not_a_placeholder_key_value"
++        os.environ["MAIL_FROM"] = "billing@example.com"
++        resend.return_value = {"provider": "resend", "id": "abc"}
++        out = send_email(to="client@example.com", subject="Due", body="Please pay")
++        self.assertEqual(out["provider"], "resend")
++
++    def test_missing_recipient(self) -> None:
++        self._smtp()
++        with self.assertRaisesRegex(RuntimeError, "no email"):
++            send_email(to="", subject="x", body="y")
++
++    def test_combined_error_when_both_fail(self) -> None:
++        self._smtp()
++        os.environ["RESEND_API_KEY"] = "re_not_a_placeholder_key_value"
++        with patch("app.mail._send_resend", side_effect=RuntimeError("Resend error 401: nope")):
++            with patch("app.mail._send_smtp", side_effect=RuntimeError("SMTP login failed")):
++                with self.assertRaisesRegex(RuntimeError, "Resend error 401.*SMTP fallback"):
++                    send_email(to="client@example.com", subject="Due", body="Please pay")
++
++    def test_resend_http_error_message(self) -> None:
++        os.environ["RESEND_API_KEY"] = "re_not_a_placeholder_key_value"
++        os.environ["MAIL_FROM"] = "billing@example.com"
++        fp = io.BytesIO(b'{"message":"invalid"}')
++        err = urllib.error.HTTPError(
++            "https://api.resend.com/emails", 401, "Unauthorized", hdrs=None, fp=fp
++        )
++        with patch("urllib.request.urlopen", side_effect=err):
++            with self.assertRaisesRegex(RuntimeError, "Resend error 401"):
++                send_email(to="client@example.com", subject="Due", body="Please pay")
++
++
++class MailApiSmokeTests(unittest.TestCase):
++    def test_status_requires_login(self) -> None:
++        from app import create_app
++
++        app = create_app()
++        app.config["TESTING"] = True
++        with app.test_client() as client:
++            res = client.get("/api/mail/status")
++            self.assertEqual(res.status_code, 401)
++
++    def test_status_and_test_send_when_logged_in(self) -> None:
++        import tempfile
++        from unittest.mock import patch
++
++        from app import create_app
++        from app.database import init_db
++
++        saved = {
++            k: os.environ.get(k)
++            for k in (
++                "DATABASE_PATH",
++                "SMTP_HOST",
++                "SMTP_USER",
++                "MAIL_FROM",
++                "SMTP_PASSWORD",
++                "SMTP_PORT",
++                "SMTP_SSL",
++                "RESEND_API_KEY",
++                "MAIL_PROVIDER",
++            )
++        }
++        fd, db_path = tempfile.mkstemp(suffix=".db")
++        os.close(fd)
++        try:
++            os.environ["DATABASE_PATH"] = db_path
++            os.environ["SMTP_HOST"] = "smtp.hostinger.com"
++            os.environ["SMTP_PORT"] = "465"
++            os.environ["SMTP_USER"] = "billing@example.com"
++            os.environ["SMTP_PASSWORD"] = "secret"
++            os.environ["SMTP_SSL"] = "1"
++            os.environ["MAIL_FROM"] = "billing@example.com"
++            os.environ["MAIL_PROVIDER"] = "smtp"
++            os.environ.pop("RESEND_API_KEY", None)
++            init_db(db_path)
++            app = create_app()
++            app.config["TESTING"] = True
++            app.config["DATABASE"] = db_path
++            with app.test_client() as client:
++                signup = client.post(
++                    "/signup",
++                    data={
++                        "name": "Pat",
++                        "business_name": "Pat Co",
++                        "email": "pat@example.com",
++                        "password": "password123",
++                    },
++                )
++                self.assertIn(signup.status_code, (302, 303))
++                status = client.get("/api/mail/status")
++                self.assertEqual(status.status_code, 200)
++                body = status.get_json()
++                self.assertTrue(body["configured"])
++                self.assertEqual(body["provider"], "smtp")
++                self.assertEqual(body["smtp_host"], "smtp.hostinger.com")
++                with patch("app.routes.send_email", return_value={"provider": "smtp", "id": None}) as send:
++                    test = client.post("/api/mail/test", json={})
++                    self.assertEqual(test.status_code, 200, test.get_json())
++                    payload = test.get_json()
++                    self.assertTrue(payload["ok"])
++                    self.assertEqual(payload["to"], "pat@example.com")
++                    self.assertEqual(payload["provider"], "smtp")
++                    send.assert_called_once()
++        finally:
++            try:
++                os.remove(db_path)
++            except OSError:
++                pass
++            for key, value in saved.items():
++                if value is None:
++                    os.environ.pop(key, None)
++                else:
++                    os.environ[key] = value
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/tests/test_mailer.php b/tests/test_mailer.php
+new file mode 100644
+index 0000000..21de2b6
+--- /dev/null
++++ b/tests/test_mailer.php
+@@ -0,0 +1,57 @@
++<?php
++declare(strict_types=1);
++
++require dirname(__DIR__) . '/php/src/Env.php';
++require dirname(__DIR__) . '/php/src/Mail.php';
++
++function clear_mail_env(): void
++{
++    foreach (['RESEND_API_KEY', 'SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASSWORD', 'SMTP_SSL', 'SMTP_STARTTLS', 'MAIL_FROM', 'MAIL_FROM_NAME', 'MAIL_PROVIDER'] as $k) {
++        putenv($k);
++        unset($_ENV[$k]);
++    }
++}
++
++function assert_true(bool $cond, string $msg): void
++{
++    if (!$cond) {
++        fwrite(STDERR, "FAIL: {$msg}\n");
++        exit(1);
++    }
++}
++
++clear_mail_env();
++assert_true(!Mailer::configured(), 'empty env is not configured');
++assert_true(Mailer::status()['provider'] === 'none', 'provider none');
++
++putenv('RESEND_API_KEY=re_...');
++$_ENV['RESEND_API_KEY'] = 're_...';
++assert_true(!Mailer::configured(), 'placeholder resend is ignored');
++
++clear_mail_env();
++putenv('SMTP_HOST=smtp.hostinger.com');
++putenv('SMTP_PORT=465');
++putenv('SMTP_USER=billing@example.com');
++putenv('SMTP_PASSWORD=secret');
++putenv('SMTP_SSL=1');
++putenv('MAIL_FROM=billing@example.com');
++$_ENV['SMTP_HOST'] = 'smtp.hostinger.com';
++$_ENV['SMTP_USER'] = 'billing@example.com';
++$_ENV['MAIL_FROM'] = 'billing@example.com';
++assert_true(Mailer::configured(), 'smtp is configured');
++$st = Mailer::status();
++assert_true($st['provider'] === 'smtp', 'provider smtp, got ' . $st['provider']);
++assert_true($st['smtp_host'] === 'smtp.hostinger.com', 'smtp host');
++assert_true($st['smtp_port'] === 465, 'smtp port');
++
++putenv('RESEND_API_KEY=re_not_a_placeholder_key_value');
++$_ENV['RESEND_API_KEY'] = 're_not_a_placeholder_key_value';
++$st = Mailer::status();
++assert_true($st['provider'] === 'resend_then_smtp', 'both providers, got ' . $st['provider']);
++
++putenv('MAIL_PROVIDER=smtp');
++$_ENV['MAIL_PROVIDER'] = 'smtp';
++$st = Mailer::status();
++assert_true($st['provider'] === 'smtp', 'MAIL_PROVIDER=smtp forces smtp, got ' . $st['provider']);
++
++fwrite(STDOUT, "ok\n");
