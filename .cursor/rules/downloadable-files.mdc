@@ -1,18 +1,27 @@
 ---
-description: Always put files the user asked for in the download tray and give a clickable link in the same turn.
+description: Always give public HTTPS download URLs. Never /opt/cursor/artifacts or other local paths in the chat.
 alwaysApply: true
 ---
 
-# Downloadable files
+# Web-accessible downloads only
 
-When the user asks for a file (zip, txt, xml, pdf, image, installer, or any other artifact they should take with them), **that turn is not done until they can download it**.
+If the user should receive a file, the **chat reply must use a public HTTPS URL** they can open in a browser. A turn is not done until that URL is pushed and verified (`curl -sSI` → 200).
 
-1. Copy the file to `/opt/cursor/artifacts/<filename>` (Cursor download tray).
-2. Commit a copy under repo-root `patches/<filename>` (same pattern as InPmnt-PHP.zip) and push.
-3. In the **user-facing reply**, the download must be a **public HTTPS URL** the user can open in a browser. Never `/opt/cursor/artifacts/...` — that path is not web-accessible to them.
-   - Zip (this is what they click): `https://raw.githubusercontent.com/devildog5x5/InPmnt/<branch>/patches/<filename>`
-   - Same pattern as InPmnt-PHP.zip. Still copy to `/opt/cursor/artifacts/` for the tray, but **do not** put that path in the chat as the download link.
-4. If you built more than one file, make **every** one downloadable the same way.
-5. Prefer a **versioned** filename (`FamilyShieldPro-1.0.0.zip`) plus a latest alias (`FamilyShieldPro.zip`).
-6. Never send `robots.txt`, `sitemap.xml`, or other text as a GitHub raw URL when the user needs a file — the browser shows the data. Put those files **inside the product zip** and give only the zip as the download.
-7. Do not give `/opt/cursor/artifacts/` as a download link. It is not a web URL.
+## Required
+
+1. Commit the file under repo-root `patches/<filename>` (same pattern as InPmnt-PHP.zip) and `git push`.
+2. In the reply, the download is **only**:
+   `https://raw.githubusercontent.com/devildog5x5/InPmnt/<branch>/patches/<filename>`
+3. Verify with `curl -sSI` that the URL returns HTTP 200 (zip → `Content-Type: application/zip`).
+4. Put `robots.txt`, `sitemap.xml`, and other text **inside the product zip**. Do not send those as standalone raw links (the browser shows text, not a save).
+5. Prefer a versioned zip (`FamilyShieldPro-1.0.0.zip`).
+
+## Forbidden in user-facing replies
+
+- `/opt/cursor/artifacts/...`
+- `/workspace/...`
+- `file://...`
+- HTML `<a href="/opt/cursor/artifacts/...">`
+- “it’s on the VM” / “download tray” as the only pointer
+
+Copying to `/opt/cursor/artifacts/` for the agent tray is fine internally. **Never** paste that path as the link they should click.

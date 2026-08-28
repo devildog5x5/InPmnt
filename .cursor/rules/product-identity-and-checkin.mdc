@@ -34,7 +34,7 @@ A turn that changes software is not done until a **dev + build manager** would s
    - `FamilyShieldPro.zip` (latest alias)
 4. Put `VERSION` and `BUILD.txt` **inside** the zip (`Product`, `Version`, `Channel`, `Git`, `Date`, `Not: InPmnt`).
 5. Copy versioned + alias zips to `/opt/cursor/artifacts/` **and** repo-root `patches/`, then push.
-6. Chat handoff lists the **versioned** filename first, then the alias, with clickable GitHub + tray links.
+6. Chat handoff lists the **versioned** HTTPS URL first (`https://raw.githubusercontent.com/devildog5x5/InPmnt/<branch>/patches/FamilyShieldPro-<version>.zip`). Never a local artifacts path.
 
 ## Do not
 
