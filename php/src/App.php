@@ -505,6 +505,7 @@ final class App
         $ctx = [
             'number' => $inv['number'],
             'client_name' => $inv['client_name'],
+            'title' => $inv['title'] ?? '',
             'amount_due' => Db::money(Db::invoiceBalance($inv)),
             'due_date' => $inv['due_date'],
             'status' => $inv['status'],
@@ -587,6 +588,8 @@ final class App
         if (!in_array($status, ['draft', 'sent', 'partial', 'overdue', 'paid'], true)) {
             $status = 'draft';
         }
+        $wantSend = $status === 'sent';
+        $insertStatus = $wantSend ? 'draft' : $status;
         $now = Db::now();
         $c = $this->db->prepare('SELECT id FROM clients WHERE id=? AND workspace_id=?');
         $c->execute([(int) $clientId, $wid]);
@@ -594,7 +597,7 @@ final class App
             Http::json(['error' => 'Client not found'], 404);
         }
         $settings = Workspace::settings($this->db, $wid);
-        if (in_array($status, ['sent', 'partial', 'overdue'], true)) {
+        if (in_array($insertStatus, ['sent', 'partial', 'overdue'], true) || $wantSend) {
             $blocked = Workspace::assertCanAddOpen($this->db, $wid, $settings);
             if ($blocked) {
                 Http::json(['error' => $blocked], 403);
@@ -607,15 +610,23 @@ final class App
              VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?)'
         )->execute([
             $wid, $number, (int) $clientId, $title, $amount,
-            $data['currency'] ?? 'USD', $issue, $due, $status,
+            $data['currency'] ?? 'USD', $issue, $due, $insertStatus,
             trim((string) ($data['notes'] ?? '')), $now, $now,
         ]);
         $invoiceId = (int) $this->db->lastInsertId();
-        if (in_array($status, ['sent', 'partial', 'overdue'], true)) {
+        $emailed = false;
+        if ($wantSend) {
+            $this->deliverInvoice($wid, $invoiceId);
+            $emailed = true;
+        } elseif (in_array($insertStatus, ['sent', 'partial', 'overdue'], true)) {
             $this->scheduleReminders($invoiceId, $due, true);
         }
         Db::log($this->db, 'invoice', "Created invoice {$number}", 'invoice', $invoiceId, $wid);
-        Http::json($this->invoiceDetail($invoiceId, $wid), 201);
+        $out = $this->invoiceDetail($invoiceId, $wid);
+        if (is_array($out)) {
+            $out['emailed'] = $emailed;
+        }
+        Http::json($out, 201);
     }
 
     private function apiUpdateInvoice(int $wid, int $id): void
@@ -666,29 +677,90 @@ final class App
 
     private function apiSendInvoice(int $wid, int $id): void
     {
-        $st = $this->db->prepare('SELECT * FROM invoices WHERE id=? AND workspace_id=?');
+        $this->deliverInvoice($wid, $id);
+        $out = $this->invoiceDetail($id, $wid);
+        if (is_array($out)) {
+            $out['emailed'] = true;
+        }
+        Http::json($out);
+    }
+
+    /** Email the Invoice template. Drafts are marked sent and reminders are scheduled. */
+    private function deliverInvoice(int $wid, int $id): void
+    {
+        $st = $this->db->prepare(
+            'SELECT i.*, c.name AS client_name, c.email AS client_email
+             FROM invoices i JOIN clients c ON c.id = i.client_id
+             WHERE i.id=? AND i.workspace_id=?'
+        );
         $st->execute([$id, $wid]);
         $inv = $st->fetch();
         if (!$inv) {
             Http::json(['error' => 'Not found'], 404);
         }
-        if ($inv['status'] === 'draft') {
-            $blocked = Workspace::assertCanAddOpen($this->db, $wid, Workspace::settings($this->db, $wid));
+        $to = trim((string) ($inv['client_email'] ?? ''));
+        if ($to === '' || !str_contains($to, '@')) {
+            Http::json(['error' => 'Client has no email address. Add one on the client, then send again.'], 400);
+        }
+        $settings = Workspace::settings($this->db, $wid);
+        $wasDraft = ($inv['status'] ?? '') === 'draft';
+        if ($wasDraft) {
+            $blocked = Workspace::assertCanAddOpen($this->db, $wid, $settings);
             if ($blocked) {
                 Http::json(['error' => $blocked], 403);
             }
         }
-        $status = ((float) $inv['amount_paid'] >= (float) $inv['amount'])
-            ? 'paid'
-            : (((float) $inv['amount_paid'] > 0) ? 'partial' : 'sent');
-        if ($inv['due_date'] < date('Y-m-d') && $status !== 'paid') {
-            $status = ((float) $inv['amount_paid'] == 0.0) ? 'overdue' : 'partial';
+        $t = $this->db->prepare("SELECT * FROM templates WHERE workspace_id=? AND name='Invoice' LIMIT 1");
+        $t->execute([$wid]);
+        $tmpl = $t->fetch();
+        $ctx = [
+            'number' => $inv['number'],
+            'client_name' => $inv['client_name'],
+            'title' => $inv['title'] ?? '',
+            'amount_due' => Db::money(Db::invoiceBalance($inv)),
+            'amount' => Db::money((float) $inv['amount']),
+            'due_date' => $inv['due_date'],
+            'issue_date' => $inv['issue_date'],
+            'status' => $inv['status'],
+            'notes' => $inv['notes'] ?? '',
+            'business_name' => $settings['business_name'] ?? 'InPmnt',
+        ];
+        $subject = Db::renderVars($tmpl['subject'] ?? 'Invoice {{number}} from {{business_name}}', $ctx);
+        $body = Db::renderVars(
+            $tmpl['body'] ?? "Hi {{client_name}},\n\nInvoice {{number}} is ready for {{title}}.\n\nAmount due: {{amount_due}}\nDue date: {{due_date}}\n\nPlease reply to this email if you have any questions.\n\nThanks,\n{{business_name}}",
+            $ctx
+        );
+        if (!Mailer::configured()) {
+            if (!Env::truthy('ALLOW_FAKE_EMAIL')) {
+                $this->emailNotConfigured();
+            }
+        } else {
+            try {
+                Mailer::send($to, $subject, $body, $settings['business_name'] ?? null);
+            } catch (Throwable $e) {
+                Http::json(['error' => $e->getMessage()], 502);
+            }
         }
-        $this->db->prepare('UPDATE invoices SET status=?, updated_at=? WHERE id=? AND workspace_id=?')
-            ->execute([$status, Db::now(), $id, $wid]);
-        $this->scheduleReminders($id, $inv['due_date'], true);
-        Db::log($this->db, 'invoice', "Marked {$inv['number']} as sent — reminders scheduled", 'invoice', $id, $wid);
-        Http::json($this->invoiceDetail($id, $wid));
+        $now = Db::now();
+        $today = date('Y-m-d');
+        if ($wasDraft) {
+            $status = ((float) $inv['amount_paid'] >= (float) $inv['amount'])
+                ? 'paid'
+                : (((float) $inv['amount_paid'] > 0) ? 'partial' : 'sent');
+            if ($inv['due_date'] < $today && $status !== 'paid') {
+                $status = ((float) $inv['amount_paid'] == 0.0) ? 'overdue' : 'partial';
+            }
+            $this->db->prepare('UPDATE invoices SET status=?, updated_at=? WHERE id=? AND workspace_id=?')
+                ->execute([$status, $now, $id, $wid]);
+            $this->scheduleReminders($id, $inv['due_date'], true);
+        }
+        $this->db->prepare(
+            "INSERT INTO reminders (invoice_id, channel, scheduled_for, status, subject, body, sent_at, created_at)
+             VALUES (?, 'email', ?, 'sent', ?, ?, ?, ?)"
+        )->execute([$id, $today, $subject, $body, $now, $now]);
+        $rid = (int) $this->db->lastInsertId();
+        Db::log($this->db, 'invoice', "Emailed invoice {$inv['number']} to {$to}", 'invoice', $id, $wid);
+        Db::log($this->db, 'reminder', "Sent INVOICE email for {$inv['number']} to {$to}", 'reminder', $rid, $wid);
     }
 
     private function apiRecordPayment(int $wid, int $id): void
@@ -932,6 +1004,7 @@ final class App
         $ctx = [
             'number' => $inv['number'],
             'client_name' => $inv['client_name'],
+            'title' => $inv['title'] ?? '',
             'amount_due' => Db::money(Db::invoiceBalance($inv)),
             'due_date' => $inv['due_date'],
             'status' => $inv['status'],

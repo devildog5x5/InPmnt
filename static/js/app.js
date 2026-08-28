@@ -314,8 +314,8 @@ async function renderInvoices(filter = "all") {
   appEl.querySelectorAll("[data-send-inv]").forEach((btn) =>
     btn.addEventListener("click", async () => {
       try {
-        await api(`/api/invoices/${btn.dataset.sendInv}/send`, { method: "POST", body: "{}" });
-        toast("Invoice sent — reminders scheduled");
+        const res = await api(`/api/invoices/${btn.dataset.sendInv}/send`, { method: "POST", body: "{}" });
+        toast(res.emailed ? `Invoice emailed to ${res.client_email || "the client"}` : "Invoice sent");
         renderInvoices(filter);
       } catch (err) {
         toast(err.message || "Send failed", "error");
@@ -333,7 +333,7 @@ async function renderInvoiceDetail(id) {
       subtitle: `${inv.title} · ${inv.client_name}`,
       actions: `
         <button class="btn secondary" data-go="#/invoices">Back</button>
-        ${inv.status === "draft" ? `<button class="btn" id="btn-send">Mark sent</button>` : ""}
+        ${inv.status === "draft" ? `<button class="btn" id="btn-send">Send invoice</button>` : `<button class="btn secondary" id="btn-send">Email invoice</button>`}
         ${inv.status !== "paid" && inv.status !== "draft" ? `<button class="btn" id="btn-pay">Record payment</button>` : ""}
         ${inv.status === "overdue" || inv.status === "partial" ? `<button class="btn danger" id="btn-final">Final notice</button>` : ""}
       `,
@@ -402,8 +402,8 @@ async function renderInvoiceDetail(id) {
   wireCommon(appEl);
   appEl.querySelector("#btn-send")?.addEventListener("click", async () => {
     try {
-      await api(`/api/invoices/${id}/send`, { method: "POST", body: "{}" });
-      toast("Invoice sent — reminders scheduled");
+      const res = await api(`/api/invoices/${id}/send`, { method: "POST", body: "{}" });
+      toast(res.emailed ? `Invoice emailed to ${res.client_email || "the client"}` : "Invoice sent");
       renderInvoiceDetail(id);
     } catch (err) {
       toast(err.message || "Send failed", "error");
@@ -427,7 +427,7 @@ async function openInvoiceModal() {
   const due = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);
   openModal({
     title: "New invoice",
-    lead: "Create an invoice. Mark it sent to schedule reminders.",
+    lead: "Create an invoice. Send now emails the client and schedules reminders.",
     body: `
       <form id="inv-form" class="form-grid">
         <div class="field"><label>Client</label>
@@ -441,7 +441,7 @@ async function openInvoiceModal() {
         <div class="field"><label>Issue date</label><input name="issue_date" type="date" value="${today}" /></div>
         <div class="field"><label>Due date</label><input name="due_date" type="date" value="${due}" /></div>
         <div class="field"><label>Status</label>
-          <select name="status"><option value="draft">Draft</option><option value="sent">Send now</option></select>
+          <select name="status"><option value="draft">Save as draft</option><option value="sent">Email to client now</option></select>
         </div>
         <div class="field"><label>Notes</label><input name="notes" placeholder="Optional" /></div>
         <div class="modal-actions field full">
@@ -458,10 +458,14 @@ async function openInvoiceModal() {
         const payload = Object.fromEntries(fd.entries());
         payload.client_id = +payload.client_id;
         payload.amount = +payload.amount;
-        const inv = await api("/api/invoices", { method: "POST", body: JSON.stringify(payload) });
-        closeModal();
-        toast(`Created ${inv.number}`);
-        location.hash = `#/invoices/${inv.id}`;
+        try {
+          const inv = await api("/api/invoices", { method: "POST", body: JSON.stringify(payload) });
+          closeModal();
+          toast(inv.emailed ? `Emailed ${inv.number} to ${inv.client_email || "the client"}` : `Created ${inv.number}`);
+          location.hash = `#/invoices/${inv.id}`;
+        } catch (err) {
+          toast(err.message || "Could not create invoice", "error");
+        }
       };
     },
   });
@@ -638,7 +642,7 @@ async function renderTemplates() {
     ${topbar({
       eyebrow: "Workspace",
       title: "Message templates",
-      subtitle: "Use {{client_name}}, {{number}}, {{amount_due}}, {{due_date}}, {{business_name}}.",
+      subtitle: "Use {{client_name}}, {{number}}, {{title}}, {{amount_due}}, {{due_date}}, {{business_name}}. The Invoice template is what Send invoice emails.",
     })}
     <div class="stack">
       ${templates

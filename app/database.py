@@ -31,6 +31,18 @@ RESERVED_SIGNUP_EMAILS = frozenset(
 
 DEFAULT_TEMPLATE_DEFS = [
     (
+        "Invoice",
+        "email",
+        "Invoice {{number}} from {{business_name}}",
+        "Hi {{client_name}},\n\n"
+        "Invoice {{number}} is ready for {{title}}.\n\n"
+        "Amount due: {{amount_due}}\n"
+        "Due date: {{due_date}}\n\n"
+        "Please reply to this email if you have any questions.\n\n"
+        "Thanks,\n{{business_name}}",
+        0,
+    ),
+    (
         "Friendly nudge",
         "email",
         "Quick reminder about invoice {{number}}",
@@ -221,6 +233,7 @@ def init_db(db_path: str) -> None:
             _seed(conn)
         else:
             _ensure_system_accounts(conn)
+        ensure_missing_templates(conn)
 
 
 def _table_sql(conn: sqlite3.Connection, name: str) -> str:
@@ -481,6 +494,26 @@ def insert_default_templates(conn: sqlite3.Connection, workspace_id: int) -> Non
             """,
             (workspace_id, name, channel, subject, body, is_default),
         )
+
+
+def ensure_missing_templates(conn: sqlite3.Connection) -> None:
+    """Add any newly shipped templates to existing workspaces."""
+    for row in conn.execute("SELECT id FROM settings").fetchall():
+        wid = int(row["id"])
+        for name, channel, subject, body, is_default in DEFAULT_TEMPLATE_DEFS:
+            exists = conn.execute(
+                "SELECT id FROM templates WHERE workspace_id=? AND name=?",
+                (wid, name),
+            ).fetchone()
+            if exists:
+                continue
+            conn.execute(
+                """
+                INSERT INTO templates (workspace_id, name, channel, subject, body, is_default)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (wid, name, channel, subject, body, is_default),
+            )
 
 
 def create_workspace(

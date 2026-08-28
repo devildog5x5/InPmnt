@@ -131,6 +131,7 @@ final class Db
         } else {
             self::ensureSystemAccounts($db);
         }
+        self::ensureMissingTemplates($db);
     }
 
     public static function now(): string
@@ -154,9 +155,12 @@ final class Db
         $st->execute([$wid, $kind, $message, $entityType, $entityId, self::now()]);
     }
 
-    public static function insertDefaultTemplates(PDO $db, int $workspaceId): void
+    /** @return list<array{0:string,1:string,2:?string,3:string,4:int}> */
+    public static function defaultTemplateDefs(): array
     {
-        $defs = [
+        return [
+            ['Invoice', 'email', 'Invoice {{number}} from {{business_name}}',
+                "Hi {{client_name}},\n\nInvoice {{number}} is ready for {{title}}.\n\nAmount due: {{amount_due}}\nDue date: {{due_date}}\n\nPlease reply to this email if you have any questions.\n\nThanks,\n{{business_name}}", 0],
             ['Friendly nudge', 'email', 'Quick reminder about invoice {{number}}',
                 "Hi {{client_name}},\n\nJust a friendly reminder that invoice {{number}} for {{amount_due}} is due on {{due_date}}.\n\nYou can reply to this email if you have any questions.\n\nThanks,\n{{business_name}}", 1],
             ['Due today', 'email', 'Invoice {{number}} is due today',
@@ -168,11 +172,34 @@ final class Db
             ['Final notice', 'email', 'Final notice: invoice {{number}}',
                 "Hi {{client_name}},\n\nThis is a final notice regarding unpaid invoice {{number}} ({{amount_due}}), originally due {{due_date}}.\n\nPlease remit payment promptly to avoid further collection steps.\n\n{{business_name}}", 0],
         ];
+    }
+
+    public static function insertDefaultTemplates(PDO $db, int $workspaceId): void
+    {
         $st = $db->prepare(
             'INSERT INTO templates (workspace_id, name, channel, subject, body, is_default) VALUES (?, ?, ?, ?, ?, ?)'
         );
-        foreach ($defs as $d) {
+        foreach (self::defaultTemplateDefs() as $d) {
             $st->execute([$workspaceId, $d[0], $d[1], $d[2], $d[3], $d[4]]);
+        }
+    }
+
+    public static function ensureMissingTemplates(PDO $db): void
+    {
+        $wids = $db->query('SELECT id FROM settings')->fetchAll();
+        $ins = $db->prepare(
+            'INSERT INTO templates (workspace_id, name, channel, subject, body, is_default) VALUES (?, ?, ?, ?, ?, ?)'
+        );
+        $find = $db->prepare('SELECT id FROM templates WHERE workspace_id=? AND name=?');
+        foreach ($wids as $row) {
+            $wid = (int) $row['id'];
+            foreach (self::defaultTemplateDefs() as $d) {
+                $find->execute([$wid, $d[0]]);
+                if ($find->fetch()) {
+                    continue;
+                }
+                $ins->execute([$wid, $d[0], $d[1], $d[2], $d[3], $d[4]]);
+            }
         }
     }
 
