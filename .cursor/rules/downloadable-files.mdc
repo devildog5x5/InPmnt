@@ -1,10 +1,16 @@
+---
+description: Always put files the user asked for in the download tray and give a clickable link in the same turn.
+alwaysApply: true
+---
+
 # Downloadable files
 
-When the user asks for a file (zip, txt, xml, pdf, image, installer, or any other artifact they should take with them):
+When the user asks for a file (zip, txt, xml, pdf, image, installer, or any other artifact they should take with them), **that turn is not done until they can download it**.
 
-1. Write a copy to `/opt/cursor/artifacts/<filename>` (this is what they can download in Cursor).
-2. Also commit a copy under repo-root `patches/<filename>` (same pattern as InPmnt-PHP.zip) and push.
-3. In the reply, give a clickable GitHub raw HTTPS URL and an HTML link to the artifacts path:
-   - `https://raw.githubusercontent.com/devildog5x5/InPmnt/<branch>/patches/<filename>`
-   - `<a href="/opt/cursor/artifacts/<filename>">Download <filename></a>`
-4. Do not only mention a VM path. If you built it, they must be able to download it in that same turn.
+1. Copy the file to `/opt/cursor/artifacts/<filename>` (Cursor download tray).
+2. Commit a copy under repo-root `patches/<filename>` (same pattern as InPmnt-PHP.zip) and push.
+3. In the reply, lead with clickable downloads — never a VM path alone:
+   - GitHub: `https://raw.githubusercontent.com/devildog5x5/InPmnt/<branch>/patches/<filename>`
+   - Tray: `<a href="/opt/cursor/artifacts/<filename>">Download <filename></a>`
+4. If you built more than one file, make **every** one downloadable the same way.
+5. Do not say “it’s on the server” or “it’s in artifacts” without those two links.
