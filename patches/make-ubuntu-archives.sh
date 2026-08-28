@@ -39,6 +39,7 @@ git show HEAD:php/.env.example > "$stage/.env.example"
 git show HEAD:static/js/app.js > "$stage/static/js/app.js"
 git show HEAD:static/css/app.css > "$stage/static/css/app.css"
 git show HEAD:static/img/inpmnt-logo-invoice.jpg > "$stage/static/img/inpmnt-logo-invoice.jpg"
+git show HEAD:php/src/inpmnt-logo-invoice.jpg > "$stage/src/inpmnt-logo-invoice.jpg"
 find "$stage" -type d -exec chmod 755 {} \;
 find "$stage" -type f -exec chmod 644 {} \;
 ( cd "$stage" && tar --numeric-owner --owner=0 --group=0 --format=ustar --sort=name \

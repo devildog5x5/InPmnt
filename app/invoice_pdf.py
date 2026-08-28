@@ -61,13 +61,78 @@ def _rgb(hex_color: str) -> str:
 
 
 def logo_path() -> Path | None:
-    root = Path(__file__).resolve().parent.parent
-    for p in (
-        root / "static" / "img" / "inpmnt-logo-invoice.jpg",
-        root / "php" / "static" / "img" / "inpmnt-logo-invoice.jpg",
-    ):
+    for p in _logo_candidates():
         if p.is_file():
             return p
+    return None
+
+
+def _logo_candidates() -> list[Path]:
+    root = Path(__file__).resolve().parent.parent
+    names = ("inpmnt-logo-invoice.jpg", "inpmnt-icon.png")
+    dirs = [
+        Path(__file__).resolve().parent,
+        root / "static" / "img",
+        root / "php" / "static" / "img",
+        root / "php" / "src",
+    ]
+    out: list[Path] = []
+    for d in dirs:
+        for name in names:
+            out.append(d / name)
+    return out
+
+
+def _jpeg_size(jpeg: bytes) -> tuple[int, int]:
+    i = 2
+    n = len(jpeg)
+    while i < n - 8:
+        if jpeg[i] != 0xFF:
+            break
+        marker = jpeg[i + 1]
+        if marker in (0xC0, 0xC1, 0xC2):
+            h = int.from_bytes(jpeg[i + 5 : i + 7], "big")
+            w = int.from_bytes(jpeg[i + 7 : i + 9], "big")
+            return (w or 160, h or 160)
+        seglen = int.from_bytes(jpeg[i + 2 : i + 4], "big")
+        if seglen < 2:
+            break
+        i += 2 + seglen
+    return 160, 160
+
+
+def _png_file_to_jpeg(path: Path) -> bytes | None:
+    try:
+        from io import BytesIO
+
+        from PIL import Image
+
+        im = Image.open(path).convert("RGB")
+        im = im.resize((160, 160), Image.Resampling.LANCZOS)
+        buf = BytesIO()
+        im.save(buf, format="JPEG", quality=88)
+        raw = buf.getvalue()
+        return raw if raw.startswith(b"\xff\xd8") else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def logo_jpeg() -> tuple[bytes, int, int] | None:
+    """Return (jpeg_bytes, width, height) for the InPmnt mark, or None."""
+    for p in _logo_candidates():
+        if not p.is_file():
+            continue
+        suffix = p.suffix.lower()
+        if suffix in {".jpg", ".jpeg"}:
+            raw = p.read_bytes()
+            if raw.startswith(b"\xff\xd8"):
+                w, h = _jpeg_size(raw)
+                return raw, w, h
+        elif suffix == ".png":
+            converted = _png_file_to_jpeg(p)
+            if converted:
+                w, h = _jpeg_size(converted)
+                return converted, w, h
     return None
 
 
@@ -177,14 +242,12 @@ def build_invoice_pdf(data: dict[str, Any]) -> bytes:
     fill_rect(0, H - 122, W, 4, "1a8a84")
     jpeg = b""
     img_w = img_h = 0
-    lp = logo_path()
-    if lp:
-        jpeg = lp.read_bytes()
-        img_w, img_h = 160, 160
-        # 52pt square in header
-        ops.append("q 52 0 0 52 40 698 cm /Im1 Do Q")
-    text(102 if jpeg else 48, 748, "InPmnt", size=16, bold=True, color="ffffff")
-    text(102 if jpeg else 48, 730, "Get paid without the chase.", size=8, color="8a99a8")
+    logo = logo_jpeg()
+    if logo:
+        jpeg, img_w, img_h = logo
+        ops.append("q 64 0 0 64 36 692 cm /Im1 Do Q")
+    text(112 if jpeg else 48, 748, "InPmnt", size=16, bold=True, color="ffffff")
+    text(112 if jpeg else 48, 730, "Get paid without the chase.", size=8, color="8a99a8")
     text_right(564, 748, "INVOICE", size=22, bold=True, color="5ee0d8")
     text_right(564, 728, number, size=12, bold=True, color="ffffff")
     text_right(564, 712, status, size=8, bold=True, color="1a8a84")

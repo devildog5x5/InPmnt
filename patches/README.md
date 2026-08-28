@@ -23,7 +23,7 @@ find src static -type f -exec chmod 644 {} \;
 # bootstrap.php lands in public_html/ — keep your live .env
 ```
 
-The tarball includes `src/InvoicePdf.php` and `static/img/inpmnt-logo-invoice.jpg`.
+The tarball includes `src/InvoicePdf.php`, `src/inpmnt-logo-invoice.jpg`, and `static/img/inpmnt-logo-invoice.jpg`. Copy **both** the PHP file and the JPEG — if the JPEG is missing, invoices have no logo in the header. The generator will also use your existing `static/img/inpmnt-icon.png` if the JPEG is not there.
 
 ## Ubuntu VPS (git clone)
 

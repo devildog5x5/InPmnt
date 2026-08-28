@@ -57,10 +57,11 @@ final class InvoicePdf
         $imgW = 160;
         $imgH = 160;
         if ($jpeg !== null) {
-            $ops[] = 'q 52 0 0 52 40 698 cm /Im1 Do Q';
+            [$imgW, $imgH] = self::jpegSize($jpeg);
+            $ops[] = 'q 64 0 0 64 36 692 cm /Im1 Do Q';
         }
-        $text($jpeg !== null ? 102.0 : 48.0, 748, 'InPmnt', 16, true, 'ffffff');
-        $text($jpeg !== null ? 102.0 : 48.0, 730, 'Get paid without the chase.', 8, false, '8a99a8');
+        $text($jpeg !== null ? 112.0 : 48.0, 748, 'InPmnt', 16, true, 'ffffff');
+        $text($jpeg !== null ? 112.0 : 48.0, 730, 'Get paid without the chase.', 8, false, '8a99a8');
         $textRight(564, 748, 'INVOICE', 22, true, '5ee0d8');
         $textRight(564, 728, $number, 12, true, 'ffffff');
         $textRight(564, 712, $status, 8, true, '1a8a84');
@@ -222,14 +223,36 @@ final class InvoicePdf
         return rtrim($body) . "\n\nA PDF copy of this invoice is attached.\n";
     }
 
+    /** @return list<string> */
+    public static function logoCandidates(): array
+    {
+        $srcDir = __DIR__;
+        $phpDir = dirname($srcDir);
+        $repoDir = dirname($phpDir);
+        $names = ['inpmnt-logo-invoice.jpg', 'inpmnt-icon.png'];
+        $dirs = [
+            $srcDir,
+            $phpDir . '/static/img',
+            $repoDir . '/static/img',
+            $phpDir . '/img',
+        ];
+        $doc = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/\\');
+        if ($doc !== '') {
+            $dirs[] = $doc . '/static/img';
+            $dirs[] = $doc . '/img';
+        }
+        $out = [];
+        foreach ($dirs as $dir) {
+            foreach ($names as $name) {
+                $out[] = $dir . '/' . $name;
+            }
+        }
+        return $out;
+    }
+
     public static function logoPath(): ?string
     {
-        $root = dirname(__DIR__);
-        $cands = [
-            $root . '/static/img/inpmnt-logo-invoice.jpg',
-            dirname($root) . '/static/img/inpmnt-logo-invoice.jpg',
-        ];
-        foreach ($cands as $p) {
+        foreach (self::logoCandidates() as $p) {
             if (is_file($p)) {
                 return $p;
             }
@@ -239,12 +262,73 @@ final class InvoicePdf
 
     private static function logoJpeg(): ?string
     {
-        $p = self::logoPath();
-        if ($p === null) {
+        foreach (self::logoCandidates() as $p) {
+            if (!is_file($p)) {
+                continue;
+            }
+            $raw = file_get_contents($p);
+            if ($raw === false || $raw === '') {
+                continue;
+            }
+            $ext = strtolower(pathinfo($p, PATHINFO_EXTENSION));
+            if ($ext === 'png') {
+                $jpeg = self::pngToJpeg($raw);
+                if ($jpeg !== null) {
+                    return $jpeg;
+                }
+                continue;
+            }
+            if (str_starts_with($raw, "\xFF\xD8")) {
+                return $raw;
+            }
+        }
+        return null;
+    }
+
+    private static function pngToJpeg(string $png): ?string
+    {
+        if (!function_exists('imagecreatefromstring')) {
             return null;
         }
-        $raw = file_get_contents($p);
-        return $raw === false ? null : $raw;
+        $im = @imagecreatefromstring($png);
+        if ($im === false) {
+            return null;
+        }
+        $size = 160;
+        $dst = imagecreatetruecolor($size, $size);
+        $bg = imagecolorallocate($dst, 16, 25, 32);
+        imagefilledrectangle($dst, 0, 0, $size, $size, $bg);
+        imagecopyresampled($dst, $im, 0, 0, 0, 0, $size, $size, imagesx($im), imagesy($im));
+        ob_start();
+        imagejpeg($dst, null, 88);
+        $jpeg = ob_get_clean();
+        imagedestroy($im);
+        imagedestroy($dst);
+        return is_string($jpeg) && str_starts_with($jpeg, "\xFF\xD8") ? $jpeg : null;
+    }
+
+    /** @return array{0:int,1:int} */
+    private static function jpegSize(string $jpeg): array
+    {
+        $len = strlen($jpeg);
+        $i = 2;
+        while ($i < $len - 8) {
+            if (ord($jpeg[$i]) !== 0xFF) {
+                break;
+            }
+            $marker = ord($jpeg[$i + 1]);
+            if ($marker === 0xC0 || $marker === 0xC1 || $marker === 0xC2) {
+                $h = (ord($jpeg[$i + 5]) << 8) | ord($jpeg[$i + 6]);
+                $w = (ord($jpeg[$i + 7]) << 8) | ord($jpeg[$i + 8]);
+                return [$w > 0 ? $w : 160, $h > 0 ? $h : 160];
+            }
+            $seglen = (ord($jpeg[$i + 2]) << 8) | ord($jpeg[$i + 3]);
+            if ($seglen < 2) {
+                break;
+            }
+            $i += 2 + $seglen;
+        }
+        return [160, 160];
     }
 
     private static function rgb(string $hex): string
