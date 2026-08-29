@@ -50,6 +50,7 @@ final class Db
                 totp_enabled INTEGER NOT NULL DEFAULT 0,
                 recovery_codes TEXT,
                 created_at TEXT NOT NULL,
+                last_access_at TEXT,
                 FOREIGN KEY (household_id) REFERENCES households(id)
             );
             CREATE TABLE IF NOT EXISTS invitations (
@@ -60,6 +61,8 @@ final class Db
                 token TEXT NOT NULL UNIQUE,
                 status TEXT NOT NULL DEFAULT 'pending',
                 created_at TEXT NOT NULL,
+                email_sent_at TEXT,
+                accepted_at TEXT,
                 FOREIGN KEY (household_id) REFERENCES households(id)
             );
             CREATE TABLE IF NOT EXISTS trusted_contacts (
@@ -127,6 +130,7 @@ final class Db
         SQL);
         self::migrateHouseholdStripe($db);
         self::migrateUserAuth($db);
+        self::migrateCircleStatus($db);
         $n = (int) $db->query('SELECT COUNT(*) FROM users')->fetchColumn();
         if ($n === 0) {
             self::seed($db);
@@ -181,6 +185,27 @@ final class Db
         SQL);
     }
 
+    public static function migrateCircleStatus(PDO $db): void
+    {
+        $userCols = [];
+        foreach ($db->query('PRAGMA table_info(users)')->fetchAll() as $col) {
+            $userCols[] = (string) ($col['name'] ?? '');
+        }
+        if (!in_array('last_access_at', $userCols, true)) {
+            $db->exec('ALTER TABLE users ADD COLUMN last_access_at TEXT');
+        }
+        $invCols = [];
+        foreach ($db->query('PRAGMA table_info(invitations)')->fetchAll() as $col) {
+            $invCols[] = (string) ($col['name'] ?? '');
+        }
+        if (!in_array('email_sent_at', $invCols, true)) {
+            $db->exec('ALTER TABLE invitations ADD COLUMN email_sent_at TEXT');
+        }
+        if (!in_array('accepted_at', $invCols, true)) {
+            $db->exec('ALTER TABLE invitations ADD COLUMN accepted_at TEXT');
+        }
+    }
+
     public static function seed(PDO $db): void
     {
         $ts = self::now();
@@ -229,16 +254,53 @@ final class Db
 
     public static function members(PDO $db, int $hid): array
     {
-        $st = $db->prepare('SELECT id, name, email, role FROM users WHERE household_id=? ORDER BY id');
+        $st = $db->prepare('SELECT id, name, email, role, last_access_at FROM users WHERE household_id=? ORDER BY id');
         $st->execute([$hid]);
         return $st->fetchAll();
     }
 
     public static function pending(PDO $db, int $hid): array
     {
-        $st = $db->prepare("SELECT id, email, name, status, token FROM invitations WHERE household_id=? AND status='pending' ORDER BY id");
+        $st = $db->prepare("SELECT id, email, name, status, token, email_sent_at, accepted_at FROM invitations WHERE household_id=? AND status='pending' ORDER BY id");
         $st->execute([$hid]);
         return $st->fetchAll();
+    }
+
+    /** @param list<array<string,mixed>> $members */
+    /** @param list<array<string,mixed>> $pending */
+    public static function decorateCircleStatus(array $members, array $pending): array
+    {
+        foreach ($members as &$m) {
+            if (($m['role'] ?? '') === 'owner' || !empty($m['last_access_at'])) {
+                $m['circle_status'] = 'User Accesses the Circle';
+                $m['circle_status_key'] = 'access';
+            } else {
+                $m['circle_status'] = 'Invite Accepted';
+                $m['circle_status_key'] = 'accepted';
+            }
+        }
+        unset($m);
+        foreach ($pending as &$p) {
+            if (!empty($p['email_sent_at'])) {
+                $p['circle_status'] = 'Invite sent';
+                $p['circle_status_key'] = 'sent';
+            } else {
+                $p['circle_status'] = 'Invited';
+                $p['circle_status_key'] = 'invited';
+            }
+        }
+        unset($p);
+        return [$members, $pending];
+    }
+
+    public static function markInviteSent(PDO $db, int $id): void
+    {
+        $db->prepare('UPDATE invitations SET email_sent_at=? WHERE id=? AND email_sent_at IS NULL')->execute([self::now(), $id]);
+    }
+
+    public static function touchLastAccess(PDO $db, int $userId): void
+    {
+        $db->prepare('UPDATE users SET last_access_at=? WHERE id=?')->execute([self::now(), $userId]);
     }
 
     public static function trusted(PDO $db, int $hid): array
@@ -263,7 +325,7 @@ final class Db
         $db->prepare(
             "INSERT INTO invitations (household_id, email, name, token, status, created_at) VALUES (?,?,?,?,'pending',?)"
         )->execute([$hid, $email, trim($name), $token, self::now()]);
-        return ['email' => $email, 'token' => $token];
+        return ['email' => $email, 'token' => $token, 'id' => (int) $db->lastInsertId()];
     }
 
     public static function acceptInvite(PDO $db, string $token, string $name, string $password): array
@@ -282,7 +344,7 @@ final class Db
         $db->prepare(
             "INSERT INTO users (household_id, name, email, password_hash, role, created_at) VALUES (?,?,?,?, 'member', ?)"
         )->execute([$inv['household_id'], trim($name), $inv['email'], password_hash($password, PASSWORD_DEFAULT), self::now()]);
-        $db->prepare('UPDATE invitations SET status=? WHERE id=?')->execute(['accepted', $inv['id']]);
+        $db->prepare('UPDATE invitations SET status=?, accepted_at=? WHERE id=?')->execute(['accepted', self::now(), $inv['id']]);
         $u = $db->prepare('SELECT * FROM users WHERE lower(email)=?');
         $u->execute([$inv['email']]);
         return $u->fetch();

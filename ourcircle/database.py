@@ -77,6 +77,7 @@ def init_db(path: str | None = None) -> None:
                 totp_enabled INTEGER NOT NULL DEFAULT 0,
                 recovery_codes TEXT,
                 created_at TEXT NOT NULL,
+                last_access_at TEXT,
                 FOREIGN KEY (household_id) REFERENCES households(id)
             );
             CREATE TABLE IF NOT EXISTS invitations (
@@ -87,6 +88,8 @@ def init_db(path: str | None = None) -> None:
                 token TEXT NOT NULL UNIQUE,
                 status TEXT NOT NULL DEFAULT 'pending',
                 created_at TEXT NOT NULL,
+                email_sent_at TEXT,
+                accepted_at TEXT,
                 FOREIGN KEY (household_id) REFERENCES households(id)
             );
             CREATE TABLE IF NOT EXISTS trusted_contacts (
@@ -155,6 +158,7 @@ def init_db(path: str | None = None) -> None:
         )
         _migrate_household_stripe(conn)
         _migrate_user_auth(conn)
+        _migrate_circle_status(conn)
         n = conn.execute("SELECT COUNT(*) AS c FROM users").fetchone()["c"]
         if n == 0:
             _seed(conn)
@@ -192,6 +196,17 @@ def _migrate_user_auth(conn: sqlite3.Connection) -> None:
         )
         """
     )
+
+
+def _migrate_circle_status(conn: sqlite3.Connection) -> None:
+    users = {row[1] for row in conn.execute("PRAGMA table_info(users)").fetchall()}
+    if "last_access_at" not in users:
+        conn.execute("ALTER TABLE users ADD COLUMN last_access_at TEXT")
+    inv = {row[1] for row in conn.execute("PRAGMA table_info(invitations)").fetchall()}
+    if "email_sent_at" not in inv:
+        conn.execute("ALTER TABLE invitations ADD COLUMN email_sent_at TEXT")
+    if "accepted_at" not in inv:
+        conn.execute("ALTER TABLE invitations ADD COLUMN accepted_at TEXT")
 
 
 def _seed(conn: sqlite3.Connection) -> None:
@@ -259,12 +274,49 @@ def authenticate(conn: sqlite3.Connection, email: str, password: str) -> dict[st
 
 
 def household_members(conn: sqlite3.Connection, hid: int) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    users = [dict(r) for r in conn.execute("SELECT id, name, email, role FROM users WHERE household_id=? ORDER BY id", (hid,)).fetchall()]
-    invites = [dict(r) for r in conn.execute(
-        "SELECT id, email, name, status, token FROM invitations WHERE household_id=? AND status='pending' ORDER BY id",
-        (hid,),
-    ).fetchall()]
-    return users, invites
+    users = [
+        dict(r)
+        for r in conn.execute(
+            "SELECT id, name, email, role, last_access_at FROM users WHERE household_id=? ORDER BY id",
+            (hid,),
+        ).fetchall()
+    ]
+    invites = [
+        dict(r)
+        for r in conn.execute(
+            "SELECT id, email, name, status, token, email_sent_at, accepted_at FROM invitations WHERE household_id=? AND status='pending' ORDER BY id",
+            (hid,),
+        ).fetchall()
+    ]
+    return decorate_circle_status(users, invites)
+
+
+def decorate_circle_status(
+    members: list[dict[str, Any]], pending: list[dict[str, Any]]
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    for m in members:
+        if (m.get("role") or "") == "owner" or m.get("last_access_at"):
+            m["circle_status"] = "User Accesses the Circle"
+            m["circle_status_key"] = "access"
+        else:
+            m["circle_status"] = "Invite Accepted"
+            m["circle_status_key"] = "accepted"
+    for p in pending:
+        if p.get("email_sent_at"):
+            p["circle_status"] = "Invite sent"
+            p["circle_status_key"] = "sent"
+        else:
+            p["circle_status"] = "Invited"
+            p["circle_status_key"] = "invited"
+    return members, pending
+
+
+def mark_invite_sent(conn: sqlite3.Connection, invite_id: int) -> None:
+    conn.execute("UPDATE invitations SET email_sent_at=? WHERE id=? AND email_sent_at IS NULL", (now(), invite_id))
+
+
+def touch_last_access(conn: sqlite3.Connection, user_id: int) -> None:
+    conn.execute("UPDATE users SET last_access_at=? WHERE id=?", (now(), user_id))
 
 
 def trusted_list(conn: sqlite3.Connection, hid: int) -> list[dict[str, Any]]:
@@ -282,14 +334,14 @@ def invite_member(conn: sqlite3.Connection, hid: int, email: str, name: str = ""
     if not email or "@" not in email:
         raise ValueError("Need an email address to invite.")
     token = secrets.token_urlsafe(16)
-    conn.execute(
+    cur = conn.execute(
         """
         INSERT INTO invitations (household_id, email, name, token, status, created_at)
         VALUES (?,?,?,?, 'pending', ?)
         """,
         (hid, email, name.strip(), token, now()),
     )
-    return {"email": email, "token": token}
+    return {"email": email, "token": token, "id": int(cur.lastrowid or 0)}
 
 
 def accept_invite(conn: sqlite3.Connection, token: str, name: str, password: str) -> dict[str, Any]:
@@ -306,6 +358,9 @@ def accept_invite(conn: sqlite3.Connection, token: str, name: str, password: str
         """,
         (inv["household_id"], name.strip(), inv["email"], generate_password_hash(password), now()),
     )
-    conn.execute("UPDATE invitations SET status='accepted' WHERE id=?", (inv["id"],))
+    conn.execute(
+        "UPDATE invitations SET status='accepted', accepted_at=? WHERE id=?",
+        (now(), inv["id"]),
+    )
     user = conn.execute("SELECT * FROM users WHERE lower(email)=?", (inv["email"],)).fetchone()
     return dict(user)

@@ -9,23 +9,40 @@ View::appOpen(get_defined_vars());
   <div class="panel">
     <h2>People in this circle</h2>
     <p class="muted">Up to five people on the family plan. Invite the person who will actually answer the phone.</p>
+    <p class="status-legend" aria-label="Circle status">
+      <span class="pill status-invited">Invited</span>
+      <span class="status-arrow" aria-hidden="true">→</span>
+      <span class="pill status-sent">Invite sent</span>
+      <span class="status-arrow" aria-hidden="true">→</span>
+      <span class="pill status-accepted">Invite Accepted</span>
+      <span class="status-arrow" aria-hidden="true">→</span>
+      <span class="pill status-access">User Accesses the Circle</span>
+    </p>
     <table class="table">
-      <thead><tr><th>Name</th><th>Email</th><th>Role</th></tr></thead>
+      <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th></tr></thead>
       <tbody>
         <?php foreach ($members as $m): ?>
-        <tr><td><?= Http::e($m['name']) ?></td><td><?= Http::e($m['email']) ?></td><td><?= Http::e($m['role']) ?></td></tr>
+        <tr>
+          <td><?= Http::e((string) ($m['name'] ?? '')) ?></td>
+          <td><?= Http::e((string) ($m['email'] ?? '')) ?></td>
+          <td><?= Http::e((string) ($m['role'] ?? '')) ?></td>
+          <td><span class="pill status-<?= Http::e((string) ($m['circle_status_key'] ?? '')) ?>"><?= Http::e((string) ($m['circle_status'] ?? '')) ?></span></td>
+        </tr>
+        <?php endforeach; ?>
+        <?php foreach ($pending as $p): ?>
+        <?php $join = rtrim((string) ($site_home ?? ''), '/') . '/join/' . rawurlencode((string) ($p['token'] ?? '')); ?>
+        <tr>
+          <td><?= Http::e((string) (($p['name'] ?? '') !== '' ? $p['name'] : '—')) ?></td>
+          <td><?= Http::e((string) ($p['email'] ?? '')) ?></td>
+          <td>invited</td>
+          <td>
+            <span class="pill status-<?= Http::e((string) ($p['circle_status_key'] ?? '')) ?>"><?= Http::e((string) ($p['circle_status'] ?? '')) ?></span>
+            <div class="join-url"><a href="<?= Http::e($join) ?>"><?= Http::e($join) ?></a></div>
+          </td>
+        </tr>
         <?php endforeach; ?>
       </tbody>
     </table>
-    <?php if ($pending): ?>
-    <h3>Waiting to join</h3>
-    <ul class="list">
-      <?php foreach ($pending as $p): ?>
-      <?php $join = rtrim((string) ($site_home ?? ''), '/') . '/join/' . rawurlencode((string) ($p['token'] ?? '')); ?>
-      <li><?= Http::e($p['email']) ?> · <a href="<?= Http::e($join) ?>"><?= Http::e($join) ?></a></li>
-      <?php endforeach; ?>
-    </ul>
-    <?php endif; ?>
   </div>
   <form class="panel" method="post">
     <h2>Invite someone</h2>
@@ -34,7 +51,7 @@ View::appOpen(get_defined_vars());
     <label>Email</label>
     <input name="email" type="email" required />
     <p><button class="btn wide" type="submit">Send invite</button></p>
-    <p class="disclaimer">We email a join link when mail is set up. Also copy it from Waiting to join and share it in a call you already trust — not inside a suspicious thread.</p>
+    <p class="disclaimer">We email a join link when mail is set up. Also copy it from the status table and share it in a call you already trust — not inside a suspicious thread.</p>
   </form>
 </div>
 <?php if ($alerts): ?>

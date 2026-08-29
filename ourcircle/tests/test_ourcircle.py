@@ -188,6 +188,12 @@ class AppTests(unittest.TestCase):
         self.assertIn(b"/join/", inv.data)
         self.assertIn(b"Send invite", inv.data)
         self.assertIn(b"kid@example.com", inv.data)
+        kid_at = inv.data.rfind(b"kid@example.com")
+        kid_chunk = inv.data[kid_at : kid_at + 500]
+        self.assertIn(b"Invited", kid_chunk)
+        self.assertIn(b"User Accesses the Circle", inv.data)
+        self.assertIn(b"Invite sent", inv.data)  # legend
+        self.assertIn(b"Invite Accepted", inv.data)  # legend
         token = None
         with db.session() as conn:
             row = conn.execute(
@@ -227,9 +233,28 @@ class AppTests(unittest.TestCase):
             self.assertEqual(sent[0]["to"], "cousin@example.com")
             self.assertIn("https://sandbox.familyshieldpro.com/join/", sent[0]["body"])
             self.assertIn("guidance, not a guarantee", sent[0]["body"])
+            cousin_at = mailed.data.rfind(b"cousin@example.com")
+            cousin_chunk = mailed.data[cousin_at : cousin_at + 500]
+            self.assertIn(b"Invite sent", cousin_chunk)
         finally:
             for k in ("SMTP_HOST", "SMTP_USER", "MAIL_FROM", "OURCIRCLE_SITE_URL"):
                 os.environ.pop(k, None)
+
+        joined = other.post(
+            f"/join/{token}",
+            data={"name": "Kid", "password": "password123"},
+            follow_redirects=True,
+        )
+        self.assertEqual(joined.status_code, 200)
+        as_owner = self.client.get("/circle")
+        kid_at = as_owner.data.rfind(b"kid@example.com")
+        kid_after = as_owner.data[kid_at : kid_at + 400]
+        self.assertIn(b"Invite Accepted", kid_after)
+        other.get("/home")
+        as_owner = self.client.get("/circle")
+        kid_at = as_owner.data.rfind(b"kid@example.com")
+        kid_active = as_owner.data[kid_at : kid_at + 400]
+        self.assertIn(b"User Accesses the Circle", kid_active)
 
     def test_robots_and_sitemap_use_familyshieldpro(self) -> None:
         robots = self.client.get("/robots.txt")

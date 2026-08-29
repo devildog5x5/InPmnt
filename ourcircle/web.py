@@ -49,8 +49,10 @@ from database import (
     household_members,
     init_db,
     invite_member,
+    mark_invite_sent,
     now,
     session as db_session,
+    touch_last_access,
     trusted_list,
 )
 from mail import mail_configured, send_email
@@ -217,6 +219,12 @@ def create_app() -> Flask:
     def login_required():
         if not current_user():
             return redirect(url_for("login", next=request.path))
+        if session.pop("just_joined", None):
+            return None
+        uid = session.get("user_id")
+        if uid:
+            with db_session() as conn:
+                touch_last_access(conn, int(uid))
         return None
 
     @app.get("/")
@@ -755,6 +763,8 @@ def create_app() -> Flask:
                             subject="Join your family circle on Family Shield Pro",
                             body=invite_email_body(join),
                         )
+                        with db_session() as conn:
+                            mark_invite_sent(conn, int(inv["id"]))
                         flash(
                             f"Invite emailed to {inv['email']}. If they do not see it (check spam), {share}",
                             "ok",
@@ -801,6 +811,7 @@ def create_app() -> Flask:
         session["household_id"] = user["household_id"]
         session["name"] = user["name"]
         session["email"] = user["email"]
+        session["just_joined"] = True
         flash("You are in the circle. If someone asks you to look, pause with them — do not rush.", "ok")
         return redirect(url_for("home"))
 

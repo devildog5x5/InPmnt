@@ -3,6 +3,10 @@
 Product: **Family Shield Pro** (app name in the UI: **OurCircle**).  
 Not InPmnt. Version file: `ourcircle/VERSION` (independent of repo-root InPmnt `VERSION`).
 
+## 1.2.15 — 2026-08-29
+
+- Circle shows status for each person: **Invited** → **Invite sent** → **Invite Accepted** → **User Accesses the Circle**.
+
 ## 1.2.14 — 2026-08-29
 
 - Circle invites now **email a join link** when SMTP or Resend is in `.env`. Waiting to join shows the full `https://…/join/…` URL (not a bare token). Hostinger SMTP is used first — PHP `mail()` often claims success without delivering.

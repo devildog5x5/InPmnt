@@ -5,22 +5,39 @@
   <div class="panel">
     <h2>People in this circle</h2>
     <p class="muted">Up to five people on the family plan. Invite the person who will actually answer the phone.</p>
+    <p class="status-legend" aria-label="Circle status">
+      <span class="pill status-invited">Invited</span>
+      <span class="status-arrow" aria-hidden="true">→</span>
+      <span class="pill status-sent">Invite sent</span>
+      <span class="status-arrow" aria-hidden="true">→</span>
+      <span class="pill status-accepted">Invite Accepted</span>
+      <span class="status-arrow" aria-hidden="true">→</span>
+      <span class="pill status-access">User Accesses the Circle</span>
+    </p>
     <table class="table">
-      <thead><tr><th>Name</th><th>Email</th><th>Role</th></tr></thead>
+      <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th></tr></thead>
       <tbody>
         {% for m in members %}
-        <tr><td>{{ m.name }}</td><td>{{ m.email }}</td><td>{{ m.role }}</td></tr>
+        <tr>
+          <td>{{ m.name }}</td>
+          <td>{{ m.email }}</td>
+          <td>{{ m.role }}</td>
+          <td><span class="pill status-{{ m.circle_status_key }}">{{ m.circle_status }}</span></td>
+        </tr>
+        {% endfor %}
+        {% for p in pending %}
+        <tr>
+          <td>{{ p.name or "—" }}</td>
+          <td>{{ p.email }}</td>
+          <td>invited</td>
+          <td>
+            <span class="pill status-{{ p.circle_status_key }}">{{ p.circle_status }}</span>
+            <div class="join-url"><a href="{{ site_home }}/join/{{ p.token }}">{{ site_home }}/join/{{ p.token }}</a></div>
+          </td>
+        </tr>
         {% endfor %}
       </tbody>
     </table>
-    {% if pending %}
-    <h3>Waiting to join</h3>
-    <ul class="list">
-      {% for p in pending %}
-      <li>{{ p.email }} · <a href="{{ site_home }}/join/{{ p.token }}">{{ site_home }}/join/{{ p.token }}</a></li>
-      {% endfor %}
-    </ul>
-    {% endif %}
   </div>
   <form class="panel" method="post">
     <h2>Invite someone</h2>
@@ -29,7 +46,7 @@
     <label>Email</label>
     <input name="email" type="email" required />
     <p><button class="btn wide" type="submit">Send invite</button></p>
-    <p class="disclaimer">We email a join link when mail is set up. Also copy it from Waiting to join and share it in a call you already trust — not inside a suspicious thread.</p>
+    <p class="disclaimer">We email a join link when mail is set up. Also copy it from the status table and share it in a call you already trust — not inside a suspicious thread.</p>
   </form>
 </div>
 {% if alerts %}

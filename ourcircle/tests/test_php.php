@@ -40,6 +40,10 @@ require_once $root . '/php/src/SupportChat.php';
 $circlePhp = file_get_contents($root . '/php/views/circle.php') ?: '';
 check(str_contains($circlePhp, 'Send invite'), 'circle send invite button');
 check(str_contains($circlePhp, '/join/'), 'circle pending join url');
+check(str_contains($circlePhp, 'Invited'), 'circle status invited');
+check(str_contains($circlePhp, 'Invite sent'), 'circle status invite sent');
+check(str_contains($circlePhp, 'Invite Accepted'), 'circle status accepted');
+check(str_contains($circlePhp, 'User Accesses the Circle'), 'circle status access');
 check(!str_contains($circlePhp, 'join link token'), 'circle no bare token label');
 $appPhp = file_get_contents($root . '/php/src/App.php') ?: '';
 check(str_contains($appPhp, 'inviteEmailBody'), 'invite email body helper');
@@ -50,7 +54,7 @@ $mailPos = strpos($mailPhp, '@mail(');
 check(is_int($smtpPos) && is_int($mailPos) && $smtpPos < $mailPos, 'smtp before php mail()');
 $inviteChat = SupportChat::faqReply('why does the invite email link not work?');
 check(str_contains(strtolower($inviteChat), 'join'), 'chat invite join');
-check(Product::version() === '1.2.14', 'product version 1.2.14');
+check(Product::version() === '1.2.15', 'product version 1.2.15');
 check(Product::NAME === 'Family Shield Pro', 'product name');
 check(Product::APP === 'OurCircle', 'app name');
 
@@ -165,6 +169,37 @@ check(in_array('stripe_subscription_id', $cols, true), 'household stripe_subscri
 $ucols = array_map(fn ($c) => $c['name'], $db->query('PRAGMA table_info(users)')->fetchAll());
 check(in_array('totp_secret', $ucols, true), 'user totp_secret');
 check(in_array('recovery_codes', $ucols, true), 'user recovery_codes');
+check(in_array('last_access_at', $ucols, true), 'user last_access_at');
+$icols = array_map(fn ($c) => $c['name'], $db->query('PRAGMA table_info(invitations)')->fetchAll());
+check(in_array('email_sent_at', $icols, true), 'invite email_sent_at');
+check(in_array('accepted_at', $icols, true), 'invite accepted_at');
+$hid = (int) $user['household_id'];
+$inv = Db::invite($db, $hid, 'status-kid@example.com', 'Status Kid');
+[$mems, $pend] = Db::decorateCircleStatus(Db::members($db, $hid), Db::pending($db, $hid));
+check(($pend[0]['circle_status'] ?? '') === 'Invited', 'status invited before send');
+Db::markInviteSent($db, (int) $inv['id']);
+[$mems, $pend] = Db::decorateCircleStatus(Db::members($db, $hid), Db::pending($db, $hid));
+check(($pend[0]['circle_status'] ?? '') === 'Invite sent', 'status invite sent');
+$joined = Db::acceptInvite($db, $inv['token'], 'Status Kid', 'password123');
+[$mems, $pend] = Db::decorateCircleStatus(Db::members($db, $hid), Db::pending($db, $hid));
+$kid = null;
+foreach ($mems as $m) {
+    if (($m['email'] ?? '') === 'status-kid@example.com') {
+        $kid = $m;
+        break;
+    }
+}
+check($kid !== null && ($kid['circle_status'] ?? '') === 'Invite Accepted', 'status invite accepted');
+Db::touchLastAccess($db, (int) $joined['id']);
+[$mems] = Db::decorateCircleStatus(Db::members($db, $hid), Db::pending($db, $hid));
+foreach ($mems as $m) {
+    if (($m['email'] ?? '') === 'status-kid@example.com') {
+        check(($m['circle_status'] ?? '') === 'User Accesses the Circle', 'status user accesses');
+    }
+    if (($m['role'] ?? '') === 'owner') {
+        check(($m['circle_status'] ?? '') === 'User Accesses the Circle', 'owner accesses');
+    }
+}
 $secret = Auth::newSecret();
 $code = Auth::totpAt($secret, 1_111_111_111);
 check(Auth::verifyTotp($secret, $code, 1_111_111_111), 'totp verifies at timestamp');

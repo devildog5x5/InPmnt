@@ -38,7 +38,7 @@ final class SupportChat
             [['email', 'contact', 'reach you', 'customer service', 'support'],
                 'Email customer service at ' . self::SUPPORT_EMAIL . '. A person reads every message. There is no public phone number yet.'],
             [['circle', 'invite', 'member', 'five', '5 people', 'household'],
-                'A circle is up to five people in one household. Invite them from Circle after you sign in. Anyone in the circle can look at a check and you can tap “Please call me before I pay” when it is urgent.'],
+                'A circle is up to five people in one household. Invite them from Circle after you sign in. Circle status is Invited → Invite sent → Invite Accepted → User Accesses the Circle. Anyone in the circle can look at a check and you can tap “Please call me before I pay” when it is urgent.'],
             [['stripe', 'billing', 'cancel', 'refund', 'charge', 'card', 'invoice'],
                 'Plans are Family monthly $14.99 or Family yearly $119.99. If Stripe keys are in .env, Plans sends you to Stripe Checkout; you can manage or cancel in the Stripe customer portal. Until keys are live, choosing a plan only saves the flag — no charge. ' . Analyze::GUIDANCE . ' Email ' . self::SUPPORT_EMAIL . ' for billing help.'],
             [['login', 'sign in', 'signin', 'account', 'demo'],

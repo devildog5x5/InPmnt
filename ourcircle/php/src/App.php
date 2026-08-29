@@ -158,6 +158,11 @@ final class App
     {
         $u = $this->user();
         if ($u) {
+            if (!empty($_SESSION['just_joined'])) {
+                unset($_SESSION['just_joined']);
+                return $u;
+            }
+            Db::touchLastAccess($this->db, $u['id']);
             return $u;
         }
         $next = Http::path();
@@ -750,6 +755,7 @@ final class App
                             'Join your family circle on Family Shield Pro',
                             self::inviteEmailBody($join)
                         );
+                        Db::markInviteSent($this->db, (int) $inv['id']);
                         $this->flash('Invite emailed to ' . $inv['email'] . '. If they do not see it (check spam), ' . $share, 'ok');
                     } catch (Throwable) {
                         $this->flash('Could not send the invite email. ' . $share, 'error');
@@ -764,10 +770,14 @@ final class App
         }
         $alerts = $this->db->prepare('SELECT * FROM alerts WHERE household_id=? ORDER BY id DESC LIMIT 12');
         $alerts->execute([$u['household_id']]);
+        [$members, $pending] = Db::decorateCircleStatus(
+            Db::members($this->db, $u['household_id']),
+            Db::pending($this->db, $u['household_id'])
+        );
         $this->page('circle', [
             'title' => 'Family circle',
-            'members' => Db::members($this->db, $u['household_id']),
-            'pending' => Db::pending($this->db, $u['household_id']),
+            'members' => $members,
+            'pending' => $pending,
             'alerts' => $alerts->fetchAll(),
         ]);
     }
@@ -808,6 +818,7 @@ final class App
             $this->flash($e->getMessage(), 'error');
             Http::redirect('/login');
         }
+        $_SESSION['just_joined'] = 1;
         $this->loginUser($user);
         $this->flash('You are in the circle. If someone asks you to look, pause with them — do not rush.', 'ok');
         Http::redirect('/home');
