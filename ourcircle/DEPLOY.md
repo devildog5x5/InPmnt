@@ -1,7 +1,7 @@
 # Family Shield Pro — deploy (no VPS)
 
 **Site:** https://familyshieldpro.com  
-**Zip:** https://raw.githubusercontent.com/devildog5x5/InPmnt/cursor/ourcircle-family-shield-4df6/patches/FamilyShieldPro-1.2.1.zip  
+**Zip:** https://raw.githubusercontent.com/devildog5x5/InPmnt/cursor/ourcircle-family-shield-4df6/patches/FamilyShieldPro-1.2.2.zip  
 (`robots.txt` and `sitemap.xml` are inside the zip.)  
 **Do not** put this in an InPmnt folder or overwrite a live `.env`.
 
@@ -49,7 +49,7 @@ These files sit in `public_html` and are also served by PHP:
 
 After the site is live: Google Search Console → add `https://familyshieldpro.com` → submit the sitemap.
 
-Public URLs: `/`, `/signup`, `/login`, `/offers`. Logged-in paths are disallowed.
+Public URLs: `/`, `/signup`, `/login`, `/forgot`. Logged-in paths are disallowed.
 
 ## Later updates
 

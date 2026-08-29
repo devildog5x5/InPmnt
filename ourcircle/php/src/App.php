@@ -52,8 +52,6 @@ final class App
             $this->supportChat();
         } elseif ($method === 'GET' && $path === '/') {
             $this->landing();
-        } elseif ($path === '/offers') {
-            $this->offers();
         } elseif ($path === '/signup') {
             $this->signup();
         } elseif ($path === '/login/2fa') {
@@ -185,7 +183,7 @@ final class App
     private function robots(): never
     {
         $host = preg_replace('#^https?://#', '', $this->siteHome()) ?? 'familyshieldpro.com';
-        $lines = ["User-agent: *", "Allow: /", "Allow: /signup", "Allow: /login", "Allow: /forgot", "Allow: /offers"];
+        $lines = ["User-agent: *", "Allow: /", "Allow: /signup", "Allow: /login", "Allow: /forgot"];
         foreach (self::PRIVATE as $p) {
             $lines[] = "Disallow: {$p}";
         }
@@ -207,7 +205,6 @@ final class App
             ['/signup', 'weekly', '0.9'],
             ['/login', 'monthly', '0.6'],
             ['/forgot', 'monthly', '0.5'],
-            ['/offers', 'weekly', '0.8'],
         ];
         $body = '<?xml version="1.0" encoding="UTF-8"?>' . "\n"
             . '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";
@@ -265,31 +262,6 @@ final class App
             'robots' => 'index,follow',
             'plans' => self::PLANS,
             'stripe_enabled' => Billing::config()['enabled'],
-            'flashes' => $this->takeFlashes(),
-        ]);
-    }
-
-    private function offers(): void
-    {
-        if (Http::method() === 'POST') {
-            $product = trim((string) ($_POST['product'] ?? ''));
-            $name = trim((string) ($_POST['name'] ?? ''));
-            $email = strtolower(trim((string) ($_POST['email'] ?? '')));
-            $offer = trim((string) ($_POST['offer'] ?? ''));
-            $note = trim((string) ($_POST['note'] ?? ''));
-            if (!in_array($product, ['inpmnt', 'vendorready', 'ourcircle'], true) || $name === '' || !str_contains($email, '@')) {
-                $this->flash('Please choose a product and leave a real name and email.', 'error');
-                Http::redirect('/offers');
-            }
-            $this->db->prepare(
-                'INSERT INTO reservations (product, name, email, offer, note, created_at) VALUES (?,?,?,?,?,?)'
-            )->execute([$product, $name, $email, $offer !== '' ? $offer : 'family year', $note, Db::now()]);
-            $this->flash('Reservation saved. This is a refundable hold, not a charge. We will email you before anything is billed.', 'ok');
-            Http::redirect('/offers');
-        }
-        $this->page('offers', [
-            'title' => 'Seven-day paid validation · Foster',
-            'robots' => 'index,follow',
             'flashes' => $this->takeFlashes(),
         ]);
     }

@@ -61,7 +61,7 @@ ROOT = Path(__file__).resolve().parent
 UPLOADS = DATA / "uploads"
 ALLOWED_SHOT = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
 DEFAULT_SITE_URL = "https://familyshieldpro.com"
-PUBLIC_PATHS = ("/", "/signup", "/login", "/forgot", "/offers")
+PUBLIC_PATHS = ("/", "/signup", "/login", "/forgot")
 PRIVATE_PREFIXES = (
     "/home",
     "/circle",
@@ -128,7 +128,6 @@ def create_app() -> Flask:
             "Allow: /signup",
             "Allow: /login",
             "Allow: /forgot",
-            "Allow: /offers",
         ]
         for path in PRIVATE_PREFIXES:
             lines.append(f"Disallow: {path}")
@@ -226,32 +225,6 @@ def create_app() -> Flask:
         session["support_chat_t"] = started
         reply, source = handle_chat(message, history)
         return {"reply": reply, "source": source}
-
-    @app.get("/offers")
-    def offers():
-        return render_template("offers.html")
-
-    @app.post("/offers")
-    def offers_reserve():
-        product = (request.form.get("product") or "").strip()
-        name = (request.form.get("name") or "").strip()
-        email = (request.form.get("email") or "").strip().lower()
-        offer = (request.form.get("offer") or "").strip()
-        note = (request.form.get("note") or "").strip()
-        if product not in ("inpmnt", "vendorready", "ourcircle") or not name or "@" not in email:
-            flash("Please choose a product and leave a real name and email.", "error")
-            return redirect(url_for("offers"))
-        with db_session() as conn:
-            conn.execute(
-                "INSERT INTO reservations (product, name, email, offer, note, created_at) VALUES (?,?,?,?,?,?)",
-                (product, name, email, offer or "family year", note, now()),
-            )
-        flash(
-            "Reservation saved. This is a refundable hold, not a charge. "
-            "We will email you before anything is billed.",
-            "ok",
-        )
-        return redirect(url_for("offers"))
 
     @app.route("/signup", methods=["GET", "POST"])
     def signup():

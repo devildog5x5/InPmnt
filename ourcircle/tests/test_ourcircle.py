@@ -76,6 +76,7 @@ class AppTests(unittest.TestCase):
         self.assertIn(b'id="contact"', land.data)
         self.assertIn(b"CUSTOMER SERVICE PHONE", land.data)
         self.assertIn(b"fsp-chat", land.data)
+        self.assertNotIn(b">Offers</a>", land.data)
         self.assertNotIn(b"not InPmnt", land.data)
         self.assertNotIn(b"Hostinger PHP", land.data)
         self.assertNotIn(b"robots.txt", land.data)
@@ -110,7 +111,7 @@ class AppTests(unittest.TestCase):
         hook = self.client.post("/billing/webhook", data=b"{}", content_type="application/json")
         self.assertEqual(hook.status_code, 503)
 
-    def test_check_alert_and_reservation(self) -> None:
+    def test_check_alert(self) -> None:
         self.client.post("/login", data={"email": "family@ourcircle.app", "password": "password123"})
         res = self.client.post(
             "/check",
@@ -125,18 +126,8 @@ class AppTests(unittest.TestCase):
         self.assertEqual(alert.status_code, 200)
         home = self.client.get("/home")
         self.assertIn(b"PLEASE CALL", home.data)
-        offer = self.client.post(
-            "/offers",
-            data={
-                "product": "ourcircle",
-                "name": "Pat",
-                "email": "pat@example.com",
-                "offer": "$119.99 family year",
-            },
-            follow_redirects=True,
-        )
-        self.assertEqual(offer.status_code, 200)
-        self.assertIn(b"Reservation saved", offer.data)
+        gone = self.client.get("/offers")
+        self.assertEqual(gone.status_code, 404)
 
     def test_invite_limit_message_and_trusted(self) -> None:
         self.client.post("/login", data={"email": "family@ourcircle.app", "password": "password123"})
@@ -160,6 +151,7 @@ class AppTests(unittest.TestCase):
         self.assertIn("Disallow: /uploads", text)
         self.assertIn("Allow: /signup", text)
         self.assertIn("Allow: /forgot", text)
+        self.assertNotIn("Allow: /offers", text)
         self.assertIn("Disallow: /account", text)
         self.assertIn("Disallow: /support", text)
         sitemap = self.client.get("/sitemap.xml")
@@ -169,7 +161,7 @@ class AppTests(unittest.TestCase):
         self.assertIn("https://familyshieldpro.com/signup", xml)
         self.assertIn("https://familyshieldpro.com/login", xml)
         self.assertIn("https://familyshieldpro.com/forgot", xml)
-        self.assertIn("https://familyshieldpro.com/offers", xml)
+        self.assertNotIn("/offers", xml)
         self.assertNotIn("/home", xml)
         health = self.client.get("/healthz")
         self.assertEqual(health.status_code, 200)

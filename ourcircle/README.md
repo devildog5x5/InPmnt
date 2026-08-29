@@ -38,7 +38,7 @@ Family plan: up to **five people**. **$14.99/month** or **$119.99/year**. Stripe
 
 ## Paid validation (seven days)
 
-Share `/offers` with real buyers. Count refundable reservations, not opinions:
+Share the homepage and `/signup` with real buyers. Count **Family yearly signups at $119.99**, not opinions:
 
 | Product | Seven-day target |
 |---|---|
@@ -50,7 +50,7 @@ If none hits the bar, change the offer before writing more product code.
 
 ## Downloads
 
-**https://raw.githubusercontent.com/devildog5x5/InPmnt/cursor/ourcircle-family-shield-4df6/patches/FamilyShieldPro-1.2.1.zip**
+**https://raw.githubusercontent.com/devildog5x5/InPmnt/cursor/ourcircle-family-shield-4df6/patches/FamilyShieldPro-1.2.2.zip**
 
 That zip is the Hostinger site. `robots.txt` and `sitemap.xml` are already inside it (next to `index.php`). Unzip into `public_html`.
 

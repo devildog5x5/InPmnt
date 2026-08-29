@@ -31,7 +31,7 @@ This build records a **refundable reservation**, not a Stripe charge, until keys
 
 ## Seven-day paid validation
 
-Share `/offers` and the homepage. Count **refundable Family yearly holds at $119.99**, not likes.
+Share the homepage and `/signup`. Count **Family yearly signups at $119.99**, not likes.
 
 | Day | Action | Done when |
 |---|---|---|
@@ -39,7 +39,7 @@ Share `/offers` and the homepage. Count **refundable Family yearly holds at $119
 | 1 | 20 personal asks: siblings, church admin, one credit-union contact, two Facebook “aging parents” groups (value first) | 20 named conversations |
 | 2–3 | 60-second phone-camera demo: paste gift-card text → Pause → tap “Please call me before I pay” | Link in every DM |
 | 4–5 | One church bulletin / senior-center flyer: “$119.99 family year — we never say a request is safe” | Flyer in one real hallway |
-| 6–7 | Follow up. Collect holds on `/offers` or signup | **Ten Family yearly holds** |
+| 6–7 | Follow up. Collect signups | **Ten Family yearly holds** |
 
 If fewer than ten holds: change the **ask and the channel**, not the product architecture. Do not add more detector features to “make it sell.”
 
@@ -86,7 +86,7 @@ Ad / post formula:
 
 - Canonical host: `https://familyshieldpro.com`
 - `https://familyshieldpro.com/robots.txt` — allow public pages, disallow logged-in paths
-- `https://familyshieldpro.com/sitemap.xml` — `/`, `/signup`, `/login`, `/offers`
+- `https://familyshieldpro.com/sitemap.xml` — `/`, `/signup`, `/login`, `/forgot`
 - Logged-in shell is `noindex`
 - After deploy: Search Console property + submit sitemap
 

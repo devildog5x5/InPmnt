@@ -34,7 +34,7 @@ $empty = Analyze::analyze('');
 check(Analyze::analyze('')['level'] === Analyze::UNKNOWN, 'empty unknown');
 
 require $root . '/php/src/Product.php';
-check(Product::version() === '1.2.1', 'product version 1.2.1');
+check(Product::version() === '1.2.2', 'product version 1.2.2');
 check(Product::NAME === 'Family Shield Pro', 'product name');
 check(Product::APP === 'OurCircle', 'app name');
 
@@ -46,6 +46,8 @@ check(str_contains($landing, 'Really! Really! Really!'), 'landing really');
 check(str_contains($landing, 'Why we built this'), 'landing why');
 check(str_contains($landing, 'CustomerService@FamilyShieldPro.com'), 'landing support email');
 check(str_contains($landing, 'CUSTOMER SERVICE PHONE'), 'landing phone commented out');
+check(!str_contains($landing, 'href="/offers"'), 'landing no offers link');
+check(!is_file($root . '/php/views/offers.php'), 'php offers view gone');
 check(!str_contains($landing, 'not InPmnt'), 'landing no product-identity footer');
 check(!str_contains($landing, 'Hostinger PHP'), 'landing no hostinger footer');
 check(!str_contains($landing, 'robots.txt'), 'landing no robots footer');
@@ -108,11 +110,13 @@ check(Auth::consumeRecovery($after, $codes[0]) === null, 'recovery code not reus
 
 $robots = file_get_contents($root . '/php/robots.txt') ?: '';
 check(str_contains($robots, 'Allow: /forgot'), 'robots allow forgot');
+check(!str_contains($robots, 'Allow: /offers'), 'robots no offers');
 check(str_contains($robots, 'Disallow: /support'), 'robots disallow support');
 check(str_contains($robots, 'familyshieldpro.com'), 'robots host');
 check(str_contains($robots, 'Disallow: /home'), 'robots disallow home');
 $sitemap = file_get_contents($root . '/php/sitemap.xml') ?: '';
 check(str_contains($sitemap, 'https://familyshieldpro.com/signup'), 'sitemap signup');
+check(!str_contains($sitemap, '/offers'), 'sitemap no offers');
 check(!str_contains($sitemap, '/home'), 'sitemap no /home');
 
 if ($fail > 0) {

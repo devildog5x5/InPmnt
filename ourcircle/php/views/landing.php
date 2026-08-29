@@ -12,7 +12,6 @@ View::start($title, $site_home, 'index,follow', '/');
     <?= View::brand($site_home) ?>
     <nav class="nav">
       <a class="btn ghost" href="#contact">Contact</a>
-      <a class="btn ghost" href="/offers">Offers</a>
       <a class="btn ghost" href="/login">Sign in</a>
       <a class="btn" href="/signup">Start a circle</a>
     </nav>
