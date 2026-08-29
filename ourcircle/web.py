@@ -78,7 +78,24 @@ PRIVATE_PREFIXES = (
 
 
 def site_url() -> str:
-    return (os.environ.get("OURCIRCLE_SITE_URL") or DEFAULT_SITE_URL).rstrip("/")
+    return (
+        (os.environ.get("OURCIRCLE_SITE_URL") or os.environ.get("BASE_URL") or DEFAULT_SITE_URL)
+        .strip()
+        .rstrip("/")
+    )
+
+
+def join_url(token: str) -> str:
+    return site_url() + "/join/" + token
+
+
+def invite_email_body(join: str) -> str:
+    return (
+        "Someone invited you to a Family Shield Pro (OurCircle) family circle.\n\n"
+        f"Open this link to join. It is only for this email:\n{join}\n\n"
+        "If you did not expect this, ignore the message.\n\n"
+        f"{GUIDANCE}\n"
+    )
 
 
 def product_version() -> str:
@@ -729,8 +746,26 @@ def create_app() -> Flask:
             try:
                 with db_session() as conn:
                     inv = invite_member(conn, u["household_id"], email, name)
-                join = url_for("join", token=inv["token"], _external=True)
-                flash(f"Invite created for {inv['email']}. Share this join link: {join}", "ok")
+                join = join_url(inv["token"])
+                share = f"Share this join link: {join}"
+                if mail_configured():
+                    try:
+                        send_email(
+                            to=inv["email"],
+                            subject="Join your family circle on Family Shield Pro",
+                            body=invite_email_body(join),
+                        )
+                        flash(
+                            f"Invite emailed to {inv['email']}. If they do not see it (check spam), {share}",
+                            "ok",
+                        )
+                    except Exception:
+                        flash(f"Could not send the invite email. {share}", "error")
+                else:
+                    flash(
+                        f"Invite created for {inv['email']}. Mail is not set up yet, so {share[0].lower() + share[1:]}",
+                        "ok",
+                    )
             except ValueError as exc:
                 flash(str(exc), "error")
             return redirect(url_for("circle"))

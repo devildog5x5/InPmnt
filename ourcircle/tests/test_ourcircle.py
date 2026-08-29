@@ -185,6 +185,51 @@ class AppTests(unittest.TestCase):
         inv = self.client.post("/circle", data={"email": "kid@example.com", "name": "Kid"}, follow_redirects=True)
         self.assertEqual(inv.status_code, 200)
         self.assertIn(b"Invite created", inv.data)
+        self.assertIn(b"/join/", inv.data)
+        self.assertIn(b"Send invite", inv.data)
+        self.assertIn(b"kid@example.com", inv.data)
+        token = None
+        with db.session() as conn:
+            row = conn.execute(
+                "SELECT token FROM invitations WHERE email=?",
+                ("kid@example.com",),
+            ).fetchone()
+            token = row["token"] if row else None
+        self.assertTrue(token)
+        other = create_app().test_client()
+        join_page = other.get(f"/join/{token}")
+        self.assertEqual(join_page.status_code, 200)
+        self.assertIn(b"Join this family circle", join_page.data)
+        self.assertIn(b"kid@example.com", join_page.data)
+
+        sent: list[dict] = []
+
+        def capture_send(**kwargs):  # type: ignore[no-untyped-def]
+            sent.append(kwargs)
+            return {"provider": "test"}
+
+        os.environ["SMTP_HOST"] = "smtp.example.test"
+        os.environ["SMTP_USER"] = "mail@example.test"
+        os.environ["MAIL_FROM"] = "mail@example.test"
+        os.environ["OURCIRCLE_SITE_URL"] = "https://sandbox.familyshieldpro.com"
+        try:
+            from unittest.mock import patch
+
+            with patch("web.send_email", side_effect=capture_send):
+                mailed = self.client.post(
+                    "/circle",
+                    data={"email": "cousin@example.com", "name": "Cousin"},
+                    follow_redirects=True,
+                )
+            self.assertEqual(mailed.status_code, 200)
+            self.assertIn(b"Invite emailed", mailed.data)
+            self.assertEqual(len(sent), 1)
+            self.assertEqual(sent[0]["to"], "cousin@example.com")
+            self.assertIn("https://sandbox.familyshieldpro.com/join/", sent[0]["body"])
+            self.assertIn("guidance, not a guarantee", sent[0]["body"])
+        finally:
+            for k in ("SMTP_HOST", "SMTP_USER", "MAIL_FROM", "OURCIRCLE_SITE_URL"):
+                os.environ.pop(k, None)
 
     def test_robots_and_sitemap_use_familyshieldpro(self) -> None:
         robots = self.client.get("/robots.txt")
@@ -387,6 +432,14 @@ class AppTests(unittest.TestCase):
         money_reply = money_chat.get_json()["reply"]
         self.assertIn("NO!!!", money_reply)
         self.assertIn("without a doubt", money_reply.lower())
+        invite_chat = self.client.post(
+            "/support/chat",
+            json={"message": "why does the invite email link not work?"},
+        )
+        self.assertEqual(invite_chat.status_code, 200)
+        invite_reply = invite_chat.get_json()["reply"].lower()
+        self.assertIn("join", invite_reply)
+        self.assertIn("circle", invite_reply)
         self.assertIn("family member", money_reply.lower())
         self.assertIn("CustomerService@FamilyShieldPro.com", self.client.get("/login").data.decode())
         health = self.client.get("/healthz")

@@ -2,6 +2,7 @@
 /** @var array $members */
 /** @var array $pending */
 /** @var array $alerts */
+/** @var string $site_home */
 View::appOpen(get_defined_vars());
 ?>
 <div class="grid-2">
@@ -20,7 +21,8 @@ View::appOpen(get_defined_vars());
     <h3>Waiting to join</h3>
     <ul class="list">
       <?php foreach ($pending as $p): ?>
-      <li><?= Http::e($p['email']) ?> · join link token <?= Http::e($p['token']) ?></li>
+      <?php $join = rtrim((string) ($site_home ?? ''), '/') . '/join/' . rawurlencode((string) ($p['token'] ?? '')); ?>
+      <li><?= Http::e($p['email']) ?> · <a href="<?= Http::e($join) ?>"><?= Http::e($join) ?></a></li>
       <?php endforeach; ?>
     </ul>
     <?php endif; ?>
@@ -31,8 +33,8 @@ View::appOpen(get_defined_vars());
     <input name="name" />
     <label>Email</label>
     <input name="email" type="email" required />
-    <p><button class="btn wide" type="submit">Create invite link</button></p>
-    <p class="disclaimer">Share the join link in a call or a message you already trust — not inside a suspicious thread.</p>
+    <p><button class="btn wide" type="submit">Send invite</button></p>
+    <p class="disclaimer">We email a join link when mail is set up. Also copy it from Waiting to join and share it in a call you already trust — not inside a suspicious thread.</p>
   </form>
 </div>
 <?php if ($alerts): ?>

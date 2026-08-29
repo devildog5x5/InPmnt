@@ -11,7 +11,7 @@
       <div class="flash {{ cat }}">{{ msg }}</div>
     {% endfor %}
     <p>Invite for {{ invite.email }}</p>
-    <form method="post">
+    <form method="post" action="{{ url_for('join', token=token) }}">
       <label>Your name</label>
       <input name="name" required value="{{ invite.name or '' }}" />
       <label>Choose a password (8+)</label>

@@ -1,4 +1,4 @@
-"""Outbound mail for Family Shield Pro password reset. Not InPmnt."""
+"""Outbound mail for Family Shield Pro password reset and circle invites. Not InPmnt."""
 from __future__ import annotations
 
 import os

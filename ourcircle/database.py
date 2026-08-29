@@ -279,6 +279,8 @@ def invite_member(conn: sqlite3.Connection, hid: int, email: str, name: str = ""
     if len(users) + len(pending) >= 5:
         raise ValueError("The family plan includes up to five people. Remove someone or upgrade with us later.")
     email = email.lower().strip()
+    if not email or "@" not in email:
+        raise ValueError("Need an email address to invite.")
     token = secrets.token_urlsafe(16)
     conn.execute(
         """

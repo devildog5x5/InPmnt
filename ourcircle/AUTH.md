@@ -15,9 +15,20 @@
 
 Demo login `family@ourcircle.app` has 2FA **off** until you turn it on.
 
-## Mail (needed for email reset links)
+## Mail (needed for email reset links and circle invites)
 
 hPanel → `public_html/.env` — **add lines, do not replace the file**.
+
+`MAIL_FROM` and `SMTP_USER` must match the Hostinger mailbox **exactly** (underscores count).
+
+Set **both** site URLs to the host families actually open, including a sandbox host:
+
+```
+BASE_URL=https://sandbox.familyshieldpro.com
+OURCIRCLE_SITE_URL=https://sandbox.familyshieldpro.com
+```
+
+Join links in invite email are `{OURCIRCLE_SITE_URL}/join/{token}`. If that host is wrong, the link will 404 or open the live site’s empty database.
 
 Hostinger mailbox (typical):
 
@@ -40,6 +51,8 @@ RESEND_API_KEY=re_...
 ```
 
 Until mail is set, `/forgot` still accepts the form (same “if that email is on a circle…” message) but **no email is sent**. Use a recovery code, or change the password while signed in.
+
+**Circle invites:** Circle → **Send invite**. If mail is set, they get a join link by email. The same full link stays under **Waiting to join**. They open `/join/…` without signing in first. Always share the link in a call you already trust if the email is slow or lands in spam.
 
 ## Turn on 2FA
 

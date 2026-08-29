@@ -256,6 +256,9 @@ final class Db
             throw new RuntimeException('The family plan includes up to five people. Remove someone or upgrade with us later.');
         }
         $email = strtolower(trim($email));
+        if ($email === '' || !str_contains($email, '@')) {
+            throw new RuntimeException('Need an email address to invite.');
+        }
         $token = rtrim(strtr(base64_encode(random_bytes(16)), '+/', '-_'), '=');
         $db->prepare(
             "INSERT INTO invitations (household_id, email, name, token, status, created_at) VALUES (?,?,?,?,'pending',?)"

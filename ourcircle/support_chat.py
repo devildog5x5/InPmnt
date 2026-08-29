@@ -73,6 +73,12 @@ _FAQ: list[tuple[tuple[str, ...], str]] = [
         f"We do not publish a customer-service phone number yet. Email {SUPPORT_EMAIL} — a person reads every message.",
     ),
     (
+        ("invite email", "invite link", "join link", "invitation", "invite someone"),
+        "Circle → Invite someone. We email them a join link if mail is set up (SMTP or Resend in .env). "
+        "You can also copy the full https://…/join/… link from Waiting to join. They do not need to sign in first. "
+        f"Stuck? {SUPPORT_EMAIL}.",
+    ),
+    (
         ("email", "contact", "reach you", "customer service", "support"),
         f"Email customer service at {SUPPORT_EMAIL}. A person reads every message. "
         "There is no public phone number yet.",

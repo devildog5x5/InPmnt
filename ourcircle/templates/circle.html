@@ -17,7 +17,7 @@
     <h3>Waiting to join</h3>
     <ul class="list">
       {% for p in pending %}
-      <li>{{ p.email }} · join link token {{ p.token }}</li>
+      <li>{{ p.email }} · <a href="{{ site_home }}/join/{{ p.token }}">{{ site_home }}/join/{{ p.token }}</a></li>
       {% endfor %}
     </ul>
     {% endif %}
@@ -28,8 +28,8 @@
     <input name="name" />
     <label>Email</label>
     <input name="email" type="email" required />
-    <p><button class="btn wide" type="submit">Create invite link</button></p>
-    <p class="disclaimer">Share the join link in a call or a message you already trust — not inside a suspicious thread.</p>
+    <p><button class="btn wide" type="submit">Send invite</button></p>
+    <p class="disclaimer">We email a join link when mail is set up. Also copy it from Waiting to join and share it in a call you already trust — not inside a suspicious thread.</p>
   </form>
 </div>
 {% if alerts %}

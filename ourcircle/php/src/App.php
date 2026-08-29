@@ -126,6 +126,19 @@ final class App
         return rtrim(Env::get('OURCIRCLE_SITE_URL', Env::get('BASE_URL', 'https://familyshieldpro.com')), '/');
     }
 
+    private function joinUrl(string $token): string
+    {
+        return $this->siteHome() . '/join/' . rawurlencode($token);
+    }
+
+    public static function inviteEmailBody(string $join): string
+    {
+        return "Someone invited you to a Family Shield Pro (OurCircle) family circle.\n\n"
+            . "Open this link to join. It is only for this email:\n{$join}\n\n"
+            . "If you did not expect this, ignore the message.\n\n"
+            . Analyze::GUIDANCE . "\n";
+    }
+
     private function user(): ?array
     {
         $uid = $_SESSION['user_id'] ?? null;
@@ -728,8 +741,22 @@ final class App
         if (Http::method() === 'POST') {
             try {
                 $inv = Db::invite($this->db, $u['household_id'], (string) ($_POST['email'] ?? ''), (string) ($_POST['name'] ?? ''));
-                $join = $this->siteHome() . '/join/' . rawurlencode($inv['token']);
-                $this->flash('Invite created for ' . $inv['email'] . '. Share this join link: ' . $join, 'ok');
+                $join = $this->joinUrl((string) $inv['token']);
+                $share = 'Share this join link: ' . $join;
+                if (Mailer::configured()) {
+                    try {
+                        Mailer::send(
+                            (string) $inv['email'],
+                            'Join your family circle on Family Shield Pro',
+                            self::inviteEmailBody($join)
+                        );
+                        $this->flash('Invite emailed to ' . $inv['email'] . '. If they do not see it (check spam), ' . $share, 'ok');
+                    } catch (Throwable) {
+                        $this->flash('Could not send the invite email. ' . $share, 'error');
+                    }
+                } else {
+                    $this->flash('Invite created for ' . $inv['email'] . '. Mail is not set up yet, so ' . lcfirst($share), 'ok');
+                }
             } catch (RuntimeException $e) {
                 $this->flash($e->getMessage(), 'error');
             }

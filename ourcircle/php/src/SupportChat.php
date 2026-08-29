@@ -33,6 +33,8 @@ final class SupportChat
                 'Forgot your password? Use /forgot. We can email a one-hour reset link if mail is set up, or you can use a one-time recovery code from when you turned on 2FA. Turn 2FA on or off under Account after you sign in. Stuck? ' . self::SUPPORT_EMAIL . '.'],
             [['phone', 'call us', 'telephone', 'support number', 'customer service number'],
                 'We do not publish a customer-service phone number yet. Email ' . self::SUPPORT_EMAIL . ' — a person reads every message.'],
+            [['invite email', 'invite link', 'join link', 'invitation', 'invite someone'],
+                'Circle → Invite someone. We email them a join link if mail is set up (SMTP or Resend in .env). You can also copy the full https://…/join/… link from Waiting to join. They do not need to sign in first. Stuck? ' . self::SUPPORT_EMAIL . '.'],
             [['email', 'contact', 'reach you', 'customer service', 'support'],
                 'Email customer service at ' . self::SUPPORT_EMAIL . '. A person reads every message. There is no public phone number yet.'],
             [['circle', 'invite', 'member', 'five', '5 people', 'household'],

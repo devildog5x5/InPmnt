@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-/** Outbound mail for Family Shield Pro password reset. Not InPmnt. */
+/** Outbound mail for Family Shield Pro password reset and circle invites. Not InPmnt. */
 final class Mailer
 {
     public static function configured(): bool
@@ -84,14 +84,20 @@ final class Mailer
         $user = trim(Env::get('SMTP_USER'));
         $password = Env::get('SMTP_PASSWORD');
         $useSsl = Env::truthy('SMTP_SSL') || $port === 465;
-        $headers = [
-            'From: ' . $fromHeader,
-            'Reply-To: ' . $mailFrom,
-            'Content-Type: text/plain; charset=UTF-8',
-        ];
-        $ok = @mail($to, $subject !== '' ? $subject : '(no subject)', $body, implode("\r\n", $headers), '-f' . $mailFrom);
-        if (!$ok) {
+        // Hostinger's mail() often returns true without delivering. Use SMTP first.
+        try {
             self::smtpSocket($host, $port, $user, $password, $fromHeader, $mailFrom, $to, $subject, $body, $useSsl);
+            return;
+        } catch (Throwable $smtpErr) {
+            $headers = [
+                'From: ' . $fromHeader,
+                'Reply-To: ' . $mailFrom,
+                'Content-Type: text/plain; charset=UTF-8',
+            ];
+            $ok = @mail($to, $subject !== '' ? $subject : '(no subject)', $body, implode("\r\n", $headers), '-f' . $mailFrom);
+            if (!$ok) {
+                throw $smtpErr;
+            }
         }
     }
 
