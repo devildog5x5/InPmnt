@@ -1,7 +1,7 @@
 # Family Shield Pro — deploy (no VPS)
 
 **Site:** https://familyshieldpro.com  
-**Zip:** https://raw.githubusercontent.com/devildog5x5/InPmnt/cursor/ourcircle-family-shield-4df6/patches/FamilyShieldPro-1.2.12.zip  
+**Zip:** https://raw.githubusercontent.com/devildog5x5/InPmnt/cursor/ourcircle-family-shield-4df6/patches/FamilyShieldPro-1.2.13.zip  
 (`robots.txt` and `sitemap.xml` are inside the zip.)  
 **Do not** put this in an InPmnt folder or overwrite a live `.env`.
 

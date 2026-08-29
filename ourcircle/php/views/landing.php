@@ -35,8 +35,8 @@ View::start($title, $site_home, 'index,follow', '/');
     </div>
   </section>
   <div class="panel featured">
-    <h2>Strategy and tactics</h2>
-    <p>We offer strategy and tactics to help you and your family prevent being scammed. Not a guarantee. Your circle and we help prevent you from being taken advantage of.</p>
+    <h2>Strategy and Tactics</h2>
+    <p>We offer Strategy and Tactics to help you and your family prevent being scammed. Not a guarantee. Your circle and us help prevent you from being taken advantage of.</p>
   </div>
   <div class="panel story">
     <h2>Why we built this</h2>
