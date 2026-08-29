@@ -10,6 +10,15 @@
   <p><button class="btn" type="submit">Change password</button></p>
 </form>
 
+<h2>Mobile and SMS</h2>
+<form method="post" action="{{ url_for('account_phone') }}">
+  <label>Mobile number (optional)</label>
+  <input name="phone" type="tel" inputmode="tel" value="{{ phone }}" placeholder="(555) 010-1234" autocomplete="tel" />
+  <label class="check-row"><input type="checkbox" name="sms_opt_out" value="1"{% if sms_opt_out %} checked{% endif %} /> Opt out of Family Shield Pro texts</label>
+  <p><button class="btn" type="submit">Save mobile</button></p>
+</form>
+<p class="disclaimer">When Twilio is in .env, we can text circle invites and “Please call me before I pay” alerts. Forward a sketchy text to the Family Shield Pro number to open a check. Reply STOP to opt out. This is not a customer-service hotline.</p>
+
 <h2>Two-factor authentication</h2>
 {% if recovery_codes %}
 <div class="panel featured">

@@ -55,6 +55,8 @@ class AppTests(unittest.TestCase):
         except OSError:
             pass
         os.environ.pop("OURCIRCLE_DB", None)
+        for key in ("TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_FROM"):
+            os.environ.pop(key, None)
 
     def test_landing_and_login_demo(self) -> None:
         land = self.client.get("/")
@@ -89,6 +91,7 @@ class AppTests(unittest.TestCase):
         self.assertIn(b"Strategy and Tactics", land.data)
         self.assertIn(b"Not a guarantee", land.data)
         self.assertIn(b"Your circle and us", land.data)
+        self.assertIn(b"Text with your circle", land.data)
         signup_page = self.client.get("/signup")
         self.assertEqual(signup_page.status_code, 200)
         self.assertIn(b"The Smith circle", signup_page.data)
@@ -126,6 +129,7 @@ class AppTests(unittest.TestCase):
         self.assertIn(b"Stripe keys are not", billing.data)
         health = self.client.get("/healthz")
         self.assertFalse(health.get_json().get("stripe"))
+        self.assertFalse(health.get_json().get("sms"))
         hook = self.client.post("/billing/webhook", data=b"{}", content_type="application/json")
         self.assertEqual(hook.status_code, 503)
 
@@ -187,6 +191,8 @@ class AppTests(unittest.TestCase):
         self.assertIn(b"Invite created", inv.data)
         self.assertIn(b"/join/", inv.data)
         self.assertIn(b"Send invite", inv.data)
+        self.assertIn(b"Mobile (optional)", inv.data)
+        self.assertIn(b"Resend invite", inv.data)
         self.assertIn(b"kid@example.com", inv.data)
         kid_at = inv.data.rfind(b"kid@example.com")
         kid_chunk = inv.data[kid_at : kid_at + 500]
@@ -269,6 +275,7 @@ class AppTests(unittest.TestCase):
         self.assertNotIn("Allow: /offers", text)
         self.assertIn("Disallow: /account", text)
         self.assertIn("Disallow: /support", text)
+        self.assertIn("Disallow: /sms", text)
         sitemap = self.client.get("/sitemap.xml")
         self.assertEqual(sitemap.status_code, 200)
         xml = sitemap.data.decode("utf-8")
@@ -465,10 +472,120 @@ class AppTests(unittest.TestCase):
         invite_reply = invite_chat.get_json()["reply"].lower()
         self.assertIn("join", invite_reply)
         self.assertIn("circle", invite_reply)
+        sms_chat = self.client.post(
+            "/support/chat",
+            json={"message": "can we get and send sms messages on our phones?"},
+        )
+        self.assertEqual(sms_chat.status_code, 200)
+        sms_reply = sms_chat.get_json()["reply"].lower()
+        self.assertIn("sms", sms_reply)
+        self.assertIn("stop", sms_reply)
+        self.assertNotIn("this is safe", sms_reply)
         self.assertIn("family member", money_reply.lower())
         self.assertIn("CustomerService@FamilyShieldPro.com", self.client.get("/login").data.decode())
         health = self.client.get("/healthz")
         self.assertFalse(health.get_json().get("openai"))
+
+    def test_sms_invite_account_and_inbound(self) -> None:
+        import base64
+        import hashlib
+        import hmac
+        from unittest.mock import patch
+
+        import sms as sms_mod
+
+        self.assertEqual(sms_mod.normalize_phone("555-010-1234"), "+15550101234")
+        self.assertEqual(sms_mod.classify_inbound("STOP"), "stop")
+        self.assertEqual(sms_mod.classify_inbound("buy gift cards now"), "check")
+        self.assertIn("<Message>", sms_mod.twiml("Hello & goodbye"))
+        self.assertNotIn("this is safe", sms_mod.check_sms_body("Pause.", "https://example.test/checks/1").lower())
+        self.assertFalse(sms_mod.sms_configured())
+
+        off = self.client.post("/sms/inbound", data={"From": "+15555550100", "Body": "HELP"})
+        self.assertEqual(off.status_code, 503)
+
+        self.client.post("/login", data={"email": "family@ourcircle.app", "password": "password123"})
+        saved = self.client.post(
+            "/account/phone",
+            data={"phone": "555-010-8888"},
+            follow_redirects=True,
+        )
+        self.assertEqual(saved.status_code, 200)
+        self.assertIn(b"Mobile number saved", saved.data)
+        self.assertIn(b"+15550108888", saved.data)
+        acct = self.client.get("/account")
+        self.assertIn(b"Mobile and SMS", acct.data)
+
+        sent: list[dict] = []
+
+        def capture_sms(*, to: str, body: str):  # type: ignore[no-untyped-def]
+            sent.append({"to": to, "body": body})
+            return {"provider": "test"}
+
+        os.environ["TWILIO_ACCOUNT_SID"] = "ACaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        os.environ["TWILIO_AUTH_TOKEN"] = "testtoken1234567890"
+        os.environ["TWILIO_FROM"] = "+15555550100"
+        os.environ["OURCIRCLE_SITE_URL"] = "https://familyshieldpro.com"
+        try:
+            health = self.client.get("/healthz")
+            self.assertTrue(health.get_json().get("sms"))
+            with patch("web.send_sms", side_effect=capture_sms):
+                invited = self.client.post(
+                    "/circle",
+                    data={"email": "aunt@example.com", "name": "Aunt", "phone": "555-010-7777"},
+                    follow_redirects=True,
+                )
+            self.assertEqual(invited.status_code, 200)
+            self.assertIn(b"texted to +15550107777", invited.data)
+            self.assertEqual(sent[0]["to"], "+15550107777")
+            self.assertIn("familyshieldpro.com/join/", sent[0]["body"])
+            self.assertIn("STOP", sent[0]["body"])
+            aunt_at = invited.data.rfind(b"aunt@example.com")
+            aunt_chunk = invited.data[aunt_at : aunt_at + 700]
+            self.assertIn(b"Invite sent", aunt_chunk)
+            self.assertIn(b"+15550107777", aunt_chunk)
+            self.assertIn(b"Resend invite", aunt_chunk)
+
+            params = {"AccountSid": os.environ["TWILIO_ACCOUNT_SID"], "From": "+15550108888", "Body": "HELP"}
+            data = "https://familyshieldpro.com/sms/inbound"
+            for key in sorted(params):
+                data += key + params[key]
+            digest = hmac.new(os.environ["TWILIO_AUTH_TOKEN"].encode(), data.encode(), hashlib.sha1).digest()
+            sig = base64.b64encode(digest).decode("ascii")
+            help_res = self.client.post(
+                "/sms/inbound",
+                data=params,
+                headers={"X-Twilio-Signature": sig},
+            )
+            self.assertEqual(help_res.status_code, 200)
+            self.assertIn(b"<Message>", help_res.data)
+            self.assertIn(b"STOP", help_res.data)
+            self.assertNotIn(b"this is safe", help_res.data.lower())
+
+            check_params = {
+                "AccountSid": os.environ["TWILIO_ACCOUNT_SID"],
+                "From": "+15550108888",
+                "Body": "Grandson in jail. Buy Apple gift cards and keep this secret.",
+            }
+            data2 = "https://familyshieldpro.com/sms/inbound"
+            for key in sorted(check_params):
+                data2 += key + check_params[key]
+            digest2 = hmac.new(os.environ["TWILIO_AUTH_TOKEN"].encode(), data2.encode(), hashlib.sha1).digest()
+            sig2 = base64.b64encode(digest2).decode("ascii")
+            check_res = self.client.post(
+                "/sms/inbound",
+                data=check_params,
+                headers={"X-Twilio-Signature": sig2},
+            )
+            self.assertEqual(check_res.status_code, 200)
+            self.assertIn(b"Pause", check_res.data)
+            self.assertNotIn(b"this is safe", check_res.data.lower())
+            with db.session(self.db_path) as conn:
+                n = conn.execute("SELECT COUNT(*) AS c FROM checks WHERE kind='sms'").fetchone()["c"]
+            self.assertEqual(n, 1)
+        finally:
+            for key in ("TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_FROM", "OURCIRCLE_SITE_URL"):
+                os.environ.pop(key, None)
 
 
 if __name__ == "__main__":

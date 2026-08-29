@@ -37,8 +37,21 @@ require $root . '/php/src/Product.php';
 require_once $root . '/php/src/Env.php';
 require_once $root . '/php/src/Http.php';
 require_once $root . '/php/src/SupportChat.php';
+require $root . '/php/src/Sms.php';
+check(Sms::configured() === false, 'sms off without keys');
+check(Sms::normalizePhone('555-010-1234') === '+15550101234', 'sms normalize us');
+check(Sms::classifyInbound('STOP') === 'stop', 'sms classify stop');
+check(Sms::classifyInbound('buy gift cards now') === 'check', 'sms classify check');
+check(str_contains(Sms::twiml('Hello & goodbye'), '<Message>'), 'sms twiml');
+check(!str_contains(strtolower(Sms::checkBody('Pause.', 'https://example.test/c')), 'this is safe'), 'sms check body never safe');
+$smsChat = strtolower(SupportChat::faqReply('can we get and send sms messages on our phones?'));
+check(str_contains($smsChat, 'sms'), 'chat sms faq');
+check(str_contains($smsChat, 'stop'), 'chat sms stop');
+check(!str_contains($smsChat, 'this is safe'), 'chat sms never safe');
 $circlePhp = file_get_contents($root . '/php/views/circle.php') ?: '';
 check(str_contains($circlePhp, 'Send invite'), 'circle send invite button');
+check(str_contains($circlePhp, 'Mobile (optional)'), 'circle invite phone');
+check(str_contains($circlePhp, 'Resend invite'), 'circle resend invite');
 check(str_contains($circlePhp, '/join/'), 'circle pending join url');
 check(str_contains($circlePhp, 'Invited'), 'circle status invited');
 check(str_contains($circlePhp, 'Invite sent'), 'circle status invite sent');
@@ -48,13 +61,15 @@ check(!str_contains($circlePhp, 'join link token'), 'circle no bare token label'
 $appPhp = file_get_contents($root . '/php/src/App.php') ?: '';
 check(str_contains($appPhp, 'inviteEmailBody'), 'invite email body helper');
 check(str_contains($appPhp, 'Mailer::send'), 'app sends mail');
+check(str_contains($appPhp, 'Sms::send'), 'app sends sms');
+check(str_contains($appPhp, '/sms/inbound'), 'app inbound sms route');
 $mailPhp = file_get_contents($root . '/php/src/Mail.php') ?: '';
 $smtpPos = strpos($mailPhp, 'smtpSocket');
 $mailPos = strpos($mailPhp, '@mail(');
 check(is_int($smtpPos) && is_int($mailPos) && $smtpPos < $mailPos, 'smtp before php mail()');
 $inviteChat = SupportChat::faqReply('why does the invite email link not work?');
 check(str_contains(strtolower($inviteChat), 'join'), 'chat invite join');
-check(Product::version() === '1.2.15', 'product version 1.2.15');
+check(Product::version() === '1.2.16', 'product version 1.2.16');
 check(Product::NAME === 'Family Shield Pro', 'product name');
 check(Product::APP === 'OurCircle', 'app name');
 
@@ -79,12 +94,17 @@ check(str_contains($landing, 'guidance, not a guarantee'), 'landing guidance dis
 check(str_contains($landing, 'Strategy and Tactics'), 'landing strategy tactics');
 check(str_contains($landing, 'Not a guarantee'), 'landing not a guarantee');
 check(str_contains($landing, 'Your circle and us'), 'landing circle and us');
+check(str_contains($landing, 'Text with your circle'), 'landing sms panel');
 check(!str_contains($landing, 'href="/offers"'), 'landing no offers link');
 check(!is_file($root . '/php/views/offers.php'), 'php offers view gone');
 check(!str_contains($landing, 'not InPmnt'), 'landing no product-identity footer');
 check(!str_contains($landing, 'Hostinger PHP'), 'landing no hostinger footer');
 check(!str_contains($landing, 'robots.txt'), 'landing no robots footer');
-check(is_file($root . '/SUPPORT.md'), 'support setup doc');
+check(is_file($root . '/SMS.md'), 'sms setup doc');
+check(is_file($root . '/php/src/Sms.php'), 'php sms class');
+$accountPhp = file_get_contents($root . '/php/views/account.php') ?: '';
+check(str_contains($accountPhp, 'Mobile and SMS'), 'account mobile heading');
+check(str_contains($accountPhp, '/account/phone'), 'account phone form');
 check(is_file($root . '/php/src/SupportChat.php'), 'php support chat class');
 check(is_file($root . '/php/views/support_chat.php'), 'php chat widget');
 $chat = file_get_contents($root . '/php/views/support_chat.php') ?: '';
@@ -170,9 +190,13 @@ $ucols = array_map(fn ($c) => $c['name'], $db->query('PRAGMA table_info(users)')
 check(in_array('totp_secret', $ucols, true), 'user totp_secret');
 check(in_array('recovery_codes', $ucols, true), 'user recovery_codes');
 check(in_array('last_access_at', $ucols, true), 'user last_access_at');
+check(in_array('phone', $ucols, true), 'user phone');
+check(in_array('sms_opt_out', $ucols, true), 'user sms_opt_out');
 $icols = array_map(fn ($c) => $c['name'], $db->query('PRAGMA table_info(invitations)')->fetchAll());
 check(in_array('email_sent_at', $icols, true), 'invite email_sent_at');
 check(in_array('accepted_at', $icols, true), 'invite accepted_at');
+check(in_array('phone', $icols, true), 'invite phone');
+check(in_array('sms_sent_at', $icols, true), 'invite sms_sent_at');
 $hid = (int) $user['household_id'];
 $inv = Db::invite($db, $hid, 'status-kid@example.com', 'Status Kid');
 [$mems, $pend] = Db::decorateCircleStatus(Db::members($db, $hid), Db::pending($db, $hid));
@@ -200,6 +224,20 @@ foreach ($mems as $m) {
         check(($m['circle_status'] ?? '') === 'User Accesses the Circle', 'owner accesses');
     }
 }
+$smsInv = Db::invite($db, $hid, 'sms-kid@example.com', 'Sms Kid', '+15550109999');
+check(($smsInv['phone'] ?? '') === '+15550109999', 'invite stores phone');
+Db::markInviteSmsSent($db, (int) $smsInv['id']);
+[, $pendSms] = Db::decorateCircleStatus(Db::members($db, $hid), Db::pending($db, $hid));
+$smsPend = null;
+foreach ($pendSms as $p) {
+    if (($p['email'] ?? '') === 'sms-kid@example.com') {
+        $smsPend = $p;
+        break;
+    }
+}
+check($smsPend !== null && ($smsPend['circle_status'] ?? '') === 'Invite sent', 'sms send marks invite sent');
+$smsJoined = Db::acceptInvite($db, $smsInv['token'], 'Sms Kid', 'password123');
+check(($smsJoined['phone'] ?? '') === '+15550109999', 'accept copies invite phone');
 $secret = Auth::newSecret();
 $code = Auth::totpAt($secret, 1_111_111_111);
 check(Auth::verifyTotp($secret, $code, 1_111_111_111), 'totp verifies at timestamp');
@@ -214,6 +252,7 @@ $robots = file_get_contents($root . '/php/robots.txt') ?: '';
 check(str_contains($robots, 'Allow: /forgot'), 'robots allow forgot');
 check(!str_contains($robots, 'Allow: /offers'), 'robots no offers');
 check(str_contains($robots, 'Disallow: /support'), 'robots disallow support');
+check(str_contains($robots, 'Disallow: /sms'), 'robots disallow sms');
 check(str_contains($robots, 'familyshieldpro.com'), 'robots host');
 check(str_contains($robots, 'Disallow: /home'), 'robots disallow home');
 $sitemap = file_get_contents($root . '/php/sitemap.xml') ?: '';

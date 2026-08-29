@@ -13,6 +13,14 @@ $codes = is_array($recovery_codes ?? null) ? $recovery_codes : [];
   <input name="password" type="password" required minlength="8" autocomplete="new-password" />
   <p><button class="btn" type="submit">Change password</button></p>
 </form>
+<h2>Mobile and SMS</h2>
+<form method="post" action="/account/phone">
+  <label>Mobile number (optional)</label>
+  <input name="phone" type="tel" inputmode="tel" value="<?= Http::e((string) ($phone ?? '')) ?>" placeholder="(555) 010-1234" autocomplete="tel" />
+  <label class="check-row"><input type="checkbox" name="sms_opt_out" value="1"<?= !empty($sms_opt_out) ? ' checked' : '' ?> /> Opt out of Family Shield Pro texts</label>
+  <p><button class="btn" type="submit">Save mobile</button></p>
+</form>
+<p class="disclaimer">When Twilio is in .env, we can text circle invites and “Please call me before I pay” alerts. Forward a sketchy text to the Family Shield Pro number to open a check. Reply STOP to opt out. This is not a customer-service hotline.</p>
 <h2>Two-factor authentication</h2>
 <?php if ($codes): ?>
 <div class="panel featured">

@@ -20,7 +20,7 @@ final class App
         ],
     ];
 
-    public const PRIVATE = ['/home', '/circle', '/trusted', '/checks', '/uploads', '/join', '/billing', '/report', '/account', '/logout', '/support'];
+    public const PRIVATE = ['/home', '/circle', '/trusted', '/checks', '/uploads', '/join', '/billing', '/report', '/account', '/logout', '/support', '/sms'];
 
     public function __construct(private PDO $db, private string $root)
     {
@@ -46,8 +46,11 @@ final class App
                 'not' => 'InPmnt',
                 'stripe' => Billing::config()['enabled'],
                 'mail' => Mailer::configured(),
+                'sms' => Sms::configured(),
                 'openai' => SupportChat::openaiConfigured(),
             ]);
+        } elseif ($method === 'POST' && $path === '/sms/inbound') {
+            $this->smsInbound();
         } elseif ($method === 'POST' && $path === '/support/chat') {
             $this->supportChat();
         } elseif ($method === 'GET' && $path === '/') {
@@ -66,6 +69,8 @@ final class App
             $this->resetPassword($m[1]);
         } elseif ($path === '/account/password' && $method === 'POST') {
             $this->accountPassword();
+        } elseif ($path === '/account/phone' && $method === 'POST') {
+            $this->accountPhone();
         } elseif ($path === '/account/2fa/setup') {
             $this->account2faSetup();
         } elseif ($path === '/account/2fa/enable' && $method === 'POST') {
@@ -96,6 +101,8 @@ final class App
             $this->upload($m[1]);
         } elseif ($path === '/circle') {
             $this->circle();
+        } elseif ($path === '/circle/resend' && $method === 'POST') {
+            $this->circleResend();
         } elseif (preg_match('#^/join/([^/]+)$#', $path, $m)) {
             $this->join($m[1]);
         } elseif ($path === '/trusted') {
@@ -137,6 +144,89 @@ final class App
             . "Open this link to join. It is only for this email:\n{$join}\n\n"
             . "If you did not expect this, ignore the message.\n\n"
             . Analyze::GUIDANCE . "\n";
+    }
+
+    private function parsePhoneField(string $raw): string
+    {
+        $text = trim($raw);
+        if ($text === '') {
+            return '';
+        }
+        $phone = Sms::normalizePhone($text);
+        if ($phone === '') {
+            throw new RuntimeException('That mobile number does not look like a US or international number.');
+        }
+        return $phone;
+    }
+
+    /** @param array<string,mixed> $inv */
+    private function notifyInvite(array $inv, string $inviter): array
+    {
+        $join = $this->joinUrl((string) $inv['token']);
+        $share = 'Share this join link: ' . $join;
+        $emailed = false;
+        $texted = false;
+        $mailError = false;
+        $smsError = false;
+        if (Mailer::configured()) {
+            try {
+                Mailer::send(
+                    (string) $inv['email'],
+                    'Join your family circle on Family Shield Pro',
+                    self::inviteEmailBody($join)
+                );
+                $emailed = true;
+            } catch (Throwable) {
+                $mailError = true;
+            }
+        }
+        $phone = trim((string) ($inv['phone'] ?? ''));
+        if ($phone !== '' && Sms::configured()) {
+            try {
+                Sms::send($phone, Sms::inviteBody($join, $inviter));
+                $texted = true;
+            } catch (Throwable) {
+                $smsError = true;
+            }
+        }
+        if ($emailed) {
+            Db::markInviteSent($this->db, (int) $inv['id']);
+        }
+        if ($texted) {
+            Db::markInviteSmsSent($this->db, (int) $inv['id']);
+        }
+        $bits = [];
+        if ($emailed) {
+            $bits[] = 'emailed to ' . $inv['email'];
+        }
+        if ($texted) {
+            $bits[] = 'texted to ' . $phone;
+        }
+        if ($bits) {
+            $msg = 'Invite ' . implode(' and ', $bits) . '. If they do not see it, ' . lcfirst($share);
+            $cat = ($mailError || $smsError) ? 'error' : 'ok';
+            if ($mailError) {
+                $msg .= ' Email did not send.';
+            }
+            if ($smsError) {
+                $msg .= ' Text did not send.';
+            }
+            return [$msg, $cat];
+        }
+        if ($mailError || $smsError) {
+            return ['Could not send the invite. ' . $share, 'error'];
+        }
+        $extra = [];
+        if (!Mailer::configured()) {
+            $extra[] = 'mail is not set up yet';
+        }
+        if ($phone !== '' && !Sms::configured()) {
+            $extra[] = 'SMS is not set up yet';
+        }
+        if ($extra) {
+            return ['Invite created for ' . $inv['email'] . '. ' . ucfirst(implode(' and ', $extra)) . ', so ' . lcfirst($share), 'ok'];
+        }
+        return ['Invite created for ' . $inv['email'] . '. ' . $share, 'ok'];
     }
 
     private function user(): ?array
@@ -307,13 +397,24 @@ final class App
                 'flashes' => $this->takeFlashes(),
             ]);
         }
+        try {
+            $phone = $this->parsePhoneField((string) ($_POST['phone'] ?? ''));
+        } catch (RuntimeException $e) {
+            $this->flash($e->getMessage(), 'error');
+            $this->page('signup', [
+                'title' => 'Start a circle · OurCircle',
+                'robots' => 'index,follow',
+                'stripe_enabled' => Billing::config()['enabled'],
+                'flashes' => $this->takeFlashes(),
+            ]);
+        }
         $st = $this->db->prepare('SELECT id FROM users WHERE lower(email)=?');
         $st->execute([$email]);
         if ($st->fetch()) {
             $this->flash('That email already has a login. Sign in instead.', 'error');
             Http::redirect('/login');
         }
-        $hid = Db::createHousehold($this->db, $household !== '' ? $household : ($name . "'s circle"), $name, $email, $password);
+        $hid = Db::createHousehold($this->db, $household !== '' ? $household : ($name . "'s circle"), $name, $email, $password, $phone);
         $u = $this->db->prepare('SELECT * FROM users WHERE lower(email)=?');
         $u->execute([$email]);
         $this->loginUser($u->fetch());
@@ -493,7 +594,27 @@ final class App
             'title' => 'Account',
             'totp_on' => Auth::totpOn($user),
             'recovery_codes' => is_array($codes) ? $codes : [],
+            'phone' => (string) ($user['phone'] ?? ''),
+            'sms_opt_out' => !empty($user['sms_opt_out']),
         ]);
+    }
+
+    private function accountPhone(): void
+    {
+        $u = $this->requireLogin();
+        try {
+            $phone = $this->parsePhoneField((string) ($_POST['phone'] ?? ''));
+            Db::setUserPhone($this->db, (int) $u['id'], $phone, ((string) ($_POST['sms_opt_out'] ?? '')) === '1');
+        } catch (RuntimeException $e) {
+            $this->flash($e->getMessage(), 'error');
+            Http::redirect('/account');
+        }
+        if ($phone !== '') {
+            $this->flash('Mobile number saved. We can text invites and call-me alerts to this number.', 'ok');
+        } else {
+            $this->flash('Mobile number cleared.', 'ok');
+        }
+        Http::redirect('/account');
     }
 
     private function accountPassword(): void
@@ -719,7 +840,32 @@ final class App
         $this->db->prepare(
             'INSERT INTO alerts (check_id, household_id, user_id, message, created_at) VALUES (?,?,?,?,?)'
         )->execute([$id, $u['household_id'], $u['id'], $msg, Db::now()]);
-        $this->flash('Urgent alert is on the circle home. Call them by voice if you can — do not rely on a banner alone.', 'ok');
+        $texted = 0;
+        if (Sms::configured()) {
+            $checkLink = $this->siteHome() . '/checks/' . $id;
+            $body = Sms::alertBody($u['name'], $checkLink);
+            foreach (Db::members($this->db, $u['household_id']) as $member) {
+                if ((int) ($member['id'] ?? 0) === (int) $u['id']) {
+                    continue;
+                }
+                $dest = trim((string) ($member['phone'] ?? ''));
+                if ($dest === '' || !empty($member['sms_opt_out'])) {
+                    continue;
+                }
+                try {
+                    Sms::send($dest, $body);
+                    $texted++;
+                } catch (Throwable) {
+                }
+            }
+        }
+        $note = 'Urgent alert is on the circle home. Call them by voice if you can — do not rely on a banner alone.';
+        if ($texted > 0) {
+            $note .= ' Texted ' . $texted . ' circle member' . ($texted === 1 ? '' : 's') . '.';
+        } elseif (Sms::configured()) {
+            $note .= ' Nobody else in the circle has a mobile number on Account yet (or they opted out).';
+        }
+        $this->flash($note, 'ok');
         Http::redirect('/checks/' . $id);
     }
 
@@ -745,24 +891,16 @@ final class App
         $u = $this->requireLogin();
         if (Http::method() === 'POST') {
             try {
-                $inv = Db::invite($this->db, $u['household_id'], (string) ($_POST['email'] ?? ''), (string) ($_POST['name'] ?? ''));
-                $join = $this->joinUrl((string) $inv['token']);
-                $share = 'Share this join link: ' . $join;
-                if (Mailer::configured()) {
-                    try {
-                        Mailer::send(
-                            (string) $inv['email'],
-                            'Join your family circle on Family Shield Pro',
-                            self::inviteEmailBody($join)
-                        );
-                        Db::markInviteSent($this->db, (int) $inv['id']);
-                        $this->flash('Invite emailed to ' . $inv['email'] . '. If they do not see it (check spam), ' . $share, 'ok');
-                    } catch (Throwable) {
-                        $this->flash('Could not send the invite email. ' . $share, 'error');
-                    }
-                } else {
-                    $this->flash('Invite created for ' . $inv['email'] . '. Mail is not set up yet, so ' . lcfirst($share), 'ok');
-                }
+                $phone = $this->parsePhoneField((string) ($_POST['phone'] ?? ''));
+                $inv = Db::invite(
+                    $this->db,
+                    $u['household_id'],
+                    (string) ($_POST['email'] ?? ''),
+                    (string) ($_POST['name'] ?? ''),
+                    $phone
+                );
+                [$msg, $cat] = $this->notifyInvite($inv, $u['name']);
+                $this->flash($msg, $cat);
             } catch (RuntimeException $e) {
                 $this->flash($e->getMessage(), 'error');
             }
@@ -780,6 +918,95 @@ final class App
             'pending' => $pending,
             'alerts' => $alerts->fetchAll(),
         ]);
+    }
+
+    private function circleResend(): void
+    {
+        $u = $this->requireLogin();
+        $inviteId = (int) ($_POST['invite_id'] ?? 0);
+        $inv = Db::pendingInvite($this->db, $u['household_id'], $inviteId);
+        if (!$inv) {
+            $this->flash('That invite is not waiting anymore.', 'error');
+            Http::redirect('/circle');
+        }
+        [$msg, $cat] = $this->notifyInvite($inv, $u['name']);
+        $this->flash($msg, $cat);
+        Http::redirect('/circle');
+    }
+
+    private function smsInbound(): never
+    {
+        if (!Sms::configured()) {
+            Http::xml(Sms::twiml('SMS is not configured.'), 503);
+        }
+        $params = [];
+        foreach ($_POST as $k => $v) {
+            if (is_string($k) && is_string($v)) {
+                $params[$k] = $v;
+            }
+        }
+        $sig = (string) ($_SERVER['HTTP_X_TWILIO_SIGNATURE'] ?? '');
+        if (!Sms::validSignature($this->siteHome() . '/sms/inbound', $params, $sig)) {
+            Http::xml(Sms::twiml('Forbidden'), 403);
+        }
+        $from = Sms::normalizePhone((string) ($_POST['From'] ?? ''));
+        $body = trim((string) ($_POST['Body'] ?? ''));
+        $action = Sms::classifyInbound($body);
+        $auto = Sms::inboundAutoReply($action);
+        $user = $from !== '' ? Db::userByPhone($this->db, $from) : null;
+        $pending = $user ? null : Db::pendingByPhone($this->db, $from);
+        if ($action === 'stop') {
+            if ($user) {
+                Db::setSmsOptOut($this->db, (int) $user['id'], true);
+            }
+            Http::xml(Sms::twiml($auto));
+        }
+        if ($action === 'start') {
+            if ($user) {
+                Db::setSmsOptOut($this->db, (int) $user['id'], false);
+            } elseif (!$pending) {
+                $auto = 'Family Shield Pro: this number is not in a circle yet. Ask a family member to invite you from Circle (email plus this phone). ' . Analyze::CORE_RULE . ' Reply STOP to opt out.';
+            }
+            Http::xml(Sms::twiml($auto));
+        }
+        if ($action === 'help') {
+            Http::xml(Sms::twiml($auto));
+        }
+        if (!$user) {
+            if ($pending) {
+                $join = $this->joinUrl((string) $pending['token']);
+                Http::xml(Sms::twiml(
+                    'Family Shield Pro: join your circle first: ' . $join
+                    . ' Then you can forward a sketchy text here. ' . Analyze::CORE_RULE . ' Reply STOP to opt out.'
+                ));
+            }
+            Http::xml(Sms::twiml(
+                'Family Shield Pro: this number is not in a circle yet. Ask a family member to invite you from Circle (email plus this phone). '
+                . Analyze::CORE_RULE . ' Reply STOP to opt out.'
+            ));
+        }
+        if (!empty($user['sms_opt_out'])) {
+            Http::xml(Sms::twiml(Sms::inboundAutoReply('stop')));
+        }
+        $report = Analyze::analyze($body, '', '', Db::trusted($this->db, (int) $user['household_id']));
+        $this->db->prepare(
+            'INSERT INTO checks (household_id, user_id, kind, raw_text, phone, url, screenshot, risk, report_json, created_at)
+             VALUES (?,?,?,?,?,?,?,?,?,?)'
+        )->execute([
+            $user['household_id'],
+            $user['id'],
+            'sms',
+            $body,
+            $from,
+            '',
+            '',
+            $report['level'],
+            json_encode($report),
+            Db::now(),
+        ]);
+        $cid = (int) $this->db->lastInsertId();
+        $title = (string) ($report['title'] ?? 'Pause with your circle.');
+        Http::xml(Sms::twiml(Sms::checkBody($title, $this->siteHome() . '/checks/' . $cid)));
     }
 
     private function join(string $token): void
@@ -813,7 +1040,8 @@ final class App
             ]);
         }
         try {
-            $user = Db::acceptInvite($this->db, $token, $name, $password);
+            $phone = $this->parsePhoneField((string) ($_POST['phone'] ?? ''));
+            $user = Db::acceptInvite($this->db, $token, $name, $password, $phone);
         } catch (RuntimeException $e) {
             $this->flash($e->getMessage(), 'error');
             Http::redirect('/login');

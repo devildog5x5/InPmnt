@@ -60,6 +60,10 @@ View::start($title, $site_home, 'index,follow', '/');
       <p>Save the real numbers for banks, doctors, insurers, utilities, and family. Checks compare incoming numbers and websites to that list — not to a stranger in the message.</p>
     </div>
     <div class="panel">
+      <h3>Text with your circle</h3>
+      <p>When SMS is set up, invites and “Please call me before I pay” can go by text. Save your mobile on Account, then forward a sketchy message to the Family Shield Pro number. We never say a request is safe. Reply STOP to opt out.</p>
+    </div>
+    <div class="panel">
       <h3>If something already went wrong</h3>
       <p>Get calm instructions to report fraud, freeze cards, and tell the people who can actually stop a payment. Speed matters more than shame.</p>
     </div>

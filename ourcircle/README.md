@@ -30,11 +30,12 @@ Demo circle: `family@ourcircle.app` / `password123`
 - Read a plain-language risk explanation and specific warning signs
 - See whether a number or domain matches the household trusted list — or resembles a known brand
 - Ask someone in the circle to review it
-- Fire an urgent **Please call me before I pay** alert
+- Fire an urgent **Please call me before I pay** alert (banner plus optional SMS)
+- Forward a sketchy text to the Family Shield Pro number when Twilio is on (**[SMS.md](SMS.md)**)
 - Keep a protected list of banks, doctors, insurers, utilities, and family contacts
 - Follow reporting steps (FTC, IC3, card freeze) if money already moved
 
-Family plan: up to **five people**. **$14.99/month** or **$119.99/year**. Stripe Checkout is wired — paste keys per **[STRIPE.md](STRIPE.md)**. Password reset and 2FA: **[AUTH.md](AUTH.md)**. Customer service email, chat widget, and the commented-out phone: **[SUPPORT.md](SUPPORT.md)**.
+Family plan: up to **five people**. **$14.99/month** or **$119.99/year**. Stripe Checkout is wired — paste keys per **[STRIPE.md](STRIPE.md)**. Optional circle SMS: **[SMS.md](SMS.md)**. Password reset and 2FA: **[AUTH.md](AUTH.md)**. Customer service email, chat widget, and the commented-out phone: **[SUPPORT.md](SUPPORT.md)**.
 
 ## Paid validation (seven days)
 
@@ -50,7 +51,7 @@ If none hits the bar, change the offer before writing more product code.
 
 ## Downloads
 
-**https://raw.githubusercontent.com/devildog5x5/InPmnt/cursor/ourcircle-family-shield-4df6/patches/FamilyShieldPro-1.2.15.zip**
+**https://raw.githubusercontent.com/devildog5x5/InPmnt/cursor/ourcircle-family-shield-4df6/patches/FamilyShieldPro-1.2.16.zip**
 
 That zip is the Hostinger site. `robots.txt` and `sitemap.xml` are already inside it (next to `index.php`). Unzip into `public_html`.
 

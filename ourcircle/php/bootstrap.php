@@ -29,6 +29,7 @@ require $root . '/src/Product.php';
 require $root . '/src/Billing.php';
 require $root . '/src/Auth.php';
 require $root . '/src/Mail.php';
+require $root . '/src/Sms.php';
 require $root . '/src/SupportChat.php';
 require $root . '/src/App.php';
 

@@ -9,6 +9,7 @@ final class View
         $vars['core_rule'] = $vars['core_rule'] ?? Analyze::CORE_RULE;
         $vars['disclaimer'] = $vars['disclaimer'] ?? Analyze::DISCLAIMER;
         $vars['guidance'] = $vars['guidance'] ?? Analyze::GUIDANCE;
+        $vars['sms_enabled'] = $vars['sms_enabled'] ?? Sms::configured();
         $vars['flashes'] = $vars['flashes'] ?? [];
         $vars['user_name'] = $vars['user_name'] ?? '';
         $vars['path'] = Http::path();

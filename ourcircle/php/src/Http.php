@@ -51,6 +51,14 @@ final class Http
         exit;
     }
 
+    public static function xml(string $body, int $status = 200): never
+    {
+        http_response_code($status);
+        header('Content-Type: text/xml; charset=utf-8');
+        echo $body;
+        exit;
+    }
+
     public static function isHttps(): bool
     {
         $https = strtolower((string) ($_SERVER['HTTPS'] ?? ''));

@@ -46,16 +46,34 @@ from database import (
     accept_invite,
     authenticate,
     create_household,
+    find_pending_invite_by_phone,
+    find_user_by_phone,
     household_members,
     init_db,
     invite_member,
     mark_invite_sent,
+    mark_invite_sms_sent,
     now,
+    pending_invite,
     session as db_session,
+    set_sms_opt_out,
+    set_user_phone,
     touch_last_access,
     trusted_list,
 )
 from mail import mail_configured, send_email
+from sms import (
+    alert_sms_body,
+    check_sms_body,
+    classify_inbound,
+    inbound_auto_reply,
+    invite_sms_body,
+    normalize_phone,
+    send_sms,
+    sms_configured,
+    twiml,
+    valid_signature,
+)
 from support_chat import handle_chat, openai_configured
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -76,6 +94,7 @@ PRIVATE_PREFIXES = (
     "/account",
     "/logout",
     "/support",
+    "/sms",
 )
 
 
@@ -98,6 +117,74 @@ def invite_email_body(join: str) -> str:
         "If you did not expect this, ignore the message.\n\n"
         f"{GUIDANCE}\n"
     )
+
+
+def inbound_url() -> str:
+    return site_url() + "/sms/inbound"
+
+
+def parse_phone_field(raw: str) -> str:
+    text = (raw or "").strip()
+    if not text:
+        return ""
+    phone = normalize_phone(text)
+    if not phone:
+        raise ValueError("That mobile number does not look like a US or international number.")
+    return phone
+
+
+def notify_invite(inv: dict[str, Any], inviter: str) -> tuple[str, str]:
+    join = join_url(inv["token"])
+    share = f"Share this join link: {join}"
+    emailed = False
+    texted = False
+    mail_error = False
+    sms_error = False
+    if mail_configured():
+        try:
+            send_email(
+                to=inv["email"],
+                subject="Join your family circle on Family Shield Pro",
+                body=invite_email_body(join),
+            )
+            emailed = True
+        except Exception:
+            mail_error = True
+    phone = (inv.get("phone") or "").strip()
+    if phone and sms_configured():
+        try:
+            send_sms(to=phone, body=invite_sms_body(join, inviter))
+            texted = True
+        except Exception:
+            sms_error = True
+    with db_session() as conn:
+        if emailed:
+            mark_invite_sent(conn, int(inv["id"]))
+        if texted:
+            mark_invite_sms_sent(conn, int(inv["id"]))
+    bits = []
+    if emailed:
+        bits.append(f"emailed to {inv['email']}")
+    if texted:
+        bits.append(f"texted to {phone}")
+    if bits:
+        msg = "Invite " + " and ".join(bits) + f". If they do not see it, {share[0].lower() + share[1:]}"
+        cat = "error" if mail_error or sms_error else "ok"
+        if mail_error:
+            msg += " Email did not send."
+        if sms_error:
+            msg += " Text did not send."
+        return msg, cat
+    if mail_error or sms_error:
+        return f"Could not send the invite. {share}", "error"
+    extra = []
+    if not mail_configured():
+        extra.append("mail is not set up yet")
+    if phone and not sms_configured():
+        extra.append("SMS is not set up yet")
+    if extra:
+        return f"Invite created for {inv['email']}. {' and '.join(extra).capitalize()}, so {share[0].lower() + share[1:]}", "ok"
+    return f"Invite created for {inv['email']}. {share}", "ok"
 
 
 def product_version() -> str:
@@ -146,6 +233,7 @@ def create_app() -> Flask:
             "site_home": site_url(),
             "app_version": product_version(),
             "stripe_enabled": load_stripe_config().enabled,
+            "sms_enabled": sms_configured(),
         }
 
     @app.get("/robots.txt")
@@ -206,6 +294,7 @@ def create_app() -> Flask:
             "not": "InPmnt",
             "stripe": load_stripe_config().enabled,
             "mail": mail_configured(),
+            "sms": sms_configured(),
             "openai": openai_configured(),
         }
 
@@ -256,6 +345,80 @@ def create_app() -> Flask:
         reply, source = handle_chat(message, history)
         return {"reply": reply, "source": source}
 
+    @app.post("/sms/inbound")
+    def sms_inbound():
+        if not sms_configured():
+            return app.response_class(twiml("SMS is not configured."), status=503, mimetype="text/xml; charset=utf-8")
+        params = {key: request.form.get(key) or "" for key in request.form}
+        header = request.headers.get("X-Twilio-Signature") or ""
+        if not valid_signature(inbound_url(), params, header):
+            return app.response_class(twiml("Forbidden"), status=403, mimetype="text/xml; charset=utf-8")
+        frm = normalize_phone(request.form.get("From") or "")
+        body = (request.form.get("Body") or "").strip()
+        action = classify_inbound(body)
+        auto = inbound_auto_reply(action)
+        with db_session() as conn:
+            user = find_user_by_phone(conn, frm) if frm else None
+            pending = None if user else find_pending_invite_by_phone(conn, frm)
+            if action == "stop":
+                if user:
+                    set_sms_opt_out(conn, int(user["id"]), True)
+                return app.response_class(twiml(auto), mimetype="text/xml; charset=utf-8")
+            if action == "start":
+                if user:
+                    set_sms_opt_out(conn, int(user["id"]), False)
+                elif not pending:
+                    auto = (
+                        "Family Shield Pro: this number is not in a circle yet. "
+                        "Ask a family member to invite you from Circle (email plus this phone). "
+                        f"{CORE_RULE} Reply STOP to opt out."
+                    )
+                return app.response_class(twiml(auto), mimetype="text/xml; charset=utf-8")
+            if action == "help":
+                return app.response_class(twiml(auto), mimetype="text/xml; charset=utf-8")
+            if not user:
+                if pending:
+                    join = join_url(pending["token"])
+                    reply = (
+                        f"Family Shield Pro: join your circle first: {join} "
+                        f"Then you can forward a sketchy text here. {CORE_RULE} Reply STOP to opt out."
+                    )
+                else:
+                    reply = (
+                        "Family Shield Pro: this number is not in a circle yet. "
+                        "Ask a family member to invite you from Circle (email plus this phone). "
+                        f"{CORE_RULE} Reply STOP to opt out."
+                    )
+                return app.response_class(twiml(reply), mimetype="text/xml; charset=utf-8")
+            if user.get("sms_opt_out"):
+                return app.response_class(twiml(inbound_auto_reply("stop")), mimetype="text/xml; charset=utf-8")
+            trusted = trusted_list(conn, int(user["household_id"]))
+            report = analyze(text=body, phone="", url="", trusted=trusted)
+            kind = "sms"
+            cur = conn.execute(
+                """
+                INSERT INTO checks (household_id, user_id, kind, raw_text, phone, url, screenshot, risk, report_json, created_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?)
+                """,
+                (
+                    user["household_id"],
+                    user["id"],
+                    kind,
+                    body,
+                    frm,
+                    "",
+                    "",
+                    report["level"],
+                    json.dumps(report),
+                    now(),
+                ),
+            )
+            cid = int(cur.lastrowid or 0)
+        check_link = site_url() + f"/checks/{cid}"
+        title = report.get("title") or "Pause with your circle."
+        reply = check_sms_body(title, check_link)
+        return app.response_class(twiml(reply), mimetype="text/xml; charset=utf-8")
+
     @app.route("/signup", methods=["GET", "POST"])
     def signup():
         if request.method == "GET":
@@ -267,12 +430,24 @@ def create_app() -> Flask:
         if not name or "@" not in email or len(password) < 8:
             flash("Name, email, and an 8+ character password are required.", "error")
             return render_template("signup.html")
+        try:
+            phone = parse_phone_field(request.form.get("phone") or "")
+        except ValueError as exc:
+            flash(str(exc), "error")
+            return render_template("signup.html")
         with db_session() as conn:
             taken = conn.execute("SELECT id FROM users WHERE lower(email)=?", (email,)).fetchone()
             if taken:
                 flash("That email already has a login. Sign in instead.", "error")
                 return redirect(url_for("login"))
-            hid = create_household(conn, name=household or f"{name}'s circle", owner_name=name, email=email, password=password)
+            hid = create_household(
+                conn,
+                name=household or f"{name}'s circle",
+                owner_name=name,
+                email=email,
+                password=password,
+                phone=phone,
+            )
             user = conn.execute("SELECT * FROM users WHERE lower(email)=?", (email,)).fetchone()
         session["user_id"] = user["id"]
         session["household_id"] = hid
@@ -454,7 +629,33 @@ def create_app() -> Flask:
             "account.html",
             totp_on=totp_on(user),
             recovery_codes=codes if isinstance(codes, list) else [],
+            phone=user.get("phone") or "" if user else "",
+            sms_opt_out=bool(user.get("sms_opt_out")) if user else False,
         )
+
+    @app.post("/account/phone")
+    def account_phone():
+        gate = login_required()
+        if gate:
+            return gate
+        u = current_user()
+        try:
+            phone = parse_phone_field(request.form.get("phone") or "")
+        except ValueError as exc:
+            flash(str(exc), "error")
+            return redirect(url_for("account"))
+        opt_out = (request.form.get("sms_opt_out") or "") == "1"
+        try:
+            with db_session() as conn:
+                set_user_phone(conn, int(u["id"]), phone, opt_out)
+        except ValueError as exc:
+            flash(str(exc), "error")
+            return redirect(url_for("account"))
+        if phone:
+            flash("Mobile number saved. We can text invites and call-me alerts to this number.", "ok")
+        else:
+            flash("Mobile number cleared.", "ok")
+        return redirect(url_for("account"))
 
     @app.post("/account/password")
     def account_password():
@@ -732,7 +933,27 @@ def create_app() -> Flask:
                 "INSERT INTO alerts (check_id, household_id, user_id, message, created_at) VALUES (?,?,?,?,?)",
                 (check_id, u["household_id"], u["id"], msg, now()),
             )
-        flash("Urgent alert is on the circle home. Call them by voice if you can — do not rely on a banner alone.", "ok")
+            texted = 0
+            if sms_configured():
+                check_link = site_url() + f"/checks/{check_id}"
+                body = alert_sms_body(u["name"], check_link)
+                for member in members:
+                    if int(member["id"]) == int(u["id"]):
+                        continue
+                    dest = (member.get("phone") or "").strip()
+                    if not dest or member.get("sms_opt_out"):
+                        continue
+                    try:
+                        send_sms(to=dest, body=body)
+                        texted += 1
+                    except Exception:
+                        pass
+        note = "Urgent alert is on the circle home. Call them by voice if you can — do not rely on a banner alone."
+        if texted:
+            note += f" Texted {texted} circle member{'s' if texted != 1 else ''}."
+        elif sms_configured():
+            note += " Nobody else in the circle has a mobile number on Account yet (or they opted out)."
+        flash(note, "ok")
         return redirect(url_for("show_check", check_id=check_id))
 
     @app.get("/uploads/<path:name>")
@@ -752,30 +973,11 @@ def create_app() -> Flask:
             email = (request.form.get("email") or "").strip()
             name = (request.form.get("name") or "").strip()
             try:
+                phone = parse_phone_field(request.form.get("phone") or "")
                 with db_session() as conn:
-                    inv = invite_member(conn, u["household_id"], email, name)
-                join = join_url(inv["token"])
-                share = f"Share this join link: {join}"
-                if mail_configured():
-                    try:
-                        send_email(
-                            to=inv["email"],
-                            subject="Join your family circle on Family Shield Pro",
-                            body=invite_email_body(join),
-                        )
-                        with db_session() as conn:
-                            mark_invite_sent(conn, int(inv["id"]))
-                        flash(
-                            f"Invite emailed to {inv['email']}. If they do not see it (check spam), {share}",
-                            "ok",
-                        )
-                    except Exception:
-                        flash(f"Could not send the invite email. {share}", "error")
-                else:
-                    flash(
-                        f"Invite created for {inv['email']}. Mail is not set up yet, so {share[0].lower() + share[1:]}",
-                        "ok",
-                    )
+                    inv = invite_member(conn, u["household_id"], email, name, phone)
+                msg, cat = notify_invite(inv, u["name"])
+                flash(msg, cat)
             except ValueError as exc:
                 flash(str(exc), "error")
             return redirect(url_for("circle"))
@@ -786,6 +988,25 @@ def create_app() -> Flask:
                 (u["household_id"],),
             ).fetchall()]
         return render_template("circle.html", members=members, pending=pending, alerts=alerts)
+
+    @app.post("/circle/resend")
+    def circle_resend():
+        gate = login_required()
+        if gate:
+            return gate
+        u = current_user()
+        try:
+            invite_id = int(request.form.get("invite_id") or 0)
+        except ValueError:
+            invite_id = 0
+        with db_session() as conn:
+            inv = pending_invite(conn, u["household_id"], invite_id)
+        if not inv:
+            flash("That invite is not waiting anymore.", "error")
+            return redirect(url_for("circle"))
+        msg, cat = notify_invite(inv, u["name"])
+        flash(msg, cat)
+        return redirect(url_for("circle"))
 
     @app.route("/join/<token>", methods=["GET", "POST"])
     def join(token: str):
@@ -802,8 +1023,13 @@ def create_app() -> Flask:
             flash("Name and an 8+ character password are required.", "error")
             return render_template("join.html", invite={"email": ""}, token=token)
         try:
+            phone = parse_phone_field(request.form.get("phone") or "")
+        except ValueError as exc:
+            flash(str(exc), "error")
+            return render_template("join.html", invite={"email": ""}, token=token)
+        try:
             with db_session() as conn:
-                user = accept_invite(conn, token, name, password)
+                user = accept_invite(conn, token, name, password, phone)
         except ValueError as exc:
             flash(str(exc), "error")
             return redirect(url_for("login"))

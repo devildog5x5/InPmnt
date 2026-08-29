@@ -34,6 +34,8 @@ There is **no live phone number** on the site. A placeholder is commented out in
 
 Do not invent a number in the chatbot — it is told that phone support is unpublished until you do the steps above.
 
+Circle **SMS** (Twilio) is a different thing: family invites, call-me alerts, and forwarding a sketchy text. That is **[SMS.md](SMS.md)**. It is not a customer-service hotline.
+
 ## Chatbot (already on every page)
 
 The teal **Help** tab sits on the right edge of every page. **Hide** parks the box; the Help tab brings it back.

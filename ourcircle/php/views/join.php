@@ -17,6 +17,8 @@ View::start($title, $site_home, 'noindex,nofollow', '/join/' . ($token ?? ''));
     <form method="post" action="/join/<?= Http::e((string) ($token ?? '')) ?>">
       <label>Your name</label>
       <input name="name" required value="<?= Http::e((string) ($invite['name'] ?? '')) ?>" />
+      <label>Mobile (optional)</label>
+      <input name="phone" type="tel" inputmode="tel" value="<?= Http::e((string) ($invite['phone'] ?? '')) ?>" placeholder="(555) 010-1234" autocomplete="tel" />
       <label>Choose a password (8+)</label>
       <input name="password" type="password" required minlength="8" />
       <p><button class="btn wide" type="submit">Join the circle</button></p>

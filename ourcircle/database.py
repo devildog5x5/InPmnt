@@ -78,6 +78,8 @@ def init_db(path: str | None = None) -> None:
                 recovery_codes TEXT,
                 created_at TEXT NOT NULL,
                 last_access_at TEXT,
+                phone TEXT,
+                sms_opt_out INTEGER NOT NULL DEFAULT 0,
                 FOREIGN KEY (household_id) REFERENCES households(id)
             );
             CREATE TABLE IF NOT EXISTS invitations (
@@ -90,6 +92,8 @@ def init_db(path: str | None = None) -> None:
                 created_at TEXT NOT NULL,
                 email_sent_at TEXT,
                 accepted_at TEXT,
+                phone TEXT,
+                sms_sent_at TEXT,
                 FOREIGN KEY (household_id) REFERENCES households(id)
             );
             CREATE TABLE IF NOT EXISTS trusted_contacts (
@@ -159,6 +163,7 @@ def init_db(path: str | None = None) -> None:
         _migrate_household_stripe(conn)
         _migrate_user_auth(conn)
         _migrate_circle_status(conn)
+        _migrate_sms(conn)
         n = conn.execute("SELECT COUNT(*) AS c FROM users").fetchone()["c"]
         if n == 0:
             _seed(conn)
@@ -209,6 +214,19 @@ def _migrate_circle_status(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE invitations ADD COLUMN accepted_at TEXT")
 
 
+def _migrate_sms(conn: sqlite3.Connection) -> None:
+    users = {row[1] for row in conn.execute("PRAGMA table_info(users)").fetchall()}
+    if "phone" not in users:
+        conn.execute("ALTER TABLE users ADD COLUMN phone TEXT")
+    if "sms_opt_out" not in users:
+        conn.execute("ALTER TABLE users ADD COLUMN sms_opt_out INTEGER NOT NULL DEFAULT 0")
+    inv = {row[1] for row in conn.execute("PRAGMA table_info(invitations)").fetchall()}
+    if "phone" not in inv:
+        conn.execute("ALTER TABLE invitations ADD COLUMN phone TEXT")
+    if "sms_sent_at" not in inv:
+        conn.execute("ALTER TABLE invitations ADD COLUMN sms_sent_at TEXT")
+
+
 def _seed(conn: sqlite3.Connection) -> None:
     ts = now()
     cur = conn.execute(
@@ -246,7 +264,9 @@ def _seed(conn: sqlite3.Connection) -> None:
         )
 
 
-def create_household(conn: sqlite3.Connection, *, name: str, owner_name: str, email: str, password: str) -> int:
+def create_household(
+    conn: sqlite3.Connection, *, name: str, owner_name: str, email: str, password: str, phone: str = ""
+) -> int:
     ts = now()
     cur = conn.execute(
         "INSERT INTO households (name, plan, founding, created_at) VALUES (?,?,?,?)",
@@ -255,10 +275,10 @@ def create_household(conn: sqlite3.Connection, *, name: str, owner_name: str, em
     hid = int(cur.lastrowid)
     conn.execute(
         """
-        INSERT INTO users (household_id, name, email, password_hash, role, created_at)
-        VALUES (?,?,?,?,?,?)
+        INSERT INTO users (household_id, name, email, password_hash, role, created_at, phone)
+        VALUES (?,?,?,?,?,?,?)
         """,
-        (hid, owner_name, email.lower().strip(), generate_password_hash(password), "owner", ts),
+        (hid, owner_name, email.lower().strip(), generate_password_hash(password), "owner", ts, phone or None),
     )
     return hid
 
@@ -277,14 +297,14 @@ def household_members(conn: sqlite3.Connection, hid: int) -> tuple[list[dict[str
     users = [
         dict(r)
         for r in conn.execute(
-            "SELECT id, name, email, role, last_access_at FROM users WHERE household_id=? ORDER BY id",
+            "SELECT id, name, email, role, last_access_at, phone, sms_opt_out FROM users WHERE household_id=? ORDER BY id",
             (hid,),
         ).fetchall()
     ]
     invites = [
         dict(r)
         for r in conn.execute(
-            "SELECT id, email, name, status, token, email_sent_at, accepted_at FROM invitations WHERE household_id=? AND status='pending' ORDER BY id",
+            "SELECT id, email, name, status, token, email_sent_at, sms_sent_at, accepted_at, phone FROM invitations WHERE household_id=? AND status='pending' ORDER BY id",
             (hid,),
         ).fetchall()
     ]
@@ -302,7 +322,7 @@ def decorate_circle_status(
             m["circle_status"] = "Invite Accepted"
             m["circle_status_key"] = "accepted"
     for p in pending:
-        if p.get("email_sent_at"):
+        if p.get("email_sent_at") or p.get("sms_sent_at"):
             p["circle_status"] = "Invite sent"
             p["circle_status_key"] = "sent"
         else:
@@ -313,6 +333,69 @@ def decorate_circle_status(
 
 def mark_invite_sent(conn: sqlite3.Connection, invite_id: int) -> None:
     conn.execute("UPDATE invitations SET email_sent_at=? WHERE id=? AND email_sent_at IS NULL", (now(), invite_id))
+
+
+def mark_invite_sms_sent(conn: sqlite3.Connection, invite_id: int) -> None:
+    conn.execute("UPDATE invitations SET sms_sent_at=? WHERE id=? AND sms_sent_at IS NULL", (now(), invite_id))
+
+
+def phone_taken(
+    conn: sqlite3.Connection,
+    phone: str,
+    *,
+    except_user_id: int | None = None,
+    except_invite_id: int | None = None,
+) -> bool:
+    if not phone:
+        return False
+    row = conn.execute("SELECT id FROM users WHERE phone=?", (phone,)).fetchone()
+    if row and (except_user_id is None or int(row["id"]) != int(except_user_id)):
+        return True
+    pending = conn.execute(
+        "SELECT id FROM invitations WHERE phone=? AND status='pending'",
+        (phone,),
+    ).fetchone()
+    if pending and (except_invite_id is None or int(pending["id"]) != int(except_invite_id)):
+        return True
+    return False
+
+
+def find_user_by_phone(conn: sqlite3.Connection, phone: str) -> dict[str, Any] | None:
+    if not phone:
+        return None
+    row = conn.execute("SELECT * FROM users WHERE phone=?", (phone,)).fetchone()
+    return dict(row) if row else None
+
+
+def find_pending_invite_by_phone(conn: sqlite3.Connection, phone: str) -> dict[str, Any] | None:
+    if not phone:
+        return None
+    row = conn.execute(
+        "SELECT * FROM invitations WHERE phone=? AND status='pending' ORDER BY id DESC",
+        (phone,),
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def pending_invite(conn: sqlite3.Connection, hid: int, invite_id: int) -> dict[str, Any] | None:
+    row = conn.execute(
+        "SELECT * FROM invitations WHERE id=? AND household_id=? AND status='pending'",
+        (invite_id, hid),
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def set_user_phone(conn: sqlite3.Connection, user_id: int, phone: str, sms_opt_out: bool = False) -> None:
+    if phone and phone_taken(conn, phone, except_user_id=user_id):
+        raise ValueError("That mobile number is already on another Family Shield Pro login.")
+    conn.execute(
+        "UPDATE users SET phone=?, sms_opt_out=? WHERE id=?",
+        (phone or None, 1 if sms_opt_out else 0, user_id),
+    )
+
+
+def set_sms_opt_out(conn: sqlite3.Connection, user_id: int, opted_out: bool) -> None:
+    conn.execute("UPDATE users SET sms_opt_out=? WHERE id=?", (1 if opted_out else 0, user_id))
 
 
 def touch_last_access(conn: sqlite3.Connection, user_id: int) -> None:
@@ -326,37 +409,43 @@ def trusted_list(conn: sqlite3.Connection, hid: int) -> list[dict[str, Any]]:
     ).fetchall()]
 
 
-def invite_member(conn: sqlite3.Connection, hid: int, email: str, name: str = "") -> dict[str, Any]:
+def invite_member(conn: sqlite3.Connection, hid: int, email: str, name: str = "", phone: str = "") -> dict[str, Any]:
     users, pending = household_members(conn, hid)
     if len(users) + len(pending) >= 5:
         raise ValueError("The family plan includes up to five people. Remove someone or upgrade with us later.")
     email = email.lower().strip()
     if not email or "@" not in email:
         raise ValueError("Need an email address to invite.")
+    phone = (phone or "").strip()
+    if phone and phone_taken(conn, phone):
+        raise ValueError("That mobile number is already on another Family Shield Pro login or invite.")
     token = secrets.token_urlsafe(16)
     cur = conn.execute(
         """
-        INSERT INTO invitations (household_id, email, name, token, status, created_at)
-        VALUES (?,?,?,?, 'pending', ?)
+        INSERT INTO invitations (household_id, email, name, token, status, created_at, phone)
+        VALUES (?,?,?,?, 'pending', ?, ?)
         """,
-        (hid, email, name.strip(), token, now()),
+        (hid, email, name.strip(), token, now(), phone or None),
     )
-    return {"email": email, "token": token, "id": int(cur.lastrowid or 0)}
+    return {"email": email, "token": token, "id": int(cur.lastrowid or 0), "phone": phone}
 
 
-def accept_invite(conn: sqlite3.Connection, token: str, name: str, password: str) -> dict[str, Any]:
+def accept_invite(conn: sqlite3.Connection, token: str, name: str, password: str, phone: str = "") -> dict[str, Any]:
     inv = conn.execute("SELECT * FROM invitations WHERE token=? AND status='pending'", (token,)).fetchone()
     if not inv:
         raise ValueError("That invite is not valid anymore.")
     existing = conn.execute("SELECT id FROM users WHERE lower(email)=?", (inv["email"],)).fetchone()
     if existing:
         raise ValueError("That email already has an OurCircle login. Sign in instead.")
+    stored = (phone or "").strip() or (inv["phone"] or "")
+    if stored and phone_taken(conn, stored, except_invite_id=int(inv["id"])):
+        raise ValueError("That mobile number is already on another Family Shield Pro login.")
     conn.execute(
         """
-        INSERT INTO users (household_id, name, email, password_hash, role, created_at)
-        VALUES (?,?,?,?, 'member', ?)
+        INSERT INTO users (household_id, name, email, password_hash, role, created_at, phone)
+        VALUES (?,?,?,?, 'member', ?, ?)
         """,
-        (inv["household_id"], name.strip(), inv["email"], generate_password_hash(password), now()),
+        (inv["household_id"], name.strip(), inv["email"], generate_password_hash(password), now(), stored or None),
     )
     conn.execute(
         "UPDATE invitations SET status='accepted', accepted_at=? WHERE id=?",

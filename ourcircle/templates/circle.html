@@ -15,12 +15,13 @@
       <span class="pill status-access">User Accesses the Circle</span>
     </p>
     <table class="table">
-      <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th></tr></thead>
+      <thead><tr><th>Name</th><th>Email</th><th>Mobile</th><th>Role</th><th>Status</th></tr></thead>
       <tbody>
         {% for m in members %}
         <tr>
           <td>{{ m.name }}</td>
           <td>{{ m.email }}</td>
+          <td>{{ m.phone or "—" }}</td>
           <td>{{ m.role }}</td>
           <td><span class="pill status-{{ m.circle_status_key }}">{{ m.circle_status }}</span></td>
         </tr>
@@ -29,10 +30,15 @@
         <tr>
           <td>{{ p.name or "—" }}</td>
           <td>{{ p.email }}</td>
+          <td>{{ p.phone or "—" }}</td>
           <td>invited</td>
           <td>
             <span class="pill status-{{ p.circle_status_key }}">{{ p.circle_status }}</span>
             <div class="join-url"><a href="{{ site_home }}/join/{{ p.token }}">{{ site_home }}/join/{{ p.token }}</a></div>
+            <form class="resend-form" method="post" action="{{ url_for('circle_resend') }}">
+              <input type="hidden" name="invite_id" value="{{ p.id }}" />
+              <button class="btn ghost" type="submit">Resend invite</button>
+            </form>
           </td>
         </tr>
         {% endfor %}
@@ -45,8 +51,10 @@
     <input name="name" />
     <label>Email</label>
     <input name="email" type="email" required />
+    <label>Mobile (optional)</label>
+    <input name="phone" type="tel" inputmode="tel" placeholder="(555) 010-1234" autocomplete="tel" />
     <p><button class="btn wide" type="submit">Send invite</button></p>
-    <p class="disclaimer">We email a join link when mail is set up. Also copy it from the status table and share it in a call you already trust — not inside a suspicious thread.</p>
+    <p class="disclaimer">We email a join link when mail is set up{% if sms_enabled %}, and text it when you add a mobile number{% endif %}. Also copy it from the status table and share it in a call you already trust — not inside a suspicious thread. Reply STOP on texts to opt out.</p>
   </form>
 </div>
 {% if alerts %}

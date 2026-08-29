@@ -51,6 +51,8 @@ final class Db
                 recovery_codes TEXT,
                 created_at TEXT NOT NULL,
                 last_access_at TEXT,
+                phone TEXT,
+                sms_opt_out INTEGER NOT NULL DEFAULT 0,
                 FOREIGN KEY (household_id) REFERENCES households(id)
             );
             CREATE TABLE IF NOT EXISTS invitations (
@@ -63,6 +65,8 @@ final class Db
                 created_at TEXT NOT NULL,
                 email_sent_at TEXT,
                 accepted_at TEXT,
+                phone TEXT,
+                sms_sent_at TEXT,
                 FOREIGN KEY (household_id) REFERENCES households(id)
             );
             CREATE TABLE IF NOT EXISTS trusted_contacts (
@@ -131,6 +135,7 @@ final class Db
         self::migrateHouseholdStripe($db);
         self::migrateUserAuth($db);
         self::migrateCircleStatus($db);
+        self::migrateSms($db);
         $n = (int) $db->query('SELECT COUNT(*) FROM users')->fetchColumn();
         if ($n === 0) {
             self::seed($db);
@@ -206,6 +211,30 @@ final class Db
         }
     }
 
+    public static function migrateSms(PDO $db): void
+    {
+        $userCols = [];
+        foreach ($db->query('PRAGMA table_info(users)')->fetchAll() as $col) {
+            $userCols[] = (string) ($col['name'] ?? '');
+        }
+        if (!in_array('phone', $userCols, true)) {
+            $db->exec('ALTER TABLE users ADD COLUMN phone TEXT');
+        }
+        if (!in_array('sms_opt_out', $userCols, true)) {
+            $db->exec('ALTER TABLE users ADD COLUMN sms_opt_out INTEGER NOT NULL DEFAULT 0');
+        }
+        $invCols = [];
+        foreach ($db->query('PRAGMA table_info(invitations)')->fetchAll() as $col) {
+            $invCols[] = (string) ($col['name'] ?? '');
+        }
+        if (!in_array('phone', $invCols, true)) {
+            $db->exec('ALTER TABLE invitations ADD COLUMN phone TEXT');
+        }
+        if (!in_array('sms_sent_at', $invCols, true)) {
+            $db->exec('ALTER TABLE invitations ADD COLUMN sms_sent_at TEXT');
+        }
+    }
+
     public static function seed(PDO $db): void
     {
         $ts = self::now();
@@ -229,15 +258,23 @@ final class Db
         }
     }
 
-    public static function createHousehold(PDO $db, string $name, string $ownerName, string $email, string $password): int
+    public static function createHousehold(PDO $db, string $name, string $ownerName, string $email, string $password, string $phone = ''): int
     {
         $ts = self::now();
         $db->prepare('INSERT INTO households (name, plan, founding, created_at) VALUES (?,?,?,?)')
             ->execute([$name !== '' ? $name : ($ownerName . "'s circle"), 'yearly', 0, $ts]);
         $hid = (int) $db->lastInsertId();
         $db->prepare(
-            'INSERT INTO users (household_id, name, email, password_hash, role, created_at) VALUES (?,?,?,?,?,?)'
-        )->execute([$hid, $ownerName, strtolower(trim($email)), password_hash($password, PASSWORD_DEFAULT), 'owner', $ts]);
+            'INSERT INTO users (household_id, name, email, password_hash, role, created_at, phone) VALUES (?,?,?,?,?,?,?)'
+        )->execute([
+            $hid,
+            $ownerName,
+            strtolower(trim($email)),
+            password_hash($password, PASSWORD_DEFAULT),
+            'owner',
+            $ts,
+            $phone !== '' ? $phone : null,
+        ]);
         return $hid;
     }
 
@@ -254,14 +291,14 @@ final class Db
 
     public static function members(PDO $db, int $hid): array
     {
-        $st = $db->prepare('SELECT id, name, email, role, last_access_at FROM users WHERE household_id=? ORDER BY id');
+        $st = $db->prepare('SELECT id, name, email, role, last_access_at, phone, sms_opt_out FROM users WHERE household_id=? ORDER BY id');
         $st->execute([$hid]);
         return $st->fetchAll();
     }
 
     public static function pending(PDO $db, int $hid): array
     {
-        $st = $db->prepare("SELECT id, email, name, status, token, email_sent_at, accepted_at FROM invitations WHERE household_id=? AND status='pending' ORDER BY id");
+        $st = $db->prepare("SELECT id, email, name, status, token, email_sent_at, sms_sent_at, accepted_at, phone FROM invitations WHERE household_id=? AND status='pending' ORDER BY id");
         $st->execute([$hid]);
         return $st->fetchAll();
     }
@@ -281,7 +318,7 @@ final class Db
         }
         unset($m);
         foreach ($pending as &$p) {
-            if (!empty($p['email_sent_at'])) {
+            if (!empty($p['email_sent_at']) || !empty($p['sms_sent_at'])) {
                 $p['circle_status'] = 'Invite sent';
                 $p['circle_status_key'] = 'sent';
             } else {
@@ -298,6 +335,75 @@ final class Db
         $db->prepare('UPDATE invitations SET email_sent_at=? WHERE id=? AND email_sent_at IS NULL')->execute([self::now(), $id]);
     }
 
+    public static function markInviteSmsSent(PDO $db, int $id): void
+    {
+        $db->prepare('UPDATE invitations SET sms_sent_at=? WHERE id=? AND sms_sent_at IS NULL')->execute([self::now(), $id]);
+    }
+
+    public static function phoneTaken(PDO $db, string $phone, ?int $exceptUserId = null, ?int $exceptInviteId = null): bool
+    {
+        if ($phone === '') {
+            return false;
+        }
+        $st = $db->prepare('SELECT id FROM users WHERE phone=?');
+        $st->execute([$phone]);
+        $row = $st->fetch();
+        if ($row && ($exceptUserId === null || (int) $row['id'] !== $exceptUserId)) {
+            return true;
+        }
+        $inv = $db->prepare("SELECT id FROM invitations WHERE phone=? AND status='pending'");
+        $inv->execute([$phone]);
+        $pending = $inv->fetch();
+        if ($pending && ($exceptInviteId === null || (int) $pending['id'] !== $exceptInviteId)) {
+            return true;
+        }
+        return false;
+    }
+
+    public static function userByPhone(PDO $db, string $phone): ?array
+    {
+        if ($phone === '') {
+            return null;
+        }
+        $st = $db->prepare('SELECT * FROM users WHERE phone=?');
+        $st->execute([$phone]);
+        $row = $st->fetch();
+        return $row ?: null;
+    }
+
+    public static function pendingByPhone(PDO $db, string $phone): ?array
+    {
+        if ($phone === '') {
+            return null;
+        }
+        $st = $db->prepare("SELECT * FROM invitations WHERE phone=? AND status='pending' ORDER BY id DESC");
+        $st->execute([$phone]);
+        $row = $st->fetch();
+        return $row ?: null;
+    }
+
+    public static function pendingInvite(PDO $db, int $hid, int $inviteId): ?array
+    {
+        $st = $db->prepare("SELECT * FROM invitations WHERE id=? AND household_id=? AND status='pending'");
+        $st->execute([$inviteId, $hid]);
+        $row = $st->fetch();
+        return $row ?: null;
+    }
+
+    public static function setUserPhone(PDO $db, int $userId, string $phone, bool $optOut = false): void
+    {
+        if ($phone !== '' && self::phoneTaken($db, $phone, $userId)) {
+            throw new RuntimeException('That mobile number is already on another Family Shield Pro login.');
+        }
+        $db->prepare('UPDATE users SET phone=?, sms_opt_out=? WHERE id=?')
+            ->execute([$phone !== '' ? $phone : null, $optOut ? 1 : 0, $userId]);
+    }
+
+    public static function setSmsOptOut(PDO $db, int $userId, bool $optOut): void
+    {
+        $db->prepare('UPDATE users SET sms_opt_out=? WHERE id=?')->execute([$optOut ? 1 : 0, $userId]);
+    }
+
     public static function touchLastAccess(PDO $db, int $userId): void
     {
         $db->prepare('UPDATE users SET last_access_at=? WHERE id=?')->execute([self::now(), $userId]);
@@ -310,7 +416,7 @@ final class Db
         return $st->fetchAll();
     }
 
-    public static function invite(PDO $db, int $hid, string $email, string $name = ''): array
+    public static function invite(PDO $db, int $hid, string $email, string $name = '', string $phone = ''): array
     {
         $users = self::members($db, $hid);
         $pending = self::pending($db, $hid);
@@ -321,14 +427,18 @@ final class Db
         if ($email === '' || !str_contains($email, '@')) {
             throw new RuntimeException('Need an email address to invite.');
         }
+        $phone = trim($phone);
+        if ($phone !== '' && self::phoneTaken($db, $phone)) {
+            throw new RuntimeException('That mobile number is already on another Family Shield Pro login or invite.');
+        }
         $token = rtrim(strtr(base64_encode(random_bytes(16)), '+/', '-_'), '=');
         $db->prepare(
-            "INSERT INTO invitations (household_id, email, name, token, status, created_at) VALUES (?,?,?,?,'pending',?)"
-        )->execute([$hid, $email, trim($name), $token, self::now()]);
-        return ['email' => $email, 'token' => $token, 'id' => (int) $db->lastInsertId()];
+            "INSERT INTO invitations (household_id, email, name, token, status, created_at, phone) VALUES (?,?,?,?,'pending',?,?)"
+        )->execute([$hid, $email, trim($name), $token, self::now(), $phone !== '' ? $phone : null]);
+        return ['email' => $email, 'token' => $token, 'id' => (int) $db->lastInsertId(), 'phone' => $phone];
     }
 
-    public static function acceptInvite(PDO $db, string $token, string $name, string $password): array
+    public static function acceptInvite(PDO $db, string $token, string $name, string $password, string $phone = ''): array
     {
         $st = $db->prepare("SELECT * FROM invitations WHERE token=? AND status='pending'");
         $st->execute([$token]);
@@ -341,9 +451,20 @@ final class Db
         if ($ex->fetch()) {
             throw new RuntimeException('That email already has an OurCircle login. Sign in instead.');
         }
+        $stored = trim($phone) !== '' ? trim($phone) : (string) ($inv['phone'] ?? '');
+        if ($stored !== '' && self::phoneTaken($db, $stored, null, (int) $inv['id'])) {
+            throw new RuntimeException('That mobile number is already on another Family Shield Pro login.');
+        }
         $db->prepare(
-            "INSERT INTO users (household_id, name, email, password_hash, role, created_at) VALUES (?,?,?,?, 'member', ?)"
-        )->execute([$inv['household_id'], trim($name), $inv['email'], password_hash($password, PASSWORD_DEFAULT), self::now()]);
+            "INSERT INTO users (household_id, name, email, password_hash, role, created_at, phone) VALUES (?,?,?,?, 'member', ?, ?)"
+        )->execute([
+            $inv['household_id'],
+            trim($name),
+            $inv['email'],
+            password_hash($password, PASSWORD_DEFAULT),
+            self::now(),
+            $stored !== '' ? $stored : null,
+        ]);
         $db->prepare('UPDATE invitations SET status=?, accepted_at=? WHERE id=?')->execute(['accepted', self::now(), $inv['id']]);
         $u = $db->prepare('SELECT * FROM users WHERE lower(email)=?');
         $u->execute([$inv['email']]);

@@ -23,7 +23,8 @@ SYSTEM = (
     "If it sounds too good to be true, it usually is. "
     "If they ask whether they should send money because someone asked them to: answer with a resounding NO!!! "
     "Not unless a family member helps them vet it, and they can make sure it is the person they think it is — without a doubt. "
-    f"Support email: {SUPPORT_EMAIL}. Do not invent a phone number — phone support is not published yet. "
+    f"Support email: {SUPPORT_EMAIL}. Do not invent a customer-service phone number — phone support is not published yet. "
+    "Circle SMS (Twilio) is optional: invites, call-me alerts, and forwarding a sketchy text. Reply STOP to opt out. Never say a request is safe. "
     "Password reset is at /forgot. 2FA is on Account. "
     "Keep answers short (2–6 sentences). Do not ask for passwords, card numbers, or 2FA codes. "
     "If you cannot help, point to the support email."
@@ -69,13 +70,19 @@ _FAQ: list[tuple[tuple[str, ...], str]] = [
         f"Stuck? {SUPPORT_EMAIL}.",
     ),
     (
+        ("sms", "text message", "text me", "twilio", "forward a text", "text the number"),
+        "Circle SMS is optional (Twilio in .env). Save a mobile on Account. Invites and “Please call me before I pay” can go by text. Forward a sketchy message to the Family Shield Pro number to open a check. Reply STOP to opt out. "
+        "We never say a request is safe. This is not a customer-service phone. "
+        f"{CORE_RULE} Setup: SMS.md. Stuck? {SUPPORT_EMAIL}.",
+    ),
+    (
         ("phone", "call us", "telephone", "support number", "customer service number"),
         f"We do not publish a customer-service phone number yet. Email {SUPPORT_EMAIL} — a person reads every message.",
     ),
     (
         ("invite email", "invite link", "join link", "invitation", "invite someone"),
-        "Circle → Invite someone. We email them a join link if mail is set up (SMTP or Resend in .env). "
-        "You can also copy the full https://…/join/… link from Waiting to join. They do not need to sign in first. "
+        "Circle → Invite someone. We email them a join link if mail is set up (SMTP or Resend in .env), and we can text it if Twilio and a mobile number are set. "
+        "You can also copy the full https://…/join/… link and tap Resend invite. They do not need to sign in first. "
         f"Stuck? {SUPPORT_EMAIL}.",
     ),
     (
