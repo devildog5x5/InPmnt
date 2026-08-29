@@ -218,13 +218,13 @@ final class App
         }
         $extra = [];
         if (!Mailer::configured()) {
-            $extra[] = 'mail is not set up yet';
+            $extra[] = 'Mail is not set up yet';
         }
         if ($phone !== '' && !Sms::configured()) {
             $extra[] = 'SMS is not set up yet';
         }
         if ($extra) {
-            return ['Invite created for ' . $inv['email'] . '. ' . ucfirst(implode(' and ', $extra)) . ', so ' . lcfirst($share), 'ok'];
+            return ['Invite created for ' . $inv['email'] . '. ' . implode(' and ', $extra) . ', so ' . lcfirst($share), 'ok'];
         }
         return ['Invite created for ' . $inv['email'] . '. ' . $share, 'ok'];
     }

@@ -179,11 +179,11 @@ def notify_invite(inv: dict[str, Any], inviter: str) -> tuple[str, str]:
         return f"Could not send the invite. {share}", "error"
     extra = []
     if not mail_configured():
-        extra.append("mail is not set up yet")
+        extra.append("Mail is not set up yet")
     if phone and not sms_configured():
         extra.append("SMS is not set up yet")
     if extra:
-        return f"Invite created for {inv['email']}. {' and '.join(extra).capitalize()}, so {share[0].lower() + share[1:]}", "ok"
+        return f"Invite created for {inv['email']}. {' and '.join(extra)}, so {share[0].lower() + share[1:]}", "ok"
     return f"Invite created for {inv['email']}. {share}", "ok"
 
 
