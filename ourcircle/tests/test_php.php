@@ -34,10 +34,13 @@ $empty = Analyze::analyze('');
 check(Analyze::analyze('')['level'] === Analyze::UNKNOWN, 'empty unknown');
 
 require $root . '/php/src/Product.php';
-check(Product::version() === '1.2.8', 'product version 1.2.8');
+check(Product::version() === '1.2.9', 'product version 1.2.9');
 check(Product::NAME === 'Family Shield Pro', 'product name');
 check(Product::APP === 'OurCircle', 'app name');
 
+$signup = file_get_contents($root . '/php/views/signup.php') ?: '';
+check(str_contains($signup, 'The Smith circle'), 'signup smith circle placeholder');
+check(!str_contains($signup, 'The Patel circle'), 'signup no patel circle');
 $landing = file_get_contents($root . '/php/views/landing.php') ?: '';
 check(str_contains($landing, '$14.99'), 'landing monthly price');
 check(str_contains($landing, '$119.99'), 'landing yearly price');

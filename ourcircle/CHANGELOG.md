@@ -3,6 +3,10 @@
 Product: **Family Shield Pro** (app name in the UI: **OurCircle**).  
 Not InPmnt. Version file: `ourcircle/VERSION` (independent of repo-root InPmnt `VERSION`).
 
+## 1.2.9 — 2026-08-29
+
+- Circle name example on Start a circle is **The Smith circle** (was The Patel circle).
+
 ## 1.2.8 — 2026-08-29
 
 - **Hide** actually closes the help box. The panel used `display: flex`, which kept it on screen after Hide (the `hidden` attribute lost). Hide now sets the box to `display: none` and ignores a follow-up tap on the Help tab.

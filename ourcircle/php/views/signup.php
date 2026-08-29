@@ -14,7 +14,7 @@ View::start($title, $site_home, 'index,follow', '/signup');
       <label>Your name</label>
       <input name="name" required />
       <label>Circle name</label>
-      <input name="household" placeholder="The Patel circle" />
+      <input name="household" placeholder="The Smith circle" />
       <label>Email</label>
       <input name="email" type="email" required />
       <label>Password (8+ characters)</label>

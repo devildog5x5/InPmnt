@@ -86,6 +86,10 @@ class AppTests(unittest.TestCase):
         self.assertNotIn(b"Hostinger PHP", land.data)
         self.assertNotIn(b"robots.txt", land.data)
         self.assertIn(b"guidance, not a guarantee", land.data)
+        signup_page = self.client.get("/signup")
+        self.assertEqual(signup_page.status_code, 200)
+        self.assertIn(b"The Smith circle", signup_page.data)
+        self.assertNotIn(b"The Patel circle", signup_page.data)
         login_page = self.client.get("/login")
         self.assertIn(b'href="https://familyshieldpro.com"', login_page.data)
         login = self.client.post(
