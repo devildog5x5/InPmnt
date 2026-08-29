@@ -76,6 +76,9 @@ class AppTests(unittest.TestCase):
         self.assertIn(b'id="contact"', land.data)
         self.assertIn(b"CUSTOMER SERVICE PHONE", land.data)
         self.assertIn(b"fsp-chat", land.data)
+        self.assertNotIn(b"not InPmnt", land.data)
+        self.assertNotIn(b"Hostinger PHP", land.data)
+        self.assertNotIn(b"robots.txt", land.data)
         login_page = self.client.get("/login")
         self.assertIn(b'href="https://familyshieldpro.com"', login_page.data)
         login = self.client.post(

@@ -90,9 +90,6 @@ View::start($title, $site_home, 'index,follow', '/');
   </section>
   <footer class="footer">
     OurCircle is built for families — including parents, adult children, and grandparents — who want a second set of eyes. We do not guarantee that a request is legitimate.
-    <span class="muted"> · <?= Http::e(Product::label()) ?> · Hostinger PHP · not InPmnt
-     · <a href="mailto:CustomerService@FamilyShieldPro.com">CustomerService@FamilyShieldPro.com</a>
-     · <a href="<?= Http::e($site_home) ?>/robots.txt">robots.txt</a> · <a href="<?= Http::e($site_home) ?>/sitemap.xml">sitemap.xml</a></span>
   </footer>
 </div>
 <?php View::end(); ?>

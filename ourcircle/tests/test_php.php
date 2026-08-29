@@ -34,7 +34,7 @@ $empty = Analyze::analyze('');
 check(Analyze::analyze('')['level'] === Analyze::UNKNOWN, 'empty unknown');
 
 require $root . '/php/src/Product.php';
-check(Product::version() === '1.2.0', 'product version 1.2.0');
+check(Product::version() === '1.2.1', 'product version 1.2.1');
 check(Product::NAME === 'Family Shield Pro', 'product name');
 check(Product::APP === 'OurCircle', 'app name');
 
@@ -46,6 +46,9 @@ check(str_contains($landing, 'Really! Really! Really!'), 'landing really');
 check(str_contains($landing, 'Why we built this'), 'landing why');
 check(str_contains($landing, 'CustomerService@FamilyShieldPro.com'), 'landing support email');
 check(str_contains($landing, 'CUSTOMER SERVICE PHONE'), 'landing phone commented out');
+check(!str_contains($landing, 'not InPmnt'), 'landing no product-identity footer');
+check(!str_contains($landing, 'Hostinger PHP'), 'landing no hostinger footer');
+check(!str_contains($landing, 'robots.txt'), 'landing no robots footer');
 check(is_file($root . '/SUPPORT.md'), 'support setup doc');
 check(is_file($root . '/php/src/SupportChat.php'), 'php support chat class');
 check(is_file($root . '/php/views/support_chat.php'), 'php chat widget');

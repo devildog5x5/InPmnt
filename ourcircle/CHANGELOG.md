@@ -3,6 +3,10 @@
 Product: **Family Shield Pro** (app name in the UI: **OurCircle**).  
 Not InPmnt. Version file: `ourcircle/VERSION` (independent of repo-root InPmnt `VERSION`).
 
+## 1.2.1 — 2026-08-29
+
+- Homepage footer no longer shows version, Hostinger, robots.txt, or sitemap.xml.
+
 ## 1.2.0 — 2026-08-29
 
 - Customer-service email on the homepage: **CustomerService@FamilyShieldPro.com**.
