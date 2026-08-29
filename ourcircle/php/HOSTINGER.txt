@@ -8,6 +8,7 @@ Site: https://familyshieldpro.com
 4. Open https://familyshieldpro.com and sign up (or demo family@ourcircle.app / password123).
 5. Stripe: add keys to public_html/.env (see STRIPE.md in this zip). Do not overwrite a live .env.
 6. Password reset / 2FA: see AUTH.md. Add SMTP or Resend for email reset links.
+7. Operator console: see ADMIN.md. Off until ADMIN_PASSWORD is in .env.
 
 Permissions are already set in the zip:
   folders 755   (data/ and data/uploads/ 775 so the site can save the database)

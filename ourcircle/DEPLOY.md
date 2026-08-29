@@ -1,7 +1,7 @@
 # Family Shield Pro — deploy (no VPS)
 
 **Site:** https://familyshieldpro.com  
-**Zip:** https://raw.githubusercontent.com/devildog5x5/InPmnt/cursor/ourcircle-family-shield-4df6/patches/FamilyShieldPro-1.2.17.zip  
+**Zip:** https://raw.githubusercontent.com/devildog5x5/InPmnt/cursor/ourcircle-family-shield-4df6/patches/FamilyShieldPro-1.2.18.zip  
 (`robots.txt` and `sitemap.xml` are inside the zip.)  
 **Do not** put this in an InPmnt folder or overwrite a live `.env`.
 
@@ -21,7 +21,7 @@ First visit creates `.env` (mode `640`) and `data/ourcircle.db`. Demo: `family@o
 
 **Password reset / 2FA:** **[AUTH.md](AUTH.md)**. Email reset needs SMTP or Resend in `.env`. Recovery codes work without mail.
 
-**Customer service:** homepage email **CustomerService@FamilyShieldPro.com**, site-wide chat widget, commented-out phone — **[SUPPORT.md](SUPPORT.md)**. Circle SMS (invites / call-me / inbound checks) is separate — **[SMS.md](SMS.md)**.
+**Customer service:** homepage email **CustomerService@FamilyShieldPro.com**, site-wide chat widget, commented-out phone — **[SUPPORT.md](SUPPORT.md)**. Circle SMS (invites / call-me / inbound checks) is separate — **[SMS.md](SMS.md)**. Operator console (user list for you) is off until `ADMIN_PASSWORD` — **[ADMIN.md](ADMIN.md)**.
 
 Webhook URL: `https://familyshieldpro.com/billing/webhook`
 

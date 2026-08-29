@@ -15,6 +15,7 @@ Disallow: /account
 Disallow: /logout
 Disallow: /support
 Disallow: /sms
+Disallow: /admin
 
 Host: familyshieldpro.com
 Sitemap: https://familyshieldpro.com/sitemap.xml

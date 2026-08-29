@@ -453,3 +453,158 @@ def accept_invite(conn: sqlite3.Connection, token: str, name: str, password: str
     )
     user = conn.execute("SELECT * FROM users WHERE lower(email)=?", (inv["email"],)).fetchone()
     return dict(user)
+
+
+def pending_invite_by_id(conn: sqlite3.Connection, invite_id: int) -> dict[str, Any] | None:
+    row = conn.execute(
+        "SELECT * FROM invitations WHERE id=? AND status='pending'",
+        (invite_id,),
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def cancel_pending_invite(conn: sqlite3.Connection, invite_id: int) -> bool:
+    cur = conn.execute("DELETE FROM invitations WHERE id=? AND status='pending'", (invite_id,))
+    return int(cur.rowcount or 0) > 0
+
+
+def admin_counts(conn: sqlite3.Connection) -> dict[str, int]:
+    def count(sql: str) -> int:
+        return int(conn.execute(sql).fetchone()[0])
+
+    return {
+        "households": count("SELECT COUNT(*) FROM households"),
+        "users": count("SELECT COUNT(*) FROM users"),
+        "pending_invites": count("SELECT COUNT(*) FROM invitations WHERE status='pending'"),
+        "trusted": count("SELECT COUNT(*) FROM trusted_contacts"),
+        "checks": count("SELECT COUNT(*) FROM checks"),
+    }
+
+
+def _admin_like(q: str) -> str:
+    return "%" + q.lower().replace("%", "").replace("_", "") + "%"
+
+
+def admin_list_users(conn: sqlite3.Connection, q: str = "") -> list[dict[str, Any]]:
+    q = (q or "").strip()
+    sql = """
+        SELECT u.*, h.name AS household_name, h.plan AS household_plan
+        FROM users u
+        JOIN households h ON h.id = u.household_id
+    """
+    params: list[Any] = []
+    if q:
+        like = _admin_like(q)
+        sql += (
+            " WHERE lower(u.name) LIKE ? OR lower(u.email) LIKE ?"
+            " OR lower(h.name) LIKE ? OR IFNULL(u.phone,'') LIKE ?"
+        )
+        params = [like, like, like, like]
+    sql += " ORDER BY u.id LIMIT 500"
+    rows = [dict(r) for r in conn.execute(sql, params).fetchall()]
+    decorated, _ = decorate_circle_status(rows, [])
+    return decorated
+
+
+def admin_list_invites(conn: sqlite3.Connection, q: str = "") -> list[dict[str, Any]]:
+    q = (q or "").strip()
+    sql = """
+        SELECT i.*, h.name AS household_name
+        FROM invitations i
+        JOIN households h ON h.id = i.household_id
+        WHERE i.status='pending'
+    """
+    params: list[Any] = []
+    if q:
+        like = _admin_like(q)
+        sql += " AND (lower(i.email) LIKE ? OR lower(IFNULL(i.name,'')) LIKE ? OR lower(h.name) LIKE ? OR IFNULL(i.phone,'') LIKE ?)"
+        params = [like, like, like, like]
+    sql += " ORDER BY i.id DESC LIMIT 500"
+    rows = [dict(r) for r in conn.execute(sql, params).fetchall()]
+    _, pending = decorate_circle_status([], rows)
+    return pending
+
+
+def admin_get_user(conn: sqlite3.Connection, user_id: int) -> dict[str, Any] | None:
+    row = conn.execute(
+        """
+        SELECT u.*, h.name AS household_name, h.plan AS household_plan,
+               h.stripe_status AS household_stripe_status,
+               h.created_at AS household_created_at
+        FROM users u
+        JOIN households h ON h.id = u.household_id
+        WHERE u.id=?
+        """,
+        (user_id,),
+    ).fetchone()
+    if not row:
+        return None
+    user = dict(row)
+    decorated, _ = decorate_circle_status([user], [])
+    return decorated[0]
+
+
+def admin_get_household(conn: sqlite3.Connection, hid: int) -> dict[str, Any] | None:
+    row = conn.execute("SELECT * FROM households WHERE id=?", (hid,)).fetchone()
+    return dict(row) if row else None
+
+
+def admin_update_user(
+    conn: sqlite3.Connection,
+    user_id: int,
+    *,
+    name: str,
+    email: str,
+    phone: str = "",
+    sms_opt_out: bool = False,
+    password: str = "",
+) -> dict[str, Any]:
+    user = admin_get_user(conn, user_id)
+    if not user:
+        raise ValueError("That login is not in Family Shield Pro.")
+    name = name.strip()
+    email = email.lower().strip()
+    if not name:
+        raise ValueError("Name cannot be empty.")
+    if not email or "@" not in email:
+        raise ValueError("Need a valid email address.")
+    taken = conn.execute(
+        "SELECT id FROM users WHERE lower(email)=? AND id<>?",
+        (email, user_id),
+    ).fetchone()
+    if taken:
+        raise ValueError("That email already has a Family Shield Pro login.")
+    conn.execute(
+        "UPDATE users SET name=?, email=? WHERE id=?",
+        (name, email, user_id),
+    )
+    set_user_phone(conn, user_id, phone, sms_opt_out)
+    password = (password or "").strip()
+    if password:
+        if len(password) < 8:
+            raise ValueError("Use at least 8 characters for a new password.")
+        conn.execute(
+            "UPDATE users SET password_hash=? WHERE id=?",
+            (generate_password_hash(password), user_id),
+        )
+    updated = admin_get_user(conn, user_id)
+    if not updated:
+        raise ValueError("That login is not in Family Shield Pro.")
+    return updated
+
+
+def admin_update_household(conn: sqlite3.Connection, hid: int, *, name: str, plan: str) -> dict[str, Any]:
+    household = admin_get_household(conn, hid)
+    if not household:
+        raise ValueError("That circle is not in Family Shield Pro.")
+    name = name.strip()
+    plan = plan.strip().lower()
+    if not name:
+        raise ValueError("Circle name cannot be empty.")
+    if plan not in ("monthly", "yearly"):
+        raise ValueError("Plan must be monthly or yearly.")
+    conn.execute("UPDATE households SET name=?, plan=? WHERE id=?", (name, plan, hid))
+    updated = admin_get_household(conn, hid)
+    if not updated:
+        raise ValueError("That circle is not in Family Shield Pro.")
+    return updated

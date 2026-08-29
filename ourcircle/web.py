@@ -20,6 +20,7 @@ from flask import (
 )
 from werkzeug.utils import secure_filename
 
+from admin import admin_configured, admin_password_ok, email_is_admin
 from analyze import CORE_RULE, DISCLAIMER, GUIDANCE, analyze
 from auth import (
     consume_recovery,
@@ -44,7 +45,14 @@ from billing import (
 from database import (
     DATA,
     accept_invite,
+    admin_counts,
+    admin_get_user,
+    admin_list_invites,
+    admin_list_users,
+    admin_update_household,
+    admin_update_user,
     authenticate,
+    cancel_pending_invite,
     create_household,
     find_pending_invite_by_phone,
     find_user_by_phone,
@@ -55,6 +63,7 @@ from database import (
     mark_invite_sms_sent,
     now,
     pending_invite,
+    pending_invite_by_id,
     session as db_session,
     set_sms_opt_out,
     set_user_phone,
@@ -95,6 +104,7 @@ PRIVATE_PREFIXES = (
     "/logout",
     "/support",
     "/sms",
+    "/admin",
 )
 
 
@@ -234,6 +244,8 @@ def create_app() -> Flask:
             "app_version": product_version(),
             "stripe_enabled": load_stripe_config().enabled,
             "sms_enabled": sms_configured(),
+            "admin_ok": bool(session.get("admin_ok")) and admin_configured(),
+            "admin_configured": admin_configured(),
         }
 
     @app.get("/robots.txt")
@@ -296,6 +308,7 @@ def create_app() -> Flask:
             "mail": mail_configured(),
             "sms": sms_configured(),
             "openai": openai_configured(),
+            "admin": admin_configured(),
         }
 
     def current_user():
@@ -304,6 +317,27 @@ def create_app() -> Flask:
         if not uid or not hid:
             return None
         return {"id": uid, "household_id": hid, "name": session.get("name"), "email": session.get("email")}
+
+    def maybe_elevate_admin() -> None:
+        if session.get("admin_ok"):
+            return
+        if not admin_configured():
+            return
+        email = (session.get("email") or "").strip()
+        if email_is_admin(email):
+            session["admin_ok"] = True
+
+    def require_admin():
+        if not admin_configured():
+            abort(404)
+        maybe_elevate_admin()
+        if not session.get("admin_ok"):
+            return redirect(url_for("admin_login"))
+        return None
+
+    @app.before_request
+    def elevate_admin_session():
+        maybe_elevate_admin()
 
     def login_required():
         if not current_user():
@@ -315,6 +349,127 @@ def create_app() -> Flask:
             with db_session() as conn:
                 touch_last_access(conn, int(uid))
         return None
+
+    @app.route("/admin/login", methods=["GET", "POST"])
+    def admin_login():
+        if not admin_configured():
+            abort(404)
+        maybe_elevate_admin()
+        if session.get("admin_ok"):
+            return redirect(url_for("admin_home"))
+        if request.method == "POST":
+            if admin_password_ok(request.form.get("password") or ""):
+                session["admin_ok"] = True
+                return redirect(url_for("admin_home"))
+            flash("Operator password did not match.", "error")
+        return render_template("admin_login.html")
+
+    @app.get("/admin/logout")
+    def admin_logout():
+        if not admin_configured():
+            abort(404)
+        session.pop("admin_ok", None)
+        return redirect(url_for("admin_login"))
+
+    @app.get("/admin")
+    def admin_home():
+        gate = require_admin()
+        if gate:
+            return gate
+        q = (request.args.get("q") or "").strip()
+        with db_session() as conn:
+            counts = admin_counts(conn)
+            users = admin_list_users(conn, q)
+            invites = admin_list_invites(conn, q)
+        return render_template("admin.html", counts=counts, users=users, invites=invites, q=q)
+
+    @app.route("/admin/users/<int:user_id>", methods=["GET", "POST"])
+    def admin_user(user_id: int):
+        gate = require_admin()
+        if gate:
+            return gate
+        if request.method == "POST":
+            try:
+                phone = parse_phone_field(request.form.get("phone") or "")
+            except ValueError as exc:
+                flash(str(exc), "error")
+                return redirect(url_for("admin_user", user_id=user_id))
+            try:
+                with db_session() as conn:
+                    person = admin_update_user(
+                        conn,
+                        user_id,
+                        name=request.form.get("name") or "",
+                        email=request.form.get("email") or "",
+                        phone=phone,
+                        sms_opt_out=(request.form.get("sms_opt_out") or "") == "1",
+                        password=request.form.get("password") or "",
+                    )
+            except ValueError as exc:
+                flash(str(exc), "error")
+                return redirect(url_for("admin_user", user_id=user_id))
+            if session.get("user_id") == person["id"]:
+                session["name"] = person["name"]
+                session["email"] = person["email"]
+            flash("Login saved.", "ok")
+            return redirect(url_for("admin_user", user_id=user_id))
+        with db_session() as conn:
+            person = admin_get_user(conn, user_id)
+        if not person:
+            flash("That login is not in Family Shield Pro.", "error")
+            return redirect(url_for("admin_home"))
+        return render_template("admin_user.html", person=person)
+
+    @app.post("/admin/households/<int:hid>")
+    def admin_household(hid: int):
+        gate = require_admin()
+        if gate:
+            return gate
+        return_user = int(request.form.get("return_user") or 0)
+        try:
+            with db_session() as conn:
+                admin_update_household(
+                    conn,
+                    hid,
+                    name=request.form.get("name") or "",
+                    plan=request.form.get("plan") or "",
+                )
+        except ValueError as exc:
+            flash(str(exc), "error")
+        else:
+            flash("Circle saved. Plan flag only — no Stripe charge.", "ok")
+        if return_user:
+            return redirect(url_for("admin_user", user_id=return_user))
+        return redirect(url_for("admin_home"))
+
+    @app.post("/admin/invites/resend")
+    def admin_invite_resend():
+        gate = require_admin()
+        if gate:
+            return gate
+        invite_id = int(request.form.get("invite_id") or 0)
+        with db_session() as conn:
+            inv = pending_invite_by_id(conn, invite_id)
+        if not inv:
+            flash("That invite is not waiting anymore.", "error")
+            return redirect(url_for("admin_home"))
+        msg, cat = notify_invite(inv, "Family Shield Pro")
+        flash(msg, cat)
+        return redirect(url_for("admin_home"))
+
+    @app.post("/admin/invites/delete")
+    def admin_invite_delete():
+        gate = require_admin()
+        if gate:
+            return gate
+        invite_id = int(request.form.get("invite_id") or 0)
+        with db_session() as conn:
+            gone = cancel_pending_invite(conn, invite_id)
+        if gone:
+            flash("Pending invite deleted.", "ok")
+        else:
+            flash("That invite is not waiting anymore.", "error")
+        return redirect(url_for("admin_home"))
 
     @app.get("/")
     def landing():

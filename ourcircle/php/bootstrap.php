@@ -31,6 +31,7 @@ require $root . '/src/Auth.php';
 require $root . '/src/Mail.php';
 require $root . '/src/Sms.php';
 require $root . '/src/SupportChat.php';
+require $root . '/src/Admin.php';
 require $root . '/src/App.php';
 
 Env::load($envPath);

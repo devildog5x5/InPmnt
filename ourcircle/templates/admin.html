@@ -1,0 +1,72 @@
+{% extends "admin_shell.html" %}
+{% block heading %}Operator console{% endblock %}
+{% block main %}
+<h2>Operator console</h2>
+<p class="muted">Households, logins, pending invites, trusted contacts, and checks. Search by name, email, phone, or circle name. This is not shown to families.</p>
+<div class="stat-grid">
+  <div class="stat"><strong>{{ counts.households }}</strong><span>Households</span></div>
+  <div class="stat"><strong>{{ counts.users }}</strong><span>Users</span></div>
+  <div class="stat"><strong>{{ counts.pending_invites }}</strong><span>Pending invites</span></div>
+  <div class="stat"><strong>{{ counts.trusted }}</strong><span>Trusted contacts</span></div>
+  <div class="stat"><strong>{{ counts.checks }}</strong><span>Checks</span></div>
+</div>
+<form method="get" class="panel" style="margin-bottom:16px">
+  <label>Search</label>
+  <input name="q" value="{{ q }}" placeholder="Name, email, phone, or circle" />
+  <p><button class="btn" type="submit">Search</button>
+  {% if q %}<a class="btn ghost" href="{{ url_for('admin_home') }}">Clear</a>{% endif %}</p>
+</form>
+<div class="panel">
+  <h2>Users</h2>
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Name</th><th>Email</th><th>Mobile</th><th>Circle</th><th>Role</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        {% for u in users %}
+        <tr>
+          <td>{{ u.name }}</td>
+          <td>{{ u.email }}</td>
+          <td>{{ u.phone or "—" }}</td>
+          <td>{{ u.household_name }} ({{ u.household_plan }})</td>
+          <td>{{ u.role }}</td>
+          <td><span class="pill status-{{ u.circle_status_key }}">{{ u.circle_status }}</span></td>
+          <td><a class="btn ghost" href="{{ url_for('admin_user', user_id=u.id) }}">Edit</a></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7">No users match.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+<div class="panel" style="margin-top:16px">
+  <h2>Pending invites</h2>
+  <form id="admin-invite-resend" method="post" action="{{ url_for('admin_invite_resend') }}"></form>
+  <form id="admin-invite-delete" method="post" action="{{ url_for('admin_invite_delete') }}"></form>
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Name</th><th>Email</th><th>Mobile</th><th>Circle</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        {% for p in invites %}
+        <tr>
+          <td>{{ p.name or "—" }}</td>
+          <td>{{ p.email }}</td>
+          <td>{{ p.phone or "—" }}</td>
+          <td>{{ p.household_name }}</td>
+          <td>
+            <span class="pill status-{{ p.circle_status_key }}">{{ p.circle_status }}</span>
+            <div class="join-url"><a href="{{ site_home }}/join/{{ p.token }}">{{ site_home }}/join/{{ p.token }}</a></div>
+          </td>
+          <td>
+            <button class="btn ghost" type="submit" form="admin-invite-resend" name="invite_id" value="{{ p.id }}">Resend</button>
+            <button class="btn danger" type="submit" form="admin-invite-delete" name="invite_id" value="{{ p.id }}">Delete invite</button>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6">No pending invites.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

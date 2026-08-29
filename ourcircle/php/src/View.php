@@ -72,6 +72,7 @@ final class View
             . '<a href="/report">Report</a>'
             . '<a href="/billing">Plans</a>'
             . '<a href="/account">Account</a>'
+            . (!empty($vars['admin_ok']) ? '<a href="/admin">Console</a>' : '')
             . '<a class="btn ghost" href="/logout">Sign out</a>'
             . '</nav></header>'
             . '<p class="core-rule">' . Http::e((string) ($vars['core_rule'] ?? Analyze::CORE_RULE)) . '</p>'
@@ -93,6 +94,34 @@ final class View
     public static function appClose(): void
     {
         echo '</main><p class="disclaimer">' . Http::e(Analyze::GUIDANCE) . '</p></div>';
+        self::end();
+    }
+
+    public static function adminOpen(array $vars): void
+    {
+        self::start(
+            (string) ($vars['title'] ?? 'Operator console · Family Shield Pro'),
+            (string) $vars['site_home'],
+            'noindex,nofollow',
+            (string) ($vars['path'] ?? '/admin')
+        );
+        $family = (string) ($vars['user_name'] ?? '');
+        echo '<div class="wrap"><header class="app-header">'
+            . self::brand((string) $vars['site_home'], 'OurCircle', 'Operator console')
+            . '<nav class="nav">'
+            . '<a href="/admin">Console</a>'
+            . ($family !== '' ? '<a href="/home">Your circle</a>' : '')
+            . '<a class="btn ghost" href="/admin/logout">Sign out of console</a>'
+            . '</nav></header>'
+            . '<p class="core-rule">' . Http::e((string) ($vars['core_rule'] ?? Analyze::CORE_RULE)) . '</p>'
+            . self::flashesHtml($vars['flashes'] ?? [])
+            . '<main class="app-main">';
+    }
+
+    public static function adminClose(): void
+    {
+        echo '</main><p class="disclaimer">' . Http::e(Analyze::GUIDANCE)
+            . ' This console cannot change .env, SMTP, Stripe, or Twilio keys.</p></div>';
         self::end();
     }
 }

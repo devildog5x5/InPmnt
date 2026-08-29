@@ -44,7 +44,7 @@ if static_src.is_dir():
 
 version = (root / "VERSION").read_text(encoding="utf-8").strip() or "0.0.0"
 shutil.copy2(root / "VERSION", stage / "VERSION")
-for doc in ("STRIPE.md", "AUTH.md", "SUPPORT.md", "SMS.md"):
+for doc in ("STRIPE.md", "AUTH.md", "SUPPORT.md", "SMS.md", "ADMIN.md"):
     p = root / doc
     if p.is_file():
         shutil.copy2(p, stage / doc)

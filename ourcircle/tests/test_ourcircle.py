@@ -45,6 +45,8 @@ class AppTests(unittest.TestCase):
         os.close(fd)
         os.environ["OURCIRCLE_DB"] = self.db_path
         db.init_db(self.db_path)
+        for key in ("TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_FROM", "ADMIN_PASSWORD", "ADMIN_EMAIL"):
+            os.environ.pop(key, None)
         app = create_app()
         app.config["TESTING"] = True
         self.client = app.test_client()
@@ -55,7 +57,7 @@ class AppTests(unittest.TestCase):
         except OSError:
             pass
         os.environ.pop("OURCIRCLE_DB", None)
-        for key in ("TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_FROM"):
+        for key in ("TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_FROM", "ADMIN_PASSWORD", "ADMIN_EMAIL"):
             os.environ.pop(key, None)
 
     def test_landing_and_login_demo(self) -> None:
@@ -277,6 +279,7 @@ class AppTests(unittest.TestCase):
         self.assertIn("Disallow: /account", text)
         self.assertIn("Disallow: /support", text)
         self.assertIn("Disallow: /sms", text)
+        self.assertIn("Disallow: /admin", text)
         sitemap = self.client.get("/sitemap.xml")
         self.assertEqual(sitemap.status_code, 200)
         xml = sitemap.data.decode("utf-8")
@@ -286,10 +289,12 @@ class AppTests(unittest.TestCase):
         self.assertIn("https://familyshieldpro.com/forgot", xml)
         self.assertNotIn("/offers", xml)
         self.assertNotIn("/home", xml)
+        self.assertNotIn("/admin", xml)
         health = self.client.get("/healthz")
         self.assertEqual(health.status_code, 200)
         self.assertTrue(health.get_json()["ok"])
         self.assertFalse(health.get_json().get("stripe"))
+        self.assertFalse(health.get_json().get("admin"))
 
     def test_stripe_webhook_marks_household_paid(self) -> None:
         import hashlib
@@ -630,6 +635,102 @@ class AppTests(unittest.TestCase):
         finally:
             for key in ("TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_FROM", "OURCIRCLE_SITE_URL"):
                 os.environ.pop(key, None)
+
+    def test_admin_console_locked_then_edits(self) -> None:
+        from support_chat import faq_reply
+
+        off = self.client.get("/admin")
+        self.assertEqual(off.status_code, 404)
+        login_off = self.client.get("/admin/login")
+        self.assertEqual(login_off.status_code, 404)
+        health = self.client.get("/healthz")
+        self.assertFalse(health.get_json().get("admin"))
+        home = self.client.get("/")
+        self.assertNotIn(b'href="/admin"', home.data)
+        chat = faq_reply("would a management console be useful for how many users?")
+        self.assertIn("ADMIN.md", chat)
+        self.assertIn("/admin is not found", chat)
+        self.assertNotIn("this is safe", chat.lower())
+
+        os.environ["ADMIN_PASSWORD"] = "short"
+        self.assertEqual(self.client.get("/admin").status_code, 404)
+        os.environ["ADMIN_PASSWORD"] = "change-me-to-a-long-..."
+        self.assertEqual(self.client.get("/admin").status_code, 404)
+
+        os.environ["ADMIN_PASSWORD"] = "operator-console-ok"
+        health_on = self.client.get("/healthz")
+        self.assertTrue(health_on.get_json().get("admin"))
+        gate = self.client.get("/admin")
+        self.assertEqual(gate.status_code, 302)
+        self.assertIn("/admin/login", gate.headers.get("Location", ""))
+        form = self.client.get("/admin/login")
+        self.assertEqual(form.status_code, 200)
+        self.assertIn(b"Operator password", form.data)
+        self.assertNotIn(b"family@ourcircle.app / password123", form.data)
+        bad = self.client.post("/admin/login", data={"password": "nope"}, follow_redirects=True)
+        self.assertIn(b"did not match", bad.data)
+        opened = self.client.post(
+            "/admin/login",
+            data={"password": "operator-console-ok"},
+            follow_redirects=True,
+        )
+        self.assertEqual(opened.status_code, 200)
+        self.assertIn(b"Operator console", opened.data)
+        self.assertIn(b"Pat Foster", opened.data)
+        self.assertIn(b"family@ourcircle.app", opened.data)
+        self.assertIn(b"Households", opened.data)
+        self.assertIn(b">1</strong>", opened.data)
+        with db.session(self.db_path) as conn:
+            hid = int(conn.execute("SELECT id FROM households").fetchone()[0])
+            inv = db.invite_member(conn, hid, "aunt-admin@example.com", "Aunt")
+            invite_id = int(inv["id"])
+            uid = int(conn.execute("SELECT id FROM users WHERE email=?", ("family@ourcircle.app",)).fetchone()["id"])
+        listed = self.client.get("/admin?q=aunt-admin")
+        self.assertIn(b"aunt-admin@example.com", listed.data)
+        self.assertIn(b"Resend", listed.data)
+        saved = self.client.post(
+            f"/admin/users/{uid}",
+            data={
+                "name": "Pat Foster Console",
+                "email": "family@ourcircle.app",
+                "phone": "555-010-4242",
+                "password": "",
+            },
+            follow_redirects=True,
+        )
+        self.assertEqual(saved.status_code, 200)
+        self.assertIn(b"Login saved", saved.data)
+        self.assertIn(b"Pat Foster Console", saved.data)
+        self.assertIn(b"+15550104242", saved.data)
+        circle = self.client.post(
+            f"/admin/households/{hid}",
+            data={"name": "Foster operator circle", "plan": "monthly", "return_user": str(uid)},
+            follow_redirects=True,
+        )
+        self.assertIn(b"Circle saved", circle.data)
+        self.assertIn(b"Foster operator circle", circle.data)
+        deleted = self.client.post(
+            "/admin/invites/delete",
+            data={"invite_id": str(invite_id)},
+            follow_redirects=True,
+        )
+        self.assertIn(b"Pending invite deleted", deleted.data)
+        gone = self.client.get("/admin?q=aunt-admin")
+        self.assertNotIn(b"aunt-admin@example.com", gone.data)
+        os.environ.pop("ADMIN_PASSWORD", None)
+
+    def test_admin_email_elevates_family_session(self) -> None:
+        os.environ["ADMIN_PASSWORD"] = "operator-console-ok"
+        os.environ["ADMIN_EMAIL"] = "family@ourcircle.app"
+        self.client.post("/login", data={"email": "family@ourcircle.app", "password": "password123"})
+        home = self.client.get("/home")
+        self.assertIn(b'href="/admin"', home.data)
+        self.assertIn(b"Console", home.data)
+        console = self.client.get("/admin")
+        self.assertEqual(console.status_code, 200)
+        self.assertIn(b"family@ourcircle.app", console.data)
+        os.environ.pop("ADMIN_PASSWORD", None)
+        os.environ.pop("ADMIN_EMAIL", None)
 
 
 if __name__ == "__main__":

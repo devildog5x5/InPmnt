@@ -470,4 +470,168 @@ final class Db
         $u->execute([$inv['email']]);
         return $u->fetch();
     }
+
+    public static function pendingInviteById(PDO $db, int $inviteId): ?array
+    {
+        $st = $db->prepare("SELECT * FROM invitations WHERE id=? AND status='pending'");
+        $st->execute([$inviteId]);
+        $row = $st->fetch();
+        return $row ?: null;
+    }
+
+    public static function cancelPendingInvite(PDO $db, int $inviteId): bool
+    {
+        $st = $db->prepare("DELETE FROM invitations WHERE id=? AND status='pending'");
+        $st->execute([$inviteId]);
+        return $st->rowCount() > 0;
+    }
+
+    /** @return array{households:int,users:int,pending_invites:int,trusted:int,checks:int} */
+    public static function adminCounts(PDO $db): array
+    {
+        $count = static function (string $sql) use ($db): int {
+            return (int) $db->query($sql)->fetchColumn();
+        };
+        return [
+            'households' => $count('SELECT COUNT(*) FROM households'),
+            'users' => $count('SELECT COUNT(*) FROM users'),
+            'pending_invites' => $count("SELECT COUNT(*) FROM invitations WHERE status='pending'"),
+            'trusted' => $count('SELECT COUNT(*) FROM trusted_contacts'),
+            'checks' => $count('SELECT COUNT(*) FROM checks'),
+        ];
+    }
+
+    private static function adminLike(string $q): string
+    {
+        return '%' . strtolower(str_replace(['%', '_'], '', $q)) . '%';
+    }
+
+    /** @return list<array<string,mixed>> */
+    public static function adminListUsers(PDO $db, string $q = ''): array
+    {
+        $q = trim($q);
+        $sql = 'SELECT u.*, h.name AS household_name, h.plan AS household_plan
+            FROM users u JOIN households h ON h.id = u.household_id';
+        $params = [];
+        if ($q !== '') {
+            $like = self::adminLike($q);
+            $sql .= ' WHERE lower(u.name) LIKE ? OR lower(u.email) LIKE ? OR lower(h.name) LIKE ? OR IFNULL(u.phone,\'\') LIKE ?';
+            $params = [$like, $like, $like, $like];
+        }
+        $sql .= ' ORDER BY u.id LIMIT 500';
+        $st = $db->prepare($sql);
+        $st->execute($params);
+        [$users] = self::decorateCircleStatus($st->fetchAll(), []);
+        return $users;
+    }
+
+    /** @return list<array<string,mixed>> */
+    public static function adminListInvites(PDO $db, string $q = ''): array
+    {
+        $q = trim($q);
+        $sql = "SELECT i.*, h.name AS household_name
+            FROM invitations i JOIN households h ON h.id = i.household_id
+            WHERE i.status='pending'";
+        $params = [];
+        if ($q !== '') {
+            $like = self::adminLike($q);
+            $sql .= ' AND (lower(i.email) LIKE ? OR lower(IFNULL(i.name,\'\')) LIKE ? OR lower(h.name) LIKE ? OR IFNULL(i.phone,\'\') LIKE ?)';
+            $params = [$like, $like, $like, $like];
+        }
+        $sql .= ' ORDER BY i.id DESC LIMIT 500';
+        $st = $db->prepare($sql);
+        $st->execute($params);
+        [, $pending] = self::decorateCircleStatus([], $st->fetchAll());
+        return $pending;
+    }
+
+    public static function adminGetUser(PDO $db, int $userId): ?array
+    {
+        $st = $db->prepare(
+            'SELECT u.*, h.name AS household_name, h.plan AS household_plan,
+                    h.stripe_status AS household_stripe_status,
+                    h.created_at AS household_created_at
+             FROM users u JOIN households h ON h.id = u.household_id WHERE u.id=?'
+        );
+        $st->execute([$userId]);
+        $row = $st->fetch();
+        if (!$row) {
+            return null;
+        }
+        [$users] = self::decorateCircleStatus([$row], []);
+        return $users[0];
+    }
+
+    public static function adminGetHousehold(PDO $db, int $hid): ?array
+    {
+        $st = $db->prepare('SELECT * FROM households WHERE id=?');
+        $st->execute([$hid]);
+        $row = $st->fetch();
+        return $row ?: null;
+    }
+
+    public static function adminUpdateUser(
+        PDO $db,
+        int $userId,
+        string $name,
+        string $email,
+        string $phone = '',
+        bool $smsOptOut = false,
+        string $password = ''
+    ): array {
+        $user = self::adminGetUser($db, $userId);
+        if (!$user) {
+            throw new RuntimeException('That login is not in Family Shield Pro.');
+        }
+        $name = trim($name);
+        $email = strtolower(trim($email));
+        if ($name === '') {
+            throw new RuntimeException('Name cannot be empty.');
+        }
+        if ($email === '' || !str_contains($email, '@')) {
+            throw new RuntimeException('Need a valid email address.');
+        }
+        $taken = $db->prepare('SELECT id FROM users WHERE lower(email)=? AND id<>?');
+        $taken->execute([$email, $userId]);
+        if ($taken->fetch()) {
+            throw new RuntimeException('That email already has a Family Shield Pro login.');
+        }
+        $db->prepare('UPDATE users SET name=?, email=? WHERE id=?')->execute([$name, $email, $userId]);
+        self::setUserPhone($db, $userId, $phone, $smsOptOut);
+        $password = trim($password);
+        if ($password !== '') {
+            if (strlen($password) < 8) {
+                throw new RuntimeException('Use at least 8 characters for a new password.');
+            }
+            $db->prepare('UPDATE users SET password_hash=? WHERE id=?')
+                ->execute([password_hash($password, PASSWORD_DEFAULT), $userId]);
+        }
+        $updated = self::adminGetUser($db, $userId);
+        if (!$updated) {
+            throw new RuntimeException('That login is not in Family Shield Pro.');
+        }
+        return $updated;
+    }
+
+    public static function adminUpdateHousehold(PDO $db, int $hid, string $name, string $plan): array
+    {
+        $household = self::adminGetHousehold($db, $hid);
+        if (!$household) {
+            throw new RuntimeException('That circle is not in Family Shield Pro.');
+        }
+        $name = trim($name);
+        $plan = strtolower(trim($plan));
+        if ($name === '') {
+            throw new RuntimeException('Circle name cannot be empty.');
+        }
+        if ($plan !== 'monthly' && $plan !== 'yearly') {
+            throw new RuntimeException('Plan must be monthly or yearly.');
+        }
+        $db->prepare('UPDATE households SET name=?, plan=? WHERE id=?')->execute([$name, $plan, $hid]);
+        $updated = self::adminGetHousehold($db, $hid);
+        if (!$updated) {
+            throw new RuntimeException('That circle is not in Family Shield Pro.');
+        }
+        return $updated;
+    }
 }

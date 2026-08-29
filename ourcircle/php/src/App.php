@@ -20,7 +20,7 @@ final class App
         ],
     ];
 
-    public const PRIVATE = ['/home', '/circle', '/trusted', '/checks', '/uploads', '/join', '/billing', '/report', '/account', '/logout', '/support', '/sms'];
+    public const PRIVATE = ['/home', '/circle', '/trusted', '/checks', '/uploads', '/join', '/billing', '/report', '/account', '/logout', '/support', '/sms', '/admin'];
 
     public function __construct(private PDO $db, private string $root)
     {
@@ -48,6 +48,7 @@ final class App
                 'mail' => Mailer::configured(),
                 'sms' => Sms::configured(),
                 'openai' => SupportChat::openaiConfigured(),
+                'admin' => Admin::configured(),
             ]);
         } elseif ($method === 'POST' && $path === '/sms/inbound') {
             $this->smsInbound();
@@ -122,6 +123,8 @@ final class App
             $this->billingPortal();
         } elseif ($method === 'GET' && $path === '/billing/success') {
             $this->billingSuccess();
+        } elseif (str_starts_with($path, '/admin')) {
+            $this->adminDispatch($method, $path);
         } else {
             http_response_code(404);
             echo 'Not found';
@@ -281,11 +284,179 @@ final class App
 
     private function page(string $view, array $vars = []): void
     {
+        $this->maybeElevateAdmin();
         $vars['flashes'] = $vars['flashes'] ?? $this->takeFlashes();
         $vars['user_name'] = $this->user()['name'] ?? '';
         $vars['site_home'] = $this->siteHome();
         $vars['robots'] = $vars['robots'] ?? 'noindex,nofollow';
+        $vars['admin_ok'] = !empty($_SESSION['admin_ok']) && Admin::configured();
+        $vars['admin_configured'] = Admin::configured();
         View::render($view, $vars);
+    }
+
+    private function maybeElevateAdmin(): void
+    {
+        if (!empty($_SESSION['admin_ok']) || !Admin::configured()) {
+            return;
+        }
+        $email = (string) ($_SESSION['email'] ?? '');
+        if (Admin::emailIsAdmin($email)) {
+            $_SESSION['admin_ok'] = true;
+        }
+    }
+
+    private function adminNotFound(): never
+    {
+        http_response_code(404);
+        echo 'Not found';
+        exit;
+    }
+
+    private function requireAdmin(): void
+    {
+        if (!Admin::configured()) {
+            $this->adminNotFound();
+        }
+        $this->maybeElevateAdmin();
+        if (empty($_SESSION['admin_ok'])) {
+            Http::redirect('/admin/login');
+        }
+    }
+
+    private function adminDispatch(string $method, string $path): void
+    {
+        if (!Admin::configured()) {
+            $this->adminNotFound();
+        }
+        if ($path === '/admin/login') {
+            $this->adminLogin();
+            return;
+        }
+        if ($path === '/admin/logout') {
+            unset($_SESSION['admin_ok']);
+            Http::redirect('/admin/login');
+        }
+        $this->requireAdmin();
+        if ($path === '/admin' && $method === 'GET') {
+            $this->adminHome();
+        } elseif (preg_match('#^/admin/users/(\d+)$#', $path, $m)) {
+            $this->adminUser((int) $m[1]);
+        } elseif ($path === '/admin/invites/resend' && $method === 'POST') {
+            $this->adminInviteResend();
+        } elseif ($path === '/admin/invites/delete' && $method === 'POST') {
+            $this->adminInviteDelete();
+        } elseif (preg_match('#^/admin/households/(\d+)$#', $path, $m) && $method === 'POST') {
+            $this->adminHousehold((int) $m[1]);
+        } else {
+            $this->adminNotFound();
+        }
+    }
+
+    private function adminLogin(): void
+    {
+        $this->maybeElevateAdmin();
+        if (!empty($_SESSION['admin_ok'])) {
+            Http::redirect('/admin');
+        }
+        if (Http::method() === 'POST') {
+            if (Admin::passwordOk((string) ($_POST['password'] ?? ''))) {
+                $_SESSION['admin_ok'] = true;
+                Http::redirect('/admin');
+            }
+            $this->flash('Operator password did not match.', 'error');
+        }
+        $this->page('admin_login', ['title' => 'Operator console · Family Shield Pro']);
+    }
+
+    private function adminHome(): void
+    {
+        $q = trim((string) ($_GET['q'] ?? ''));
+        $this->page('admin', [
+            'title' => 'Operator console · Family Shield Pro',
+            'counts' => Db::adminCounts($this->db),
+            'users' => Db::adminListUsers($this->db, $q),
+            'invites' => Db::adminListInvites($this->db, $q),
+            'q' => $q,
+        ]);
+    }
+
+    private function adminUser(int $userId): void
+    {
+        if (Http::method() === 'POST') {
+            try {
+                $phone = $this->parsePhoneField((string) ($_POST['phone'] ?? ''));
+                $person = Db::adminUpdateUser(
+                    $this->db,
+                    $userId,
+                    (string) ($_POST['name'] ?? ''),
+                    (string) ($_POST['email'] ?? ''),
+                    $phone,
+                    (string) ($_POST['sms_opt_out'] ?? '') === '1',
+                    (string) ($_POST['password'] ?? '')
+                );
+                if ((int) ($_SESSION['user_id'] ?? 0) === (int) $person['id']) {
+                    $_SESSION['name'] = $person['name'];
+                    $_SESSION['email'] = $person['email'];
+                }
+                $this->flash('Login saved.', 'ok');
+            } catch (RuntimeException $e) {
+                $this->flash($e->getMessage(), 'error');
+            }
+            Http::redirect('/admin/users/' . $userId);
+        }
+        $person = Db::adminGetUser($this->db, $userId);
+        if (!$person) {
+            $this->flash('That login is not in Family Shield Pro.', 'error');
+            Http::redirect('/admin');
+        }
+        $this->page('admin_user', [
+            'title' => 'Edit ' . (string) $person['name'] . ' · Console',
+            'person' => $person,
+        ]);
+    }
+
+    private function adminHousehold(int $hid): void
+    {
+        $returnUser = (int) ($_POST['return_user'] ?? 0);
+        try {
+            Db::adminUpdateHousehold(
+                $this->db,
+                $hid,
+                (string) ($_POST['name'] ?? ''),
+                (string) ($_POST['plan'] ?? '')
+            );
+            $this->flash('Circle saved. Plan flag only — no Stripe charge.', 'ok');
+        } catch (RuntimeException $e) {
+            $this->flash($e->getMessage(), 'error');
+        }
+        if ($returnUser > 0) {
+            Http::redirect('/admin/users/' . $returnUser);
+        }
+        Http::redirect('/admin');
+    }
+
+    private function adminInviteResend(): void
+    {
+        $inviteId = (int) ($_POST['invite_id'] ?? 0);
+        $inv = Db::pendingInviteById($this->db, $inviteId);
+        if (!$inv) {
+            $this->flash('That invite is not waiting anymore.', 'error');
+            Http::redirect('/admin');
+        }
+        [$msg, $cat] = $this->notifyInvite($inv, 'Family Shield Pro');
+        $this->flash($msg, $cat);
+        Http::redirect('/admin');
+    }
+
+    private function adminInviteDelete(): void
+    {
+        $inviteId = (int) ($_POST['invite_id'] ?? 0);
+        if (Db::cancelPendingInvite($this->db, $inviteId)) {
+            $this->flash('Pending invite deleted.', 'ok');
+        } else {
+            $this->flash('That invite is not waiting anymore.', 'error');
+        }
+        Http::redirect('/admin');
     }
 
     private function robots(): never

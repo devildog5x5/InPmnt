@@ -36,6 +36,8 @@ Do not invent a number in the chatbot — it is told that phone support is unpub
 
 Circle **SMS** (Twilio) is a different thing: family invites, call-me alerts, and forwarding a sketchy text. That is **[SMS.md](SMS.md)**. It is not a customer-service hotline.
 
+The **operator console** (your user list) is separate again — **[ADMIN.md](ADMIN.md)**. Families never see it. It stays 404 until `ADMIN_PASSWORD` is set.
+
 ## Chatbot (already on every page)
 
 The teal **Help** tab sits on the right edge of every page. **Hide** parks the box; the Help tab brings it back.

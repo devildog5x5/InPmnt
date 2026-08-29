@@ -3,6 +3,10 @@
 Product: **Family Shield Pro** (app name in the UI: **OurCircle**).  
 Not InPmnt. Version file: `ourcircle/VERSION` (independent of repo-root InPmnt `VERSION`).
 
+## 1.2.18 — 2026-08-29
+
+- **Operator console** for the product owner: user counts, names, emails, phones, circle status, and safe edits (login fields, circle name, monthly/yearly flag, resend/delete pending invites). Locked until `ADMIN_PASSWORD` is in `.env` (12+ characters; stubs with `...` stay off). `/admin` is 404 until then — not in family nav, sitemap, or robots Allow. See **ADMIN.md**. Cannot change `.env`, SMTP, Stripe, or Twilio keys.
+
 ## 1.2.17 — 2026-08-29
 
 - Circle and Trusted list show **every** person/contact (full-width table). Invites no longer fail when a mobile number is already on a login (browser autofill of *your* number used to block people 2 and 3). Check page lists each circle member and each trusted contact by name.

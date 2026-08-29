@@ -339,7 +339,22 @@ input.otp { font-size: 1.4rem; letter-spacing: 0.3em; text-align: center; }
   font-size: 0.82rem;
   color: var(--muted);
 }
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+.stat {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+}
+.stat strong { display: block; font-size: 1.6rem; line-height: 1.2; }
+.stat span { color: var(--muted); font-size: 0.85rem; }
 @media (max-width: 860px) {
   .hero, .grid-3, .grid-2 { grid-template-columns: 1fr; }
   .brand img { width: 48px; height: 48px; }
+  .stat-grid { grid-template-columns: 1fr 1fr; }
 }

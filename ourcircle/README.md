@@ -35,7 +35,7 @@ Demo circle: `family@ourcircle.app` / `password123`
 - Keep a protected list of banks, doctors, insurers, utilities, and family contacts
 - Follow reporting steps (FTC, IC3, card freeze) if money already moved
 
-Family plan: up to **five people**. **$14.99/month** or **$119.99/year**. Stripe Checkout is wired — paste keys per **[STRIPE.md](STRIPE.md)**. Optional circle SMS: **[SMS.md](SMS.md)**. Password reset and 2FA: **[AUTH.md](AUTH.md)**. Customer service email, chat widget, and the commented-out phone: **[SUPPORT.md](SUPPORT.md)**.
+Family plan: up to **five people**. **$14.99/month** or **$119.99/year**. Stripe Checkout is wired — paste keys per **[STRIPE.md](STRIPE.md)**. Optional circle SMS: **[SMS.md](SMS.md)**. Password reset and 2FA: **[AUTH.md](AUTH.md)**. Customer service email, chat widget, and the commented-out phone: **[SUPPORT.md](SUPPORT.md)**. Operator console (your user list — off until `ADMIN_PASSWORD`): **[ADMIN.md](ADMIN.md)**.
 
 ## Paid validation (seven days)
 
@@ -51,7 +51,7 @@ If none hits the bar, change the offer before writing more product code.
 
 ## Downloads
 
-**https://raw.githubusercontent.com/devildog5x5/InPmnt/cursor/ourcircle-family-shield-4df6/patches/FamilyShieldPro-1.2.17.zip**
+**https://raw.githubusercontent.com/devildog5x5/InPmnt/cursor/ourcircle-family-shield-4df6/patches/FamilyShieldPro-1.2.18.zip**
 
 That zip is the Hostinger site. `robots.txt` and `sitemap.xml` are already inside it (next to `index.php`). Unzip into `public_html`.
 

@@ -25,6 +25,7 @@ SYSTEM = (
     "Not unless a family member helps them vet it, and they can make sure it is the person they think it is — without a doubt. "
     f"Support email: {SUPPORT_EMAIL}. Do not invent a customer-service phone number — phone support is not published yet. "
     "Circle SMS (Twilio) is optional: invites, call-me alerts, and forwarding a sketchy text. Reply STOP to opt out. Never say a request is safe. "
+    "An operator console exists only when ADMIN_PASSWORD is set in .env; it is not a public family page. Do not invent a public admin URL. "
     "Password reset is at /forgot. 2FA is on Account. "
     "Keep answers short (2–6 sentences). Do not ask for passwords, card numbers, or 2FA codes. "
     "If you cannot help, point to the support email."
@@ -74,6 +75,13 @@ _FAQ: list[tuple[tuple[str, ...], str]] = [
         "Circle SMS is optional (Twilio in .env). Save a mobile on Account. Invites and “Please call me before I pay” can go by text. Forward a sketchy message to the Family Shield Pro number to open a check. Reply STOP to opt out. "
         "We never say a request is safe. This is not a customer-service phone. "
         f"{CORE_RULE} Setup: SMS.md. Stuck? {SUPPORT_EMAIL}.",
+    ),
+    (
+        ("admin", "console", "management", "operator", "how many users", "list users"),
+        "A management console exists for the product owner when ADMIN_PASSWORD is set in .env (see ADMIN.md). "
+        "It shows user counts, names, emails, and safe edits. It is not a family page and is not in the public nav. "
+        "Until that password is set, /admin is not found. Families use Circle and Account for their own people. "
+        f"Stuck? {SUPPORT_EMAIL}.",
     ),
     (
         ("phone", "call us", "telephone", "support number", "customer service number"),
