@@ -293,6 +293,32 @@ class AppTests(unittest.TestCase):
         self.assertIn(b"Check this with OurCircle", via_code.data)
         login_page = self.client.get("/login")
         self.assertIn(b"Forgot password", login_page.data)
+
+
+    def test_2fa_setup_keeps_secret_and_shows_qr(self) -> None:
+        import re
+
+        from auth import otpauth_uri
+
+        uri = otpauth_uri("family@ourcircle.app", "JBSWY3DPEHPK3PXP")
+        self.assertTrue(uri.startswith("otpauth://totp/"))
+        self.assertIn("secret=JBSWY3DPEHPK3PXP", uri)
+        self.client.post("/login", data={"email": "family@ourcircle.app", "password": "password123"})
+        first = self.client.get("/account/2fa/setup")
+        self.assertEqual(first.status_code, 200)
+        self.assertIn(b"otpauth://totp/", first.data)
+        self.assertIn(b'id="otp-qr"', first.data)
+        self.assertIn(b"qrcode.min.js", first.data)
+        self.assertIn(b"Open authenticator app", first.data)
+        grouped = re.search(rb'id="otp-secret"[^>]*>([^<]+)', first.data)
+        self.assertIsNotNone(grouped)
+        second = self.client.get("/account/2fa/setup")
+        self.assertIn(grouped.group(1), second.data)
+        rotated = self.client.post("/account/2fa/setup", data={"new_key": "1"}, follow_redirects=True)
+        self.assertEqual(rotated.status_code, 200)
+        again = re.search(rb'id="otp-secret"[^>]*>([^<]+)', rotated.data)
+        self.assertIsNotNone(again)
+        self.assertNotEqual(grouped.group(1), again.group(1))
         chat = self.client.post(
             "/support/chat",
             json={"message": "how much does a family plan cost?"},

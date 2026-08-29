@@ -459,7 +459,9 @@ def create_app() -> Flask:
         user = _user_by_id(int(u["id"]))
         if totp_on(user):
             return redirect(url_for("account"))
-        if request.method == "GET" or not session.get("totp_pending_secret"):
+        if request.method == "POST" and (request.form.get("new_key") or "") == "1":
+            session.pop("totp_pending_secret", None)
+        if not session.get("totp_pending_secret"):
             session["totp_pending_secret"] = new_secret()
         secret = session["totp_pending_secret"]
         return render_template(

@@ -43,7 +43,9 @@ Until mail is set, `/forgot` still accepts the form (same “if that email is on
 
 ## Turn on 2FA
 
-Sign in → **Account** → **Turn on 2FA** → add the setup key in the app → enter the 6-digit code → **write down the recovery codes**.
+Sign in → **Account** → **Turn on 2FA** → scan the square (or paste the setup key) → enter the 6-digit code → **write down the recovery codes**.
+
+“Open authenticator app” works on a phone (and some desktop apps such as 1Password). On a computer with no authenticator installed, that button does nothing — scan the QR or copy the key instead. Refreshing the page keeps the same key until you tap **Use a different key**.
 
 Lost phone: `/forgot` → recovery code + new password, then sign in (if 2FA is still on, use another recovery code at the 2FA screen).
 

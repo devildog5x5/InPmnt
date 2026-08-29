@@ -34,7 +34,7 @@ $empty = Analyze::analyze('');
 check(Analyze::analyze('')['level'] === Analyze::UNKNOWN, 'empty unknown');
 
 require $root . '/php/src/Product.php';
-check(Product::version() === '1.2.3', 'product version 1.2.3');
+check(Product::version() === '1.2.4', 'product version 1.2.4');
 check(Product::NAME === 'Family Shield Pro', 'product name');
 check(Product::APP === 'OurCircle', 'app name');
 
@@ -67,6 +67,13 @@ require $root . '/php/src/Env.php';
 require $root . '/php/src/Billing.php';
 require $root . '/php/src/Auth.php';
 require $root . '/php/src/SupportChat.php';
+$otp = Auth::otpauthUri('family@ourcircle.app', 'JBSWY3DPEHPK3PXP');
+check(str_starts_with($otp, 'otpauth://totp/'), 'otpauth uri scheme');
+check(str_contains($otp, 'secret=JBSWY3DPEHPK3PXP'), 'otpauth uri secret');
+$setup = file_get_contents($root . '/php/views/account_2fa_setup.php') ?: '';
+check(str_contains($setup, 'otp-qr'), '2fa setup qr box');
+check(str_contains($setup, 'qrcode.min.js'), '2fa setup qr script');
+check(is_file($root . '/static/js/qrcode.min.js'), 'qrcode js vendored');
 $priceChat = SupportChat::faqReply('how much does a family plan cost?');
 check(str_contains($priceChat, '14.99'), 'chat price faq');
 $safeChat = strtolower(SupportChat::faqReply('is this paypal email safe to pay?'));

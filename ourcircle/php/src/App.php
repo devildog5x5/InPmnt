@@ -505,7 +505,10 @@ final class App
         if (Auth::totpOn($user)) {
             Http::redirect('/account');
         }
-        if (Http::method() === 'GET' || empty($_SESSION['totp_pending_secret'])) {
+        if (Http::method() === 'POST' && (string) ($_POST['new_key'] ?? '') === '1') {
+            unset($_SESSION['totp_pending_secret']);
+        }
+        if (empty($_SESSION['totp_pending_secret'])) {
             $_SESSION['totp_pending_secret'] = Auth::newSecret();
         }
         $secret = (string) $_SESSION['totp_pending_secret'];

@@ -185,6 +185,15 @@ textarea { min-height: 140px; }
   padding: 14px 16px;
   word-break: break-all;
 }
+.otp-qr {
+  display: inline-block;
+  margin: 8px 0 16px;
+  padding: 12px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.otp-qr img, .otp-qr canvas { display: block; }
 .recovery-codes { letter-spacing: 0.04em; }
 .recovery-codes li { margin: 6px 0; }
 input.otp { font-size: 1.4rem; letter-spacing: 0.3em; text-align: center; }

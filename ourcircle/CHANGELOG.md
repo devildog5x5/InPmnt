@@ -3,6 +3,10 @@
 Product: **Family Shield Pro** (app name in the UI: **OurCircle**).  
 Not InPmnt. Version file: `ourcircle/VERSION` (independent of repo-root InPmnt `VERSION`).
 
+## 1.2.4 — 2026-08-29
+
+- 2FA setup shows a QR code you can scan. “Open authenticator app” is for phones; a refresh no longer mints a new key.
+
 ## 1.2.3 — 2026-08-29
 
 - Short disclaimer on the homepage, signed-in screens, checks, and chat: **This application offers guidance, not a guarantee.**
