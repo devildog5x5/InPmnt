@@ -31,9 +31,22 @@ View::appOpen(get_defined_vars());
     <div class="panel">
       <h3>Your circle</h3>
       <p><?= count($members) ?> of 5 people · <?= count($pending) ?> invite<?= count($pending) !== 1 ? 's' : '' ?> waiting</p>
+      <ul class="list">
+        <?php foreach ($members as $m): ?>
+        <li><?= Http::e((string) ($m['name'] ?? '')) ?> · <?= Http::e((string) ($m['email'] ?? '')) ?></li>
+        <?php endforeach; ?>
+        <?php foreach ($pending as $p): ?>
+        <li><?= Http::e((string) (($p['name'] ?? '') !== '' ? $p['name'] : ($p['email'] ?? ''))) ?> · <?= Http::e((string) ($p['email'] ?? '')) ?> · invited</li>
+        <?php endforeach; ?>
+      </ul>
       <p><a class="btn ghost" href="/circle">Invite family</a></p>
       <h3>Trusted list</h3>
       <p><?= count($trusted) ?> saved banks, doctors, utilities, and family numbers.</p>
+      <ul class="list">
+        <?php foreach ($trusted as $t): ?>
+        <li><?= Http::e((string) ($t['name'] ?? '')) ?><?php if (!empty($t['phone'])): ?> · <?= Http::e((string) $t['phone']) ?><?php endif; ?></li>
+        <?php endforeach; ?>
+      </ul>
       <p><a class="btn ghost" href="/trusted">Open list</a></p>
     </div>
     <div class="panel" style="margin-top:16px">

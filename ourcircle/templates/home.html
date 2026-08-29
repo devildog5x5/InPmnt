@@ -26,9 +26,22 @@
     <div class="panel">
       <h3>Your circle</h3>
       <p>{{ members|length }} of 5 people · {{ pending|length }} invite{{ 's' if pending|length != 1 else '' }} waiting</p>
+      <ul class="list">
+        {% for m in members %}
+        <li>{{ m.name }} · {{ m.email }}</li>
+        {% endfor %}
+        {% for p in pending %}
+        <li>{{ p.name or p.email }} · {{ p.email }} · invited</li>
+        {% endfor %}
+      </ul>
       <p><a class="btn ghost" href="{{ url_for('circle') }}">Invite family</a></p>
       <h3>Trusted list</h3>
       <p>{{ trusted|length }} saved banks, doctors, utilities, and family numbers.</p>
+      <ul class="list">
+        {% for t in trusted %}
+        <li>{{ t.name }}{% if t.phone %} · {{ t.phone }}{% endif %}</li>
+        {% endfor %}
+      </ul>
       <p><a class="btn ghost" href="{{ url_for('trusted') }}">Open list</a></p>
     </div>
     <div class="panel" style="margin-top:16px">

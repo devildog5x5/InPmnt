@@ -297,14 +297,14 @@ def household_members(conn: sqlite3.Connection, hid: int) -> tuple[list[dict[str
     users = [
         dict(r)
         for r in conn.execute(
-            "SELECT id, name, email, role, last_access_at, phone, sms_opt_out FROM users WHERE household_id=? ORDER BY id",
+            "SELECT * FROM users WHERE household_id=? ORDER BY id",
             (hid,),
         ).fetchall()
     ]
     invites = [
         dict(r)
         for r in conn.execute(
-            "SELECT id, email, name, status, token, email_sent_at, sms_sent_at, accepted_at, phone FROM invitations WHERE household_id=? AND status='pending' ORDER BY id",
+            "SELECT * FROM invitations WHERE household_id=? AND status='pending' ORDER BY id",
             (hid,),
         ).fetchall()
     ]
@@ -417,8 +417,8 @@ def invite_member(conn: sqlite3.Connection, hid: int, email: str, name: str = ""
     if not email or "@" not in email:
         raise ValueError("Need an email address to invite.")
     phone = (phone or "").strip()
-    if phone and phone_taken(conn, phone):
-        raise ValueError("That mobile number is already on another Family Shield Pro login or invite.")
+    if phone and find_user_by_phone(conn, phone):
+        phone = ""
     token = secrets.token_urlsafe(16)
     cur = conn.execute(
         """
@@ -439,7 +439,7 @@ def accept_invite(conn: sqlite3.Connection, token: str, name: str, password: str
         raise ValueError("That email already has an OurCircle login. Sign in instead.")
     stored = (phone or "").strip() or (inv["phone"] or "")
     if stored and phone_taken(conn, stored, except_invite_id=int(inv["id"])):
-        raise ValueError("That mobile number is already on another Family Shield Pro login.")
+        stored = ""
     conn.execute(
         """
         INSERT INTO users (household_id, name, email, password_hash, role, created_at, phone)

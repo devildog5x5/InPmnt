@@ -718,10 +718,14 @@ final class App
         $checks->execute([$hid]);
         $alerts = $this->db->prepare('SELECT * FROM alerts WHERE household_id=? ORDER BY id DESC LIMIT 5');
         $alerts->execute([$hid]);
+        [$members, $pending] = Db::decorateCircleStatus(
+            Db::members($this->db, $hid),
+            Db::pending($this->db, $hid)
+        );
         $this->page('home', [
             'title' => 'Check this',
-            'members' => Db::members($this->db, $hid),
-            'pending' => Db::pending($this->db, $hid),
+            'members' => $members,
+            'pending' => $pending,
             'trusted' => Db::trusted($this->db, $hid),
             'checks' => $checks->fetchAll(),
             'alerts' => $alerts->fetchAll(),
@@ -891,15 +895,18 @@ final class App
         $u = $this->requireLogin();
         if (Http::method() === 'POST') {
             try {
-                $phone = $this->parsePhoneField((string) ($_POST['phone'] ?? ''));
+                $requested = $this->parsePhoneField((string) ($_POST['phone'] ?? ''));
                 $inv = Db::invite(
                     $this->db,
                     $u['household_id'],
                     (string) ($_POST['email'] ?? ''),
                     (string) ($_POST['name'] ?? ''),
-                    $phone
+                    $requested
                 );
                 [$msg, $cat] = $this->notifyInvite($inv, $u['name']);
+                if ($requested !== '' && trim((string) ($inv['phone'] ?? '')) === '') {
+                    $msg .= ' We did not attach that mobile — it is already on a Family Shield Pro login. They can add theirs on Account after they join.';
+                }
                 $this->flash($msg, $cat);
             } catch (RuntimeException $e) {
                 $this->flash($e->getMessage(), 'error');

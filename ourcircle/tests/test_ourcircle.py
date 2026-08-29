@@ -193,6 +193,7 @@ class AppTests(unittest.TestCase):
         self.assertIn(b"Send invite", inv.data)
         self.assertIn(b"Mobile (optional)", inv.data)
         self.assertIn(b"Resend invite", inv.data)
+        self.assertIn(b'id="circle-resend"', inv.data)
         self.assertIn(b"kid@example.com", inv.data)
         kid_at = inv.data.rfind(b"kid@example.com")
         kid_chunk = inv.data[kid_at : kid_at + 500]
@@ -485,6 +486,49 @@ class AppTests(unittest.TestCase):
         self.assertIn("CustomerService@FamilyShieldPro.com", self.client.get("/login").data.decode())
         health = self.client.get("/healthz")
         self.assertFalse(health.get_json().get("openai"))
+
+    def test_three_trusted_and_three_invites_all_show(self) -> None:
+        self.client.post("/login", data={"email": "family@ourcircle.app", "password": "password123"})
+        for i, name in enumerate(("Contact One", "Contact Two", "Contact Three"), start=1):
+            saved = self.client.post(
+                "/trusted",
+                data={"kind": "family", "name": name, "phone": f"555010100{i}", "website": "", "notes": ""},
+                follow_redirects=True,
+            )
+            self.assertEqual(saved.status_code, 200)
+            self.assertIn(name.encode(), saved.data)
+        trusted = self.client.get("/trusted")
+        self.assertIn(b"Contact One", trusted.data)
+        self.assertIn(b"Contact Two", trusted.data)
+        self.assertIn(b"Contact Three", trusted.data)
+        self.assertIn(b'id="trusted-delete"', trusted.data)
+        self.assertIn(b"table-wrap", trusted.data)
+
+        emails = ("one@example.com", "two@example.com", "three@example.com")
+        for i, email in enumerate(emails):
+            invited = self.client.post(
+                "/circle",
+                data={"email": email, "name": f"Person {i+1}", "phone": "555-010-1111"},
+                follow_redirects=True,
+            )
+            self.assertEqual(invited.status_code, 200)
+            self.assertIn(email.encode(), invited.data)
+            self.assertNotIn(b"already on another", invited.data)
+        circle = self.client.get("/circle")
+        for email in emails:
+            self.assertIn(email.encode(), circle.data)
+        self.assertIn(b"Person 1", circle.data)
+        self.assertIn(b"Person 2", circle.data)
+        self.assertIn(b"Person 3", circle.data)
+        self.assertIn(b"table-wrap", circle.data)
+        home = self.client.get("/home")
+        self.assertIn(b"Contact One", home.data)
+        self.assertIn(b"Contact Two", home.data)
+        self.assertIn(b"Contact Three", home.data)
+        self.assertIn(b"one@example.com", home.data)
+        self.assertIn(b"two@example.com", home.data)
+        self.assertIn(b"three@example.com", home.data)
+        self.assertIn(b"3 invite", home.data)
 
     def test_sms_invite_account_and_inbound(self) -> None:
         import base64

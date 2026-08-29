@@ -3,6 +3,10 @@
 Product: **Family Shield Pro** (app name in the UI: **OurCircle**).  
 Not InPmnt. Version file: `ourcircle/VERSION` (independent of repo-root InPmnt `VERSION`).
 
+## 1.2.17 — 2026-08-29
+
+- Circle and Trusted list show **every** person/contact (full-width table). Invites no longer fail when a mobile number is already on a login (browser autofill of *your* number used to block people 2 and 3). Check page lists each circle member and each trusted contact by name.
+
 ## 1.2.16 — 2026-08-29
 
 - Optional **Twilio SMS**: circle invite texts, “Please call me before I pay” texts, and inbound forward-a-text to open a check. STOP / START / HELP. Mobile number on Account, signup, join, and invite. **Resend invite**. Status **Invite sent** if email or SMS went out. See **SMS.md**.

@@ -973,10 +973,12 @@ def create_app() -> Flask:
             email = (request.form.get("email") or "").strip()
             name = (request.form.get("name") or "").strip()
             try:
-                phone = parse_phone_field(request.form.get("phone") or "")
+                requested = parse_phone_field(request.form.get("phone") or "")
                 with db_session() as conn:
-                    inv = invite_member(conn, u["household_id"], email, name, phone)
+                    inv = invite_member(conn, u["household_id"], email, name, requested)
                 msg, cat = notify_invite(inv, u["name"])
+                if requested and not (inv.get("phone") or ""):
+                    msg += " We did not attach that mobile — it is already on a Family Shield Pro login. They can add theirs on Account after they join."
                 flash(msg, cat)
             except ValueError as exc:
                 flash(str(exc), "error")

@@ -291,14 +291,14 @@ final class Db
 
     public static function members(PDO $db, int $hid): array
     {
-        $st = $db->prepare('SELECT id, name, email, role, last_access_at, phone, sms_opt_out FROM users WHERE household_id=? ORDER BY id');
+        $st = $db->prepare('SELECT * FROM users WHERE household_id=? ORDER BY id');
         $st->execute([$hid]);
         return $st->fetchAll();
     }
 
     public static function pending(PDO $db, int $hid): array
     {
-        $st = $db->prepare("SELECT id, email, name, status, token, email_sent_at, sms_sent_at, accepted_at, phone FROM invitations WHERE household_id=? AND status='pending' ORDER BY id");
+        $st = $db->prepare("SELECT * FROM invitations WHERE household_id=? AND status='pending' ORDER BY id");
         $st->execute([$hid]);
         return $st->fetchAll();
     }
@@ -428,8 +428,8 @@ final class Db
             throw new RuntimeException('Need an email address to invite.');
         }
         $phone = trim($phone);
-        if ($phone !== '' && self::phoneTaken($db, $phone)) {
-            throw new RuntimeException('That mobile number is already on another Family Shield Pro login or invite.');
+        if ($phone !== '' && self::userByPhone($db, $phone)) {
+            $phone = '';
         }
         $token = rtrim(strtr(base64_encode(random_bytes(16)), '+/', '-_'), '=');
         $db->prepare(
@@ -453,7 +453,7 @@ final class Db
         }
         $stored = trim($phone) !== '' ? trim($phone) : (string) ($inv['phone'] ?? '');
         if ($stored !== '' && self::phoneTaken($db, $stored, null, (int) $inv['id'])) {
-            throw new RuntimeException('That mobile number is already on another Family Shield Pro login.');
+            $stored = '';
         }
         $db->prepare(
             "INSERT INTO users (household_id, name, email, password_hash, role, created_at, phone) VALUES (?,?,?,?, 'member', ?, ?)"
