@@ -79,6 +79,8 @@ class AppTests(unittest.TestCase):
         self.assertIn(b"fsp-chat-tab", land.data)
         self.assertIn(b">Help</button>", land.data)
         self.assertIn(b">Hide</button>", land.data)
+        self.assertIn(b"fsp-chat.js", land.data)
+        self.assertIn(b"css/app.css?v=", land.data)
         self.assertNotIn(b">Offers</a>", land.data)
         self.assertNotIn(b"not InPmnt", land.data)
         self.assertNotIn(b"Hostinger PHP", land.data)

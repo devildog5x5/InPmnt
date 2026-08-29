@@ -34,7 +34,7 @@ $empty = Analyze::analyze('');
 check(Analyze::analyze('')['level'] === Analyze::UNKNOWN, 'empty unknown');
 
 require $root . '/php/src/Product.php';
-check(Product::version() === '1.2.7', 'product version 1.2.7');
+check(Product::version() === '1.2.8', 'product version 1.2.8');
 check(Product::NAME === 'Family Shield Pro', 'product name');
 check(Product::APP === 'OurCircle', 'app name');
 
@@ -57,6 +57,13 @@ check(is_file($root . '/php/views/support_chat.php'), 'php chat widget');
 $chat = file_get_contents($root . '/php/views/support_chat.php') ?: '';
 check(str_contains($chat, 'fsp-chat-tab'), 'chat help tab');
 check(str_contains($chat, '>Hide</button>'), 'chat hide button');
+check(str_contains($chat, 'fsp-chat.js'), 'chat hide script file');
+$chatJs = file_get_contents($root . '/static/js/fsp-chat.js') ?: '';
+check(str_contains($chatJs, 'style.display = "none"'), 'hide sets inline display none');
+check(str_contains($chatJs, 'stopPropagation'), 'hide stops click bubbling');
+$css = file_get_contents($root . '/static/css/app.css') ?: '';
+check(str_contains($css, '.fsp-chat.open .fsp-chat-panel'), 'css open panel');
+check(str_contains($css, '.fsp-chat-panel[hidden]'), 'css hidden panel');
 check(!str_contains($landing, '$7.99'), 'landing no old monthly');
 check(!str_contains($landing, 'Founding year'), 'landing no founding sku');
 $plans = file_get_contents($root . '/php/src/App.php') ?: '';

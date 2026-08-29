@@ -3,6 +3,10 @@
 Product: **Family Shield Pro** (app name in the UI: **OurCircle**).  
 Not InPmnt. Version file: `ourcircle/VERSION` (independent of repo-root InPmnt `VERSION`).
 
+## 1.2.8 — 2026-08-29
+
+- **Hide** actually closes the help box. The panel used `display: flex`, which kept it on screen after Hide (the `hidden` attribute lost). Hide now sets the box to `display: none` and ignores a follow-up tap on the Help tab.
+
 ## 1.2.7 — 2026-08-29
 
 - Hostinger PHP login on `http://127.0.0.1` keeps the session cookie (Secure flag no longer follows the public HTTPS site URL on localhost). Live HTTPS is unchanged.

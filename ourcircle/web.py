@@ -80,6 +80,13 @@ PRIVATE_PREFIXES = (
 def site_url() -> str:
     return (os.environ.get("OURCIRCLE_SITE_URL") or DEFAULT_SITE_URL).rstrip("/")
 
+
+def product_version() -> str:
+    vp = ROOT / "VERSION"
+    if vp.is_file():
+        return vp.read_text(encoding="utf-8").strip() or "0.0.0"
+    return "0.0.0"
+
 PLANS = [
     {
         "id": "monthly",
@@ -118,6 +125,7 @@ def create_app() -> Flask:
             "guidance": GUIDANCE,
             "user_name": session.get("name"),
             "site_home": site_url(),
+            "app_version": product_version(),
             "stripe_enabled": load_stripe_config().enabled,
         }
 
@@ -170,16 +178,12 @@ def create_app() -> Flask:
 
     @app.get("/healthz")
     def healthz():
-        ver = "0.0.0"
-        vp = ROOT / "VERSION"
-        if vp.is_file():
-            ver = vp.read_text(encoding="utf-8").strip() or ver
         return {
             "ok": True,
             "service": "familyshieldpro",
             "product": "Family Shield Pro",
             "app": "OurCircle",
-            "version": ver,
+            "version": product_version(),
             "not": "InPmnt",
             "stripe": load_stripe_config().enabled,
             "mail": mail_configured(),
