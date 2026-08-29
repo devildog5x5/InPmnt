@@ -36,7 +36,7 @@ Do not invent a number in the chatbot — it is told that phone support is unpub
 
 ## Chatbot (already on every page)
 
-The teal **Chat with us** button (bottom-right) is on the public site and signed-in screens.
+The teal **Help** tab sits on the right edge of every page. **Hide** parks the box; the Help tab brings it back.
 
 - **Works with no AI key.** It answers from a small Family Shield Pro FAQ (plans, login, pause rule, circle of five, billing, contact). It will **never** say a request is “safe.”
 - **Optional OpenAI.** Paste a real key in the live `.env` (do not replace the whole file):

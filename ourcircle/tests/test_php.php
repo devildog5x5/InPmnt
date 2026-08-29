@@ -34,7 +34,7 @@ $empty = Analyze::analyze('');
 check(Analyze::analyze('')['level'] === Analyze::UNKNOWN, 'empty unknown');
 
 require $root . '/php/src/Product.php';
-check(Product::version() === '1.2.5', 'product version 1.2.5');
+check(Product::version() === '1.2.6', 'product version 1.2.6');
 check(Product::NAME === 'Family Shield Pro', 'product name');
 check(Product::APP === 'OurCircle', 'app name');
 
@@ -54,6 +54,9 @@ check(!str_contains($landing, 'robots.txt'), 'landing no robots footer');
 check(is_file($root . '/SUPPORT.md'), 'support setup doc');
 check(is_file($root . '/php/src/SupportChat.php'), 'php support chat class');
 check(is_file($root . '/php/views/support_chat.php'), 'php chat widget');
+$chat = file_get_contents($root . '/php/views/support_chat.php') ?: '';
+check(str_contains($chat, 'fsp-chat-tab'), 'chat help tab');
+check(str_contains($chat, '>Hide</button>'), 'chat hide button');
 check(!str_contains($landing, '$7.99'), 'landing no old monthly');
 check(!str_contains($landing, 'Founding year'), 'landing no founding sku');
 $plans = file_get_contents($root . '/php/src/App.php') ?: '';

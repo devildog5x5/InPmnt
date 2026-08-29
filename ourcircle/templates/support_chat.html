@@ -1,9 +1,9 @@
 <div class="fsp-chat" id="fsp-chat">
-  <button type="button" class="fsp-chat-toggle" id="fsp-chat-toggle" aria-expanded="false" aria-controls="fsp-chat-panel">Chat with us</button>
+  <button type="button" class="fsp-chat-tab" id="fsp-chat-toggle" aria-expanded="false" aria-controls="fsp-chat-panel">Help</button>
   <div class="fsp-chat-panel" id="fsp-chat-panel" hidden>
     <header class="fsp-chat-head">
       <strong>Family Shield Pro help</strong>
-      <button type="button" class="fsp-chat-x" id="fsp-chat-close" aria-label="Close chat">&times;</button>
+      <button type="button" class="fsp-chat-hide" id="fsp-chat-close">Hide</button>
     </header>
     <div class="fsp-chat-log" id="fsp-chat-log"></div>
     <form class="fsp-chat-form" id="fsp-chat-form">
@@ -37,20 +37,26 @@
     panel.hidden = false;
     toggle.setAttribute("aria-expanded", "true");
     wrap.classList.add("open");
+    try { localStorage.setItem("fsp-help", "open"); } catch (e) {}
     if (!log.childNodes.length) {
       add("assistant", "Hi — I can help with plans, login, and how OurCircle works. I will never tell you a request is safe. For a person, email CustomerService@FamilyShieldPro.com.");
     }
     input.focus();
   }
-  function close() {
+  function hide() {
     panel.hidden = true;
     toggle.setAttribute("aria-expanded", "false");
     wrap.classList.remove("open");
+    try { localStorage.setItem("fsp-help", "hidden"); } catch (e) {}
+    toggle.focus();
   }
   toggle.addEventListener("click", function () {
-    if (panel.hidden) open(); else close();
+    if (panel.hidden) open(); else hide();
   });
-  closeBtn.addEventListener("click", close);
+  closeBtn.addEventListener("click", hide);
+  try {
+    if (localStorage.getItem("fsp-help") === "open") open();
+  } catch (e) {}
   form.addEventListener("submit", function (ev) {
     ev.preventDefault();
     var msg = (input.value || "").trim();

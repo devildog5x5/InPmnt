@@ -3,6 +3,10 @@
 Product: **Family Shield Pro** (app name in the UI: **OurCircle**).  
 Not InPmnt. Version file: `ourcircle/VERSION` (independent of repo-root InPmnt `VERSION`).
 
+## 1.2.6 — 2026-08-29
+
+- Help box parks to a right-edge **Help** tab. **Hide** puts it away; tap **Help** to bring it back.
+
 ## 1.2.5 — 2026-08-29
 
 - Chat: if someone asks you to send money, the answer is **NO!!!** unless a family member helps you vet it and you are sure it is the person you think it is.
