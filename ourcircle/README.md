@@ -34,7 +34,7 @@ Demo circle: `family@ourcircle.app` / `password123`
 - Keep a protected list of banks, doctors, insurers, utilities, and family contacts
 - Follow reporting steps (FTC, IC3, card freeze) if money already moved
 
-Family plan: up to **five people**. Founding year: **$49** (reservation in this build — no card charge).
+Family plan: up to **five people**. **$14.99/month** or **$119.99/year**.
 
 ## Paid validation (seven days)
 
@@ -44,13 +44,13 @@ Share `/offers` with real buyers. Count refundable reservations, not opinions:
 |---|---|
 | InPmnt | Five $99 annual customers |
 | VendorReady | Two $500 setup deposits |
-| OurCircle | Ten $49 founding families |
+| OurCircle | Ten $119.99 family years |
 
 If none hits the bar, change the offer before writing more product code.
 
 ## Downloads
 
-**https://raw.githubusercontent.com/devildog5x5/InPmnt/cursor/ourcircle-family-shield-4df6/patches/FamilyShieldPro-1.0.0.zip**
+**https://raw.githubusercontent.com/devildog5x5/InPmnt/cursor/ourcircle-family-shield-4df6/patches/FamilyShieldPro-1.0.1.zip**
 
 That zip is the Hostinger site. `robots.txt` and `sitemap.xml` are already inside it (next to `index.php`). Unzip into `public_html`.
 

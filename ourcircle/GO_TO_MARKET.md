@@ -1,7 +1,7 @@
 # Family Shield Pro — Go to market
 
 **Product:** OurCircle on **https://familyshieldpro.com**  
-**Owner offer:** founding family year **$49** (reservation in this build — no card charge yet)  
+**Owner offer:** Family yearly **$119.99** (default) or Family monthly **$14.99**. No card charge in this build.  
 **Positioning line:** Pause. Ask family. Then pay.
 
 This is **not** an AI scam-detector launch. Families do not buy “our model scored 94%.” They buy a **circle that makes them pause** before they send money, gift cards, crypto, passwords, or account information.
@@ -12,9 +12,9 @@ Primary buyer is the **adult child** who already fields “Mom got a weird text�
 
 | Segment | Why they pay | First ask |
 |---|---|---|
-| Adult children of seniors | Fear of a wire / gift-card loss this week | $49 founding year for one household (up to five people) |
-| Households that already have a group chat | They need a place to park the screenshot | Family $14.99/mo after founding year |
-| Church / senior / veterans group | Training + circles for members | $299–$999/year |
+| Adult children of seniors | Fear of a wire / gift-card loss this week | Family year $119.99 (or $14.99/mo) for one household (up to five people) |
+| Households that already have a group chat | They need a place to park the screenshot | Same two prices |
+| Church / senior / veterans group | Training + circles for members | Quote later — not on the public menu |
 | Credit union / insurer partnership | Member protection, not a consumer ad | Per-member later — do not sell this in week one |
 
 Do **not** lead with “AI.” Lead with the rule on every screen:
@@ -23,23 +23,23 @@ Do **not** lead with “AI.” Lead with the rule on every screen:
 
 ## Offer (sell this, not the rest)
 
-**Founding family — $49 first year.** Up to five people. Trusted list. Paste a message, number, or URL. “Please call me before I pay.” No “this is safe” stamp.
+**Family yearly — $119.99.** Up to five people. Trusted list. Paste a message, number, or URL. “Please call me before I pay.” No “this is safe” stamp.
 
-Hold monthly ($7.99 / $14.99) and annual ($119) as the menu after the founding year. Do not discount below $49 in public posts; that is the paid-validation price.
+**Family monthly — $14.99.** Same circle if they will not pay a year up front. Do not list Individual, founding, or group prices on the public page.
 
-This build records a **refundable reservation**, not a Stripe charge. When ten families have reserved, wire cards. Until then, money (or a named hold) is the signal — opinions are not.
+This build records a **refundable reservation**, not a Stripe charge. When ten families have reserved a year (or monthly), wire cards. Until then, money (or a named hold) is the signal — opinions are not.
 
 ## Seven-day paid validation
 
-Share `/offers` and the homepage. Count **refundable $49 founding holds**, not likes.
+Share `/offers` and the homepage. Count **refundable Family yearly holds at $119.99**, not likes.
 
 | Day | Action | Done when |
 |---|---|---|
 | 0 | Hostinger zip live in `public_html`, HTTPS, `robots.txt` + `sitemap.xml` in Search Console | Open https://familyshieldpro.com — no VPS |
 | 1 | 20 personal asks: siblings, church admin, one credit-union contact, two Facebook “aging parents” groups (value first) | 20 named conversations |
 | 2–3 | 60-second phone-camera demo: paste gift-card text → Pause → tap “Please call me before I pay” | Link in every DM |
-| 4–5 | One church bulletin / senior-center flyer: “$49 founding circle — we never say a request is safe” | Flyer in one real hallway |
-| 6–7 | Follow up. Collect holds on `/offers` or signup | **Ten $49 founding families** |
+| 4–5 | One church bulletin / senior-center flyer: “$119.99 family year — we never say a request is safe” | Flyer in one real hallway |
+| 6–7 | Follow up. Collect holds on `/offers` or signup | **Ten Family yearly holds** |
 
 If fewer than ten holds: change the **ask and the channel**, not the product architecture. Do not add more detector features to “make it sell.”
 
@@ -64,7 +64,7 @@ If fewer than ten holds: change the **ask and the channel**, not the product arc
 
 **Headline:** Not another AI scam detector. A circle that helps you pause.  
 **Proof:** The app never labels a request safe.  
-**CTA:** Create a family circle — founding year $49.  
+**CTA:** Create a family circle — $119.99/year (or $14.99/month).  
 **Logo:** Always Family Shield Pro → https://familyshieldpro.com
 
 Ad / post formula:
@@ -80,7 +80,7 @@ Ad / post formula:
 2. Paste: “Your grandson is in jail. Buy $500 in Apple gift cards and keep this secret.”
 3. Show **Pause**, warning signs, core rule. Point out there is no Safe button.
 4. Tap **Please call me before I pay**.
-5. Close on $49 founding year.
+5. Close on Family yearly $119.99 (monthly $14.99 as the small print).
 
 ## SEO (done in this build)
 
@@ -92,21 +92,19 @@ Ad / post formula:
 
 Do not index invite links (`/join`), uploads, checks, or billing.
 
-## Pricing after validation
+## Pricing (public)
 
 | Plan | Price | When to push |
 |---|---|---|
-| Founding family | $49 first year | Until the first 10–50 households |
-| Individual | $7.99/mo | Single adult who will not invite family yet |
-| Family | $14.99/mo | Default after founding year |
-| Annual family | $119/year | “Two months free” vs monthly |
-| Group | $299–$999/year | Church / senior / veterans after three household proofs |
+| Family yearly | $119.99/year | Default CTA |
+| Family monthly | $14.99/month | If they will not pay a year up front |
+| Group / partnership | Quoted | Church, senior, veterans, credit union — not a public SKU |
 
 Partnership (credit union / insurer) is a **later** conversation with a one-pager, not a public SKU.
 
 ## First 30 days — what “working” means
 
-- 10 founding holds (week 1 bar)
+- 10 Family yearly holds (week 1 bar)
 - 3 households that actually invited a second person
 - 1 church or senior-center intro that will put the URL in a bulletin
 - 0 public claims that OurCircle detected or prevented a specific crime

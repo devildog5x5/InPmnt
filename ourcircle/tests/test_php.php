@@ -34,9 +34,20 @@ $empty = Analyze::analyze('');
 check(Analyze::analyze('')['level'] === Analyze::UNKNOWN, 'empty unknown');
 
 require $root . '/php/src/Product.php';
-check(Product::version() === '1.0.0', 'product version 1.0.0');
+check(Product::version() === '1.0.1', 'product version 1.0.1');
 check(Product::NAME === 'Family Shield Pro', 'product name');
 check(Product::APP === 'OurCircle', 'app name');
+
+$landing = file_get_contents($root . '/php/views/landing.php') ?: '';
+check(str_contains($landing, '$14.99'), 'landing monthly price');
+check(str_contains($landing, '$119.99'), 'landing yearly price');
+check(!str_contains($landing, '$7.99'), 'landing no old monthly');
+check(!str_contains($landing, 'Founding year'), 'landing no founding sku');
+$plans = file_get_contents($root . '/php/src/App.php') ?: '';
+check(str_contains($plans, "'id' => 'monthly'"), 'php monthly plan');
+check(str_contains($plans, "'id' => 'yearly'"), 'php yearly plan');
+check(str_contains($plans, '$14.99/month'), 'php monthly price');
+check(str_contains($plans, '$119.99/year'), 'php yearly price');
 
 $dir = sys_get_temp_dir() . '/ocphp-' . bin2hex(random_bytes(4));
 mkdir($dir, 0775, true);

@@ -11,7 +11,7 @@ View::start($title, $site_home, 'index,follow', '/');
   <header class="site-header">
     <?= View::brand($site_home) ?>
     <nav class="nav">
-      <a class="btn ghost" href="/offers">Founding offers</a>
+      <a class="btn ghost" href="/offers">Offers</a>
       <a class="btn ghost" href="/login">Sign in</a>
       <a class="btn" href="/signup">Start a circle</a>
     </nav>
@@ -23,8 +23,8 @@ View::start($title, $site_home, 'index,follow', '/');
       <h1>Not another AI scam detector. A circle that helps you pause.</h1>
       <p class="lede">Forward a sketchy text, upload a screenshot, or paste a number or website. We show warning signs in plain language — then you ask someone you trust before you send a dime.</p>
       <p>
-        <a class="btn" href="/signup">Create your family circle</a>
-        <a class="btn gold" href="/signup">Founding year $49</a>
+        <a class="btn gold" href="/signup">Family yearly · $119.99</a>
+        <a class="btn ghost" href="/signup">or $14.99/month</a>
       </p>
       <p class="disclaimer"><?= Http::e($disclaimer) ?></p>
     </div>
@@ -50,17 +50,18 @@ View::start($title, $site_home, 'index,follow', '/');
       <p>Get calm instructions to report fraud, freeze cards, and tell the people who can actually stop a payment. Speed matters more than shame.</p>
     </div>
   </div>
-  <h2 style="margin-top:36px">Plans</h2>
+  <h2 style="margin-top:36px">Family plans</h2>
   <div class="plans">
     <?php foreach ($plans as $p): ?>
-    <div class="panel">
+    <div class="panel<?= !empty($p['featured']) ? ' featured' : '' ?>">
+      <?php if (!empty($p['featured'])): ?><span class="plan-badge">Best for families</span><?php endif; ?>
       <h3><?= Http::e($p['name']) ?></h3>
       <p><strong><?= Http::e($p['price']) ?></strong></p>
       <p class="muted"><?= Http::e($p['detail']) ?></p>
     </div>
     <?php endforeach; ?>
   </div>
-  <p>Credit unions and insurers: per-member partnership pricing. Churches, senior centers, and veterans groups: $299–$999/year.</p>
+  <p>Churches, senior centers, and veterans groups: ask us about a shared license. Credit unions and insurers: per-member partnership pricing.</p>
   <footer class="footer">
     OurCircle is built for families — including parents, adult children, and grandparents — who want a second set of eyes. We do not guarantee that a request is legitimate.
     <span class="muted"> · <?= Http::e(Product::label()) ?> · Hostinger PHP · not InPmnt

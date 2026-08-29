@@ -59,8 +59,8 @@ def init_db(path: str | None = None) -> None:
             CREATE TABLE IF NOT EXISTS households (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
-                plan TEXT NOT NULL DEFAULT 'founding',
-                founding INTEGER NOT NULL DEFAULT 1,
+                plan TEXT NOT NULL DEFAULT 'yearly',
+                founding INTEGER NOT NULL DEFAULT 0,
                 created_at TEXT NOT NULL
             );
             CREATE TABLE IF NOT EXISTS users (
@@ -148,7 +148,7 @@ def _seed(conn: sqlite3.Connection) -> None:
     ts = now()
     cur = conn.execute(
         "INSERT INTO households (name, plan, founding, created_at) VALUES (?,?,?,?)",
-        ("Foster family circle", "founding", 1, ts),
+        ("Foster family circle", "yearly", 0, ts),
     )
     hid = cur.lastrowid
     conn.execute(
@@ -185,7 +185,7 @@ def create_household(conn: sqlite3.Connection, *, name: str, owner_name: str, em
     ts = now()
     cur = conn.execute(
         "INSERT INTO households (name, plan, founding, created_at) VALUES (?,?,?,?)",
-        (name or f"{owner_name}'s circle", "founding", 1, ts),
+        (name or f"{owner_name}'s circle", "yearly", 0, ts),
     )
     hid = int(cur.lastrowid)
     conn.execute(

@@ -4,11 +4,20 @@ declare(strict_types=1);
 final class App
 {
     public const PLANS = [
-        ['id' => 'individual', 'name' => 'Individual', 'price' => '$7.99/month', 'detail' => 'One login, your trusted list, and checks.'],
-        ['id' => 'family', 'name' => 'Family', 'price' => '$14.99/month', 'detail' => 'Up to five people in one circle.'],
-        ['id' => 'annual', 'name' => 'Annual family', 'price' => '$119/year', 'detail' => 'Two months free versus monthly.'],
-        ['id' => 'founding', 'name' => 'Founding family', 'price' => '$49 first year', 'detail' => 'Lock the first year while we grow this with real families.'],
-        ['id' => 'group', 'name' => 'Church / senior / veterans group', 'price' => '$299–$999/year', 'detail' => 'Shared training plus family circles for members.'],
+        [
+            'id' => 'monthly',
+            'name' => 'Family monthly',
+            'price' => '$14.99/month',
+            'detail' => 'Up to five people in one circle. Pause, trusted list, and call-me-before-I-pay.',
+            'featured' => false,
+        ],
+        [
+            'id' => 'yearly',
+            'name' => 'Family yearly',
+            'price' => '$119.99/year',
+            'detail' => 'Same circle. Pay once a year — about $10 a month. Best for families.',
+            'featured' => true,
+        ],
     ];
 
     public const PRIVATE = ['/home', '/circle', '/trusted', '/checks', '/uploads', '/join', '/billing', '/report', '/logout'];
@@ -75,8 +84,8 @@ final class App
             $this->page('report', ['title' => 'Report & recover']);
         } elseif ($method === 'GET' && $path === '/billing') {
             $this->billing();
-        } elseif ($method === 'POST' && $path === '/billing/founding') {
-            $this->founding();
+        } elseif ($method === 'POST' && $path === '/billing/choose') {
+            $this->choosePlan();
         } else {
             http_response_code(404);
             echo 'Not found';
@@ -208,7 +217,7 @@ final class App
             }
             $this->db->prepare(
                 'INSERT INTO reservations (product, name, email, offer, note, created_at) VALUES (?,?,?,?,?,?)'
-            )->execute([$product, $name, $email, $offer !== '' ? $offer : 'founding', $note, Db::now()]);
+            )->execute([$product, $name, $email, $offer !== '' ? $offer : 'family year', $note, Db::now()]);
             $this->flash('Reservation saved. This is a refundable hold, not a charge. We will email you before anything is billed.', 'ok');
             Http::redirect('/offers');
         }
@@ -526,11 +535,17 @@ final class App
         ]);
     }
 
-    private function founding(): void
+    private function choosePlan(): void
     {
         $u = $this->requireLogin();
-        $this->db->prepare("UPDATE households SET plan='founding', founding=1 WHERE id=?")->execute([$u['household_id']]);
-        $this->flash('Founding-family year marked at $49. We will not charge a card in this build — this is the reservation flag.', 'ok');
+        $plan = trim((string) ($_POST['plan'] ?? ''));
+        if (!in_array($plan, ['monthly', 'yearly'], true)) {
+            $this->flash('Choose Family monthly or Family yearly.', 'error');
+            Http::redirect('/billing');
+        }
+        $this->db->prepare('UPDATE households SET plan=?, founding=0 WHERE id=?')->execute([$plan, $u['household_id']]);
+        $label = $plan === 'monthly' ? '$14.99/month' : '$119.99/year';
+        $this->flash("This circle is on Family {$plan} ({$label}). No card is charged in this build — this is the plan flag.", 'ok');
         Http::redirect('/billing');
     }
 }

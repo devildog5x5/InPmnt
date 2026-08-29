@@ -32,8 +32,8 @@ final class Db
             CREATE TABLE IF NOT EXISTS households (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
-                plan TEXT NOT NULL DEFAULT 'founding',
-                founding INTEGER NOT NULL DEFAULT 1,
+                plan TEXT NOT NULL DEFAULT 'yearly',
+                founding INTEGER NOT NULL DEFAULT 0,
                 created_at TEXT NOT NULL
             );
             CREATE TABLE IF NOT EXISTS users (
@@ -121,7 +121,7 @@ final class Db
     {
         $ts = self::now();
         $db->prepare('INSERT INTO households (name, plan, founding, created_at) VALUES (?,?,?,?)')
-            ->execute(['Foster family circle', 'founding', 1, $ts]);
+            ->execute(['Foster family circle', 'yearly', 0, $ts]);
         $hid = (int) $db->lastInsertId();
         $db->prepare(
             'INSERT INTO users (household_id, name, email, password_hash, role, created_at) VALUES (?,?,?,?,?,?)'
@@ -144,7 +144,7 @@ final class Db
     {
         $ts = self::now();
         $db->prepare('INSERT INTO households (name, plan, founding, created_at) VALUES (?,?,?,?)')
-            ->execute([$name !== '' ? $name : ($ownerName . "'s circle"), 'founding', 1, $ts]);
+            ->execute([$name !== '' ? $name : ($ownerName . "'s circle"), 'yearly', 0, $ts]);
         $hid = (int) $db->lastInsertId();
         $db->prepare(
             'INSERT INTO users (household_id, name, email, password_hash, role, created_at) VALUES (?,?,?,?,?,?)'

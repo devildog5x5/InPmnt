@@ -7,10 +7,10 @@ View::start($title, $site_home, 'index,follow', '/offers');
 ?>
 <div class="wrap">
   <header class="site-header">
-    <?= View::brand($site_home, 'Founding offers', 'Family Shield Pro') ?>
+    <?= View::brand($site_home, 'Offers', 'Family Shield Pro') ?>
     <a class="btn ghost" href="<?= Http::e($site_home) ?>">Family Shield Pro</a>
   </header>
-  <p class="core-rule">We ask for a refundable reservation or founding membership — not merely an opinion.</p>
+  <p class="core-rule">We ask for a refundable reservation — not merely an opinion.</p>
   <?= View::flashesHtml($flashes) ?>
   <h1>Three offers. Money decides which we build next.</h1>
   <p class="lede">InPmnt can take the first small payments fastest. VendorReady can bring higher-value customers. OurCircle (Family Scam Shield) can help the most families. The paid test tells us which opportunity exists in practice.</p>
@@ -28,7 +28,7 @@ View::start($title, $site_home, 'index,follow', '/offers');
     <div class="panel">
       <h2>OurCircle</h2>
       <p>Family circle, not a generic AI detector. Pause, warning signs, trusted list, “call me before I pay.”</p>
-      <p><strong>Ask:</strong> ten $49 founding families.</p>
+      <p><strong>Ask:</strong> ten Family yearly at $119.99 (or monthly at $14.99).</p>
       <p><a class="btn" href="/signup">Start a circle</a></p>
     </div>
   </div>
@@ -36,7 +36,7 @@ View::start($title, $site_home, 'index,follow', '/offers');
     <h2>Refundable reservation</h2>
     <label>Which offer</label>
     <select name="product" required>
-      <option value="ourcircle">OurCircle · $49 founding family</option>
+      <option value="ourcircle">OurCircle · Family yearly $119.99</option>
       <option value="inpmnt">InPmnt · $99 annual</option>
       <option value="vendorready">VendorReady · $500 setup deposit</option>
     </select>
@@ -45,7 +45,7 @@ View::start($title, $site_home, 'index,follow', '/offers');
     <label>Email</label>
     <input name="email" type="email" required />
     <label>Offer / amount you intend</label>
-    <input name="offer" placeholder="$49 founding year" />
+    <input name="offer" placeholder="$119.99 family year" />
     <label>Note</label>
     <textarea name="note" placeholder="Church group of 40, or CMMC Level 1 shop, etc."></textarea>
     <p><button class="btn wide" type="submit">Hold my spot (not a charge)</button></p>

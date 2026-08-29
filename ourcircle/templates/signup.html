@@ -3,7 +3,7 @@
 {% block body %}
 <div class="auth-page">
   <div class="auth-card">
-    {% with brand_sub="Founding family" %}{% include "_brand.html" %}{% endwith %}
+    {% with brand_sub="Family circle" %}{% include "_brand.html" %}{% endwith %}
     <p class="core-rule">{{ core_rule }}</p>
     {% for cat, msg in get_flashed_messages(with_categories=true) %}
       <div class="flash {{ cat }}">{{ msg }}</div>
@@ -17,9 +17,9 @@
       <input name="email" type="email" required />
       <label>Password (8+ characters)</label>
       <input name="password" type="password" required minlength="8" />
-      <p><button class="btn wide" type="submit">Create circle · $49 founding year</button></p>
+      <p><button class="btn gold wide" type="submit">Start family year · $119.99</button></p>
     </form>
-    <p class="disclaimer">No card is charged in this build. You are reserving the founding price.</p>
+    <p class="disclaimer">No card is charged in this build. Default is Family yearly. Switch to $14.99/month anytime on Plans.</p>
     <p><a href="{{ url_for('login') }}">Already have a login</a></p>
   </div>
 </div>

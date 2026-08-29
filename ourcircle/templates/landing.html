@@ -5,7 +5,7 @@
   <header class="site-header">
     {% include "_brand.html" %}
     <nav class="nav">
-      <a class="btn ghost" href="{{ url_for('offers') }}">Founding offers</a>
+      <a class="btn ghost" href="{{ url_for('offers') }}">Offers</a>
       <a class="btn ghost" href="{{ url_for('login') }}">Sign in</a>
       <a class="btn" href="{{ url_for('signup') }}">Start a circle</a>
     </nav>
@@ -17,8 +17,8 @@
       <h1>Not another AI scam detector. A circle that helps you pause.</h1>
       <p class="lede">Forward a sketchy text, upload a screenshot, or paste a number or website. We show warning signs in plain language — then you ask someone you trust before you send a dime.</p>
       <p>
-        <a class="btn" href="{{ url_for('signup') }}">Create your family circle</a>
-        <a class="btn gold" href="{{ url_for('signup') }}">Founding year $49</a>
+        <a class="btn gold" href="{{ url_for('signup') }}">Family yearly · $119.99</a>
+        <a class="btn ghost" href="{{ url_for('signup') }}">or $14.99/month</a>
       </p>
       <p class="disclaimer">{{ disclaimer }}</p>
     </div>
@@ -47,17 +47,18 @@
     </div>
   </div>
 
-  <h2 style="margin-top:36px">Plans</h2>
+  <h2 style="margin-top:36px">Family plans</h2>
   <div class="plans">
     {% for p in plans %}
-    <div class="panel">
+    <div class="panel{% if p.featured %} featured{% endif %}">
+      {% if p.featured %}<span class="plan-badge">Best for families</span>{% endif %}
       <h3>{{ p.name }}</h3>
       <p><strong>{{ p.price }}</strong></p>
       <p class="muted">{{ p.detail }}</p>
     </div>
     {% endfor %}
   </div>
-  <p>Credit unions and insurers: per-member partnership pricing. Churches, senior centers, and veterans groups: $299–$999/year.</p>
+  <p>Churches, senior centers, and veterans groups: ask us about a shared license. Credit unions and insurers: per-member partnership pricing.</p>
 
   <footer class="footer">
     OurCircle is built for families — including parents, adult children, and grandparents — who want a second set of eyes. We do not guarantee that a request is legitimate.

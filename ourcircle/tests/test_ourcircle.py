@@ -62,7 +62,12 @@ class AppTests(unittest.TestCase):
         self.assertIn(b"OurCircle", land.data)
         self.assertIn(b"Never send money", land.data)
         self.assertIn(b'href="https://familyshieldpro.com"', land.data)
-        self.assertIn(b'alt="Family Shield Pro"', land.data)
+        self.assertIn(b"$14.99", land.data)
+        self.assertIn(b"$119.99", land.data)
+        self.assertNotIn(b"$7.99", land.data)
+        self.assertNotIn(b"Founding year $49", land.data)
+        self.assertIn(b"Family monthly", land.data)
+        self.assertIn(b"Family yearly", land.data)
         login_page = self.client.get("/login")
         self.assertIn(b'href="https://familyshieldpro.com"', login_page.data)
         login = self.client.post(
@@ -73,6 +78,21 @@ class AppTests(unittest.TestCase):
         self.assertEqual(login.status_code, 200)
         self.assertIn(b"Check this with OurCircle", login.data)
         self.assertIn(b'href="https://familyshieldpro.com"', login.data)
+        billing = self.client.get("/billing")
+        self.assertEqual(billing.status_code, 200)
+        self.assertIn(b"Family monthly", billing.data)
+        self.assertIn(b"$14.99/month", billing.data)
+        self.assertIn(b"Family yearly", billing.data)
+        self.assertIn(b"$119.99/year", billing.data)
+        choose = self.client.post(
+            "/billing/choose",
+            data={"plan": "monthly"},
+            follow_redirects=True,
+        )
+        self.assertEqual(choose.status_code, 200)
+        self.assertIn(b"$14.99/month", choose.data)
+        self.assertIn(b"This household is on", choose.data)
+        self.assertIn(b"monthly", choose.data)
 
     def test_check_alert_and_reservation(self) -> None:
         self.client.post("/login", data={"email": "family@ourcircle.app", "password": "password123"})
@@ -95,7 +115,7 @@ class AppTests(unittest.TestCase):
                 "product": "ourcircle",
                 "name": "Pat",
                 "email": "pat@example.com",
-                "offer": "$49 founding",
+                "offer": "$119.99 family year",
             },
             follow_redirects=True,
         )

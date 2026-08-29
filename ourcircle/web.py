@@ -54,11 +54,20 @@ def site_url() -> str:
     return (os.environ.get("OURCIRCLE_SITE_URL") or DEFAULT_SITE_URL).rstrip("/")
 
 PLANS = [
-    {"id": "individual", "name": "Individual", "price": "$7.99/month", "detail": "One login, your trusted list, and checks."},
-    {"id": "family", "name": "Family", "price": "$14.99/month", "detail": "Up to five people in one circle."},
-    {"id": "annual", "name": "Annual family", "price": "$119/year", "detail": "Two months free versus monthly."},
-    {"id": "founding", "name": "Founding family", "price": "$49 first year", "detail": "Lock the first year while we grow this with real families."},
-    {"id": "group", "name": "Church / senior / veterans group", "price": "$299–$999/year", "detail": "Shared training plus family circles for members."},
+    {
+        "id": "monthly",
+        "name": "Family monthly",
+        "price": "$14.99/month",
+        "detail": "Up to five people in one circle. Pause, trusted list, and call-me-before-I-pay.",
+        "featured": False,
+    },
+    {
+        "id": "yearly",
+        "name": "Family yearly",
+        "price": "$119.99/year",
+        "detail": "Same circle. Pay once a year — about $10 a month. Best for families.",
+        "featured": True,
+    },
 ]
 
 
@@ -180,7 +189,7 @@ def create_app() -> Flask:
         with db_session() as conn:
             conn.execute(
                 "INSERT INTO reservations (product, name, email, offer, note, created_at) VALUES (?,?,?,?,?,?)",
-                (product, name, email, offer or "founding", note, now()),
+                (product, name, email, offer or "family year", note, now()),
             )
         flash(
             "Reservation saved. This is a refundable hold, not a charge. "
@@ -538,18 +547,23 @@ def create_app() -> Flask:
             hh = conn.execute("SELECT * FROM households WHERE id=?", (u["household_id"],)).fetchone()
         return render_template("billing.html", plans=PLANS, household=dict(hh) if hh else {})
 
-    @app.post("/billing/founding")
-    def founding():
+    @app.post("/billing/choose")
+    def choose_plan():
         gate = login_required()
         if gate:
             return gate
         u = current_user()
+        plan = (request.form.get("plan") or "").strip()
+        if plan not in ("monthly", "yearly"):
+            flash("Choose Family monthly or Family yearly.", "error")
+            return redirect(url_for("billing"))
         with db_session() as conn:
             conn.execute(
-                "UPDATE households SET plan='founding', founding=1 WHERE id=?",
-                (u["household_id"],),
+                "UPDATE households SET plan=?, founding=0 WHERE id=?",
+                (plan, u["household_id"]),
             )
-        flash("Founding-family year marked at $49. We will not charge a card in this build — this is the reservation flag.", "ok")
+        label = "$14.99/month" if plan == "monthly" else "$119.99/year"
+        flash(f"This circle is on Family {plan} ({label}). No card is charged in this build — this is the plan flag.", "ok")
         return redirect(url_for("billing"))
 
     return app
