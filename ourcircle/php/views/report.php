@@ -14,6 +14,6 @@ View::appOpen(get_defined_vars());
     <li><strong>Tell your circle</strong> so they do not fall for a follow-up “we can get your money back” pitch.</li>
     <li>Consider a <strong>credit freeze</strong> at Equifax, Experian, and TransUnion if a Social Security number or ID was shared.</li>
   </ol>
-  <p class="disclaimer">OurCircle is not a bank, law firm, or law-enforcement agency. We help you pause and point to official reporting doors.</p>
+  <p class="disclaimer">OurCircle is not a bank, law firm, or law-enforcement agency. We help you pause and point to official reporting doors. <?= Http::e($guidance ?? Analyze::GUIDANCE) ?></p>
 </div>
 <?php View::appClose(); ?>

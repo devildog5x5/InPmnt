@@ -19,7 +19,7 @@
       <input name="password" type="password" required minlength="8" />
       <p><button class="btn gold wide" type="submit">Start family year · $119.99</button></p>
     </form>
-    <p class="disclaimer">{% if stripe_enabled %}You’ll pay $119.99/year on Stripe after you create the circle, or switch to $14.99/month on Plans.{% else %}No card is charged until Stripe keys are in .env. Default is Family yearly. Switch to $14.99/month anytime on Plans.{% endif %}</p>
+    <p class="disclaimer">{% if stripe_enabled %}You’ll pay $119.99/year on Stripe after you create the circle, or switch to $14.99/month on Plans.{% else %}No card is charged until Stripe keys are in .env. Default is Family yearly. Switch to $14.99/month anytime on Plans.{% endif %} {{ guidance }}</p>
     <p><a href="{{ url_for('login') }}">Already have a login</a></p>
   </div>
 </div>

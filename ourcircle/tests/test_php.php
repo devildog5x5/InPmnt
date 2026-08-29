@@ -34,13 +34,17 @@ $empty = Analyze::analyze('');
 check(Analyze::analyze('')['level'] === Analyze::UNKNOWN, 'empty unknown');
 
 require $root . '/php/src/Product.php';
-check(Product::version() === '1.2.9', 'product version 1.2.9');
+check(Product::version() === '1.2.10', 'product version 1.2.10');
 check(Product::NAME === 'Family Shield Pro', 'product name');
 check(Product::APP === 'OurCircle', 'app name');
 
 $signup = file_get_contents($root . '/php/views/signup.php') ?: '';
 check(str_contains($signup, 'The Smith circle'), 'signup smith circle placeholder');
 check(!str_contains($signup, 'The Patel circle'), 'signup no patel circle');
+check(str_contains($signup, 'Analyze::GUIDANCE') || str_contains($signup, 'guidance, not a guarantee'), 'signup guidance');
+$billingPhp = file_get_contents($root . '/php/views/billing.php') ?: '';
+check(str_contains($billingPhp, 'Paying for a plan does not make a request safe'), 'billing pay disclaimer');
+check(str_contains($billingPhp, 'Analyze::GUIDANCE'), 'billing guidance constant');
 $landing = file_get_contents($root . '/php/views/landing.php') ?: '';
 check(str_contains($landing, '$14.99'), 'landing monthly price');
 check(str_contains($landing, '$119.99'), 'landing yearly price');
@@ -90,6 +94,7 @@ check(str_contains($setup, 'qrcode.min.js'), '2fa setup qr script');
 check(is_file($root . '/static/js/qrcode.min.js'), 'qrcode js vendored');
 $priceChat = SupportChat::faqReply('how much does a family plan cost?');
 check(str_contains($priceChat, '14.99'), 'chat price faq');
+check(str_contains($priceChat, 'guidance, not a guarantee'), 'chat price guidance');
 $safeChat = strtolower(SupportChat::faqReply('is this paypal email safe to pay?'));
 check(!str_contains($safeChat, 'this is safe'), 'chat never this is safe');
 check(str_contains($safeChat, 'never'), 'chat says never');

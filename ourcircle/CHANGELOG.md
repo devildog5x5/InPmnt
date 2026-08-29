@@ -3,6 +3,10 @@
 Product: **Family Shield Pro** (app name in the UI: **OurCircle**).  
 Not InPmnt. Version file: `ourcircle/VERSION` (independent of repo-root InPmnt `VERSION`).
 
+## 1.2.10 — 2026-08-29
+
+- **This application offers guidance, not a guarantee.** now sits next to pay buttons (Plans, Start a circle, homepage family plans) and on sign-in, join, the check form, report, and billing chat answers. Paying for a plan does not make a request safe.
+
 ## 1.2.9 — 2026-08-29
 
 - Circle name example on Start a circle is **The Smith circle** (was The Patel circle).

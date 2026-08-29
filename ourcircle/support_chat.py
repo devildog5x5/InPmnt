@@ -7,7 +7,7 @@ import re
 import urllib.error
 import urllib.request
 
-from analyze import CORE_RULE
+from analyze import CORE_RULE, GUIDANCE
 
 SUPPORT_EMAIL = "CustomerService@FamilyShieldPro.com"
 
@@ -59,7 +59,7 @@ _FAQ: list[tuple[tuple[str, ...], str]] = [
         ("price", "cost", "plan", "monthly", "yearly", "how much", "subscription", "119", "14.99"),
         "Family Shield Pro is $14.99 per month or $119.99 per year for one circle of up to five people. "
         "Yearly is the better family value. Start at familyshieldpro.com/signup. "
-        f"Billing questions: {SUPPORT_EMAIL}.",
+        f"{GUIDANCE} Billing questions: {SUPPORT_EMAIL}.",
     ),
     (
         ("password", "forgot", "reset", "2fa", "two-factor", "two factor", "authenticator", "recovery code"),
@@ -81,7 +81,7 @@ _FAQ: list[tuple[tuple[str, ...], str]] = [
         ("stripe", "billing", "cancel", "refund", "charge", "card", "invoice"),
         "Plans are Family monthly $14.99 or Family yearly $119.99. "
         "If Stripe keys are in .env, Plans sends you to Stripe Checkout; you can manage or cancel in the Stripe customer portal. "
-        f"Until keys are live, choosing a plan only saves the flag — no charge. Email {SUPPORT_EMAIL} for billing help.",
+        f"Until keys are live, choosing a plan only saves the flag — no charge. {GUIDANCE} Email {SUPPORT_EMAIL} for billing help.",
     ),
     (
         ("circle", "invite", "member", "five", "5 people", "household"),

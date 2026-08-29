@@ -18,6 +18,7 @@ View::start($title, $site_home, 'index,follow', '/login');
       <p><button class="btn wide" type="submit">Sign in</button></p>
     </form>
     <p class="muted">Demo circle: family@ourcircle.app / password123</p>
+    <p class="disclaimer"><?= Http::e($guidance ?? Analyze::GUIDANCE) ?></p>
     <p><a href="/forgot">Forgot password</a></p>
     <p><a href="/signup">Start a circle</a></p>
   </div>

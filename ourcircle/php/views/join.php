@@ -21,6 +21,7 @@ View::start($title, $site_home, 'noindex,nofollow', '/join/' . ($token ?? ''));
       <input name="password" type="password" required minlength="8" />
       <p><button class="btn wide" type="submit">Join the circle</button></p>
     </form>
+    <p class="disclaimer"><?= Http::e($guidance ?? Analyze::GUIDANCE) ?></p>
   </div>
 </div>
 <?php View::end(); ?>

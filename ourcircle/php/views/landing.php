@@ -71,6 +71,7 @@ View::start($title, $site_home, 'index,follow', '/');
     </div>
     <?php endforeach; ?>
   </div>
+  <p class="disclaimer"><?= Http::e($guidance ?? Analyze::GUIDANCE) ?> A paid plan is a family tool, not a stamp that a request is safe.</p>
   <p>Churches, senior centers, and veterans groups: ask us about a shared license. Credit unions and insurers: per-member partnership pricing.</p>
   <section class="support-contact" id="contact">
     <h2>Customer service</h2>

@@ -2,6 +2,7 @@
 {% block heading %}Plans{% endblock %}
 {% block main %}
 <p>This household is on <strong>{{ household.plan or 'yearly' }}</strong>{% if household.stripe_status %} · Stripe: {{ household.stripe_status }}{% endif %}.</p>
+<p class="disclaimer">{{ guidance }} Paying for a plan does not make a request safe.</p>
 <div class="plans">
   {% for p in plans %}
   <div class="panel{% if p.featured %} featured{% endif %}">
@@ -22,8 +23,8 @@
 </form>
 {% endif %}
 {% if stripe_enabled %}
-<p class="disclaimer">Choosing a plan opens Stripe Checkout. Churches, senior centers, and veterans groups: ask us about a shared license.</p>
+<p class="disclaimer">Choosing a plan opens Stripe Checkout. {{ guidance }} Churches, senior centers, and veterans groups: ask us about a shared license.</p>
 {% else %}
-<p class="disclaimer">Stripe keys are not in <code>.env</code> yet, so a plan choice is only saved on this circle. Add keys (see STRIPE.md) to charge $14.99/month or $119.99/year. Churches, senior centers, and veterans groups: ask us about a shared license.</p>
+<p class="disclaimer">Stripe keys are not in <code>.env</code> yet, so a plan choice is only saved on this circle. Add keys (see STRIPE.md) to charge $14.99/month or $119.99/year. {{ guidance }} Churches, senior centers, and veterans groups: ask us about a shared license.</p>
 {% endif %}
 {% endblock %}

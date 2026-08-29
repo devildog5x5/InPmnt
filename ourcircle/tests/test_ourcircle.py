@@ -90,8 +90,10 @@ class AppTests(unittest.TestCase):
         self.assertEqual(signup_page.status_code, 200)
         self.assertIn(b"The Smith circle", signup_page.data)
         self.assertNotIn(b"The Patel circle", signup_page.data)
+        self.assertIn(b"guidance, not a guarantee", signup_page.data)
         login_page = self.client.get("/login")
         self.assertIn(b'href="https://familyshieldpro.com"', login_page.data)
+        self.assertIn(b"guidance, not a guarantee", login_page.data)
         login = self.client.post(
             "/login",
             data={"email": "family@ourcircle.app", "password": "password123"},
@@ -107,6 +109,8 @@ class AppTests(unittest.TestCase):
         self.assertIn(b"$14.99/month", billing.data)
         self.assertIn(b"Family yearly", billing.data)
         self.assertIn(b"$119.99/year", billing.data)
+        self.assertIn(b"guidance, not a guarantee", billing.data)
+        self.assertIn(b"Paying for a plan does not make a request safe", billing.data)
         choose = self.client.post(
             "/billing/choose",
             data={"plan": "monthly"},
@@ -361,6 +365,7 @@ class AppTests(unittest.TestCase):
         self.assertEqual(chat.status_code, 200)
         chat_body = chat.get_json()
         self.assertIn("14.99", chat_body["reply"])
+        self.assertIn("guidance, not a guarantee", chat_body["reply"])
         self.assertEqual(chat_body["source"], "faq")
         safe_chat = self.client.post(
             "/support/chat",

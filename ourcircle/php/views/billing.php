@@ -7,6 +7,7 @@ $stripeOn = !empty($stripe_enabled);
 $status = (string) ($household['stripe_status'] ?? '');
 ?>
 <p>This household is on <strong><?= Http::e((string) ($household['plan'] ?? 'yearly')) ?></strong><?php if ($status !== ''): ?> · Stripe: <?= Http::e($status) ?><?php endif; ?>.</p>
+<p class="disclaimer"><?= Http::e(Analyze::GUIDANCE) ?> Paying for a plan does not make a request safe.</p>
 <div class="plans">
   <?php foreach ($plans as $p): ?>
   <div class="panel<?= !empty($p['featured']) ? ' featured' : '' ?>">
@@ -27,8 +28,8 @@ $status = (string) ($household['stripe_status'] ?? '');
 </form>
 <?php endif; ?>
 <?php if ($stripeOn): ?>
-<p class="disclaimer">Choosing a plan opens Stripe Checkout. Churches, senior centers, and veterans groups: ask us about a shared license.</p>
+<p class="disclaimer">Choosing a plan opens Stripe Checkout. <?= Http::e(Analyze::GUIDANCE) ?> Churches, senior centers, and veterans groups: ask us about a shared license.</p>
 <?php else: ?>
-<p class="disclaimer">Stripe keys are not in <code>.env</code> yet, so a plan choice is only saved on this circle. Add keys (see STRIPE.md) to charge $14.99/month or $119.99/year. Churches, senior centers, and veterans groups: ask us about a shared license.</p>
+<p class="disclaimer">Stripe keys are not in <code>.env</code> yet, so a plan choice is only saved on this circle. Add keys (see STRIPE.md) to charge $14.99/month or $119.99/year. <?= Http::e(Analyze::GUIDANCE) ?> Churches, senior centers, and veterans groups: ask us about a shared license.</p>
 <?php endif; ?>
 <?php View::appClose(); ?>

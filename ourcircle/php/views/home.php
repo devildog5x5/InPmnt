@@ -25,7 +25,7 @@ View::appOpen(get_defined_vars());
     <label>Screenshot</label>
     <input name="screenshot" type="file" accept="image/*" />
     <p><button class="btn wide" type="submit">Check this with OurCircle</button></p>
-    <p class="disclaimer">This will not say the request is safe. It will help you pause.</p>
+    <p class="disclaimer">This will not say the request is safe. It will help you pause. <?= Http::e($guidance ?? Analyze::GUIDANCE) ?></p>
   </form>
   <div>
     <div class="panel">
