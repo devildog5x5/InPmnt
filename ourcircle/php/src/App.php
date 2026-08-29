@@ -20,7 +20,7 @@ final class App
         ],
     ];
 
-    public const PRIVATE = ['/home', '/circle', '/trusted', '/checks', '/uploads', '/join', '/billing', '/report', '/logout'];
+    public const PRIVATE = ['/home', '/circle', '/trusted', '/checks', '/uploads', '/join', '/billing', '/report', '/account', '/logout'];
 
     public function __construct(private PDO $db, private string $root)
     {
@@ -45,6 +45,7 @@ final class App
                 'channel' => Product::CHANNEL,
                 'not' => 'InPmnt',
                 'stripe' => Billing::config()['enabled'],
+                'mail' => Mailer::configured(),
             ]);
         } elseif ($method === 'GET' && $path === '/') {
             $this->landing();
@@ -52,8 +53,28 @@ final class App
             $this->offers();
         } elseif ($path === '/signup') {
             $this->signup();
+        } elseif ($path === '/login/2fa') {
+            $this->loginTwoFactor();
         } elseif ($path === '/login') {
             $this->login();
+        } elseif ($path === '/forgot/code') {
+            $this->forgotCode();
+        } elseif ($path === '/forgot') {
+            $this->forgot();
+        } elseif (preg_match('#^/reset/([^/]+)$#', $path, $m)) {
+            $this->resetPassword($m[1]);
+        } elseif ($path === '/account/password' && $method === 'POST') {
+            $this->accountPassword();
+        } elseif ($path === '/account/2fa/setup') {
+            $this->account2faSetup();
+        } elseif ($path === '/account/2fa/enable' && $method === 'POST') {
+            $this->account2faEnable();
+        } elseif ($path === '/account/2fa/disable' && $method === 'POST') {
+            $this->account2faDisable();
+        } elseif ($path === '/account/2fa/recovery' && $method === 'POST') {
+            $this->account2faRecovery();
+        } elseif ($method === 'GET' && $path === '/account') {
+            $this->account();
         } elseif ($method === 'GET' && $path === '/logout') {
             $_SESSION = [];
             session_destroy();
@@ -161,7 +182,7 @@ final class App
     private function robots(): never
     {
         $host = preg_replace('#^https?://#', '', $this->siteHome()) ?? 'familyshieldpro.com';
-        $lines = ["User-agent: *", "Allow: /", "Allow: /signup", "Allow: /login", "Allow: /offers"];
+        $lines = ["User-agent: *", "Allow: /", "Allow: /signup", "Allow: /login", "Allow: /forgot", "Allow: /offers"];
         foreach (self::PRIVATE as $p) {
             $lines[] = "Disallow: {$p}";
         }
@@ -182,6 +203,7 @@ final class App
             ['/', 'weekly', '1.0'],
             ['/signup', 'weekly', '0.9'],
             ['/login', 'monthly', '0.6'],
+            ['/forgot', 'monthly', '0.5'],
             ['/offers', 'weekly', '0.8'],
         ];
         $body = '<?xml version="1.0" encoding="UTF-8"?>' . "\n"
@@ -284,8 +306,256 @@ final class App
             $this->flash('Email or password did not match.', 'error');
             $this->page('login', ['title' => 'Sign in · OurCircle', 'robots' => 'index,follow', 'next' => $next, 'flashes' => $this->takeFlashes()]);
         }
+        if (Auth::totpOn($user)) {
+            $_SESSION['pending_2fa'] = (int) $user['id'];
+            $_SESSION['pending_2fa_tries'] = 0;
+            $_SESSION['pending_next'] = $next;
+            Http::redirect('/login/2fa');
+        }
         $this->loginUser($user);
         Http::redirect($next);
+    }
+
+    private function userById(int $id): ?array
+    {
+        $st = $this->db->prepare('SELECT * FROM users WHERE id=?');
+        $st->execute([$id]);
+        $row = $st->fetch();
+        return $row ?: null;
+    }
+
+    private function verifySecondFactor(array $user, string $code, string $recovery): bool
+    {
+        $secret = (string) ($user['totp_secret'] ?? '');
+        if ($code !== '' && $secret !== '' && Auth::verifyTotp($secret, $code)) {
+            return true;
+        }
+        if ($recovery === '') {
+            return false;
+        }
+        $next = Auth::consumeRecovery((string) ($user['recovery_codes'] ?? ''), $recovery);
+        if ($next === null) {
+            return false;
+        }
+        $this->db->prepare('UPDATE users SET recovery_codes=? WHERE id=?')->execute([$next, $user['id']]);
+        return true;
+    }
+
+    private function loginTwoFactor(): void
+    {
+        $uid = (int) ($_SESSION['pending_2fa'] ?? 0);
+        if ($uid < 1) {
+            Http::redirect('/login');
+        }
+        if (Http::method() === 'GET') {
+            $this->page('login_2fa', ['title' => 'Two-factor · OurCircle', 'flashes' => $this->takeFlashes()]);
+        }
+        $user = $this->userById($uid);
+        if (!$user) {
+            unset($_SESSION['pending_2fa'], $_SESSION['pending_2fa_tries']);
+            Http::redirect('/login');
+        }
+        $tries = (int) ($_SESSION['pending_2fa_tries'] ?? 0);
+        if ($tries >= 8) {
+            unset($_SESSION['pending_2fa'], $_SESSION['pending_2fa_tries'], $_SESSION['pending_next']);
+            $this->flash('Too many codes. Sign in again.', 'error');
+            Http::redirect('/login');
+        }
+        $code = trim((string) ($_POST['code'] ?? ''));
+        $recovery = trim((string) ($_POST['recovery_code'] ?? ''));
+        if (!$this->verifySecondFactor($user, $code, $recovery)) {
+            $_SESSION['pending_2fa_tries'] = $tries + 1;
+            $this->flash('That code did not match.', 'error');
+            Http::redirect('/login/2fa');
+        }
+        $next = Http::safeNext((string) ($_SESSION['pending_next'] ?? '')) ?: '/home';
+        unset($_SESSION['pending_2fa'], $_SESSION['pending_2fa_tries'], $_SESSION['pending_next']);
+        $this->loginUser($user);
+        Http::redirect($next);
+    }
+
+    private function forgot(): void
+    {
+        $generic = 'If that email is on a circle, we sent reset instructions. Check spam. You can also use a recovery code on this page.';
+        if (Http::method() === 'GET') {
+            $this->page('forgot', ['title' => 'Forgot password · OurCircle', 'robots' => 'index,follow', 'flashes' => $this->takeFlashes()]);
+        }
+        $email = strtolower(trim((string) ($_POST['email'] ?? '')));
+        if (str_contains($email, '@')) {
+            $st = $this->db->prepare('SELECT * FROM users WHERE lower(email)=?');
+            $st->execute([$email]);
+            $user = $st->fetch();
+            if ($user) {
+                $tok = Auth::newResetToken();
+                $this->db->prepare('DELETE FROM password_resets WHERE user_id=?')->execute([$user['id']]);
+                $this->db->prepare(
+                    'INSERT INTO password_resets (user_id, token_hash, expires_at, created_at) VALUES (?,?,?,?)'
+                )->execute([$user['id'], $tok['hash'], gmdate('Y-m-d\TH:i:s\Z', time() + 3600), Db::now()]);
+                $link = $this->siteHome() . '/reset/' . rawurlencode($tok['token']);
+                $body = "Someone asked to reset the Family Shield Pro password for this email.\n\n"
+                    . "Open this link within one hour:\n{$link}\n\n"
+                    . "If you did not ask, ignore this message.\n";
+                try {
+                    Mailer::send((string) $user['email'], 'Reset your Family Shield Pro password', $body);
+                } catch (Throwable) {
+                    // Same public message either way.
+                }
+            }
+        }
+        $this->flash($generic, 'ok');
+        Http::redirect('/forgot');
+    }
+
+    private function forgotCode(): void
+    {
+        if (Http::method() !== 'POST') {
+            Http::redirect('/forgot');
+        }
+        $email = strtolower(trim((string) ($_POST['email'] ?? '')));
+        $recovery = trim((string) ($_POST['recovery_code'] ?? ''));
+        $password = (string) ($_POST['password'] ?? '');
+        $generic = 'If that email and recovery code matched, the password is updated. Sign in.';
+        if (str_contains($email, '@') && $recovery !== '' && strlen($password) >= 8) {
+            $st = $this->db->prepare('SELECT * FROM users WHERE lower(email)=?');
+            $st->execute([$email]);
+            $user = $st->fetch();
+            if ($user) {
+                $next = Auth::consumeRecovery((string) ($user['recovery_codes'] ?? ''), $recovery);
+                if ($next !== null) {
+                    $this->db->prepare('UPDATE users SET password_hash=?, recovery_codes=? WHERE id=?')
+                        ->execute([password_hash($password, PASSWORD_DEFAULT), $next, $user['id']]);
+                    $this->db->prepare('DELETE FROM password_resets WHERE user_id=?')->execute([$user['id']]);
+                }
+            }
+        }
+        $this->flash($generic, 'ok');
+        Http::redirect('/login');
+    }
+
+    private function resetPassword(string $token): void
+    {
+        $hash = hash('sha256', $token);
+        $st = $this->db->prepare('SELECT * FROM password_resets WHERE token_hash=? AND expires_at >= ?');
+        $st->execute([$hash, Db::now()]);
+        $row = $st->fetch();
+        if (!$row) {
+            $this->flash('That reset link is invalid or expired. Request a new one.', 'error');
+            Http::redirect('/forgot');
+        }
+        if (Http::method() === 'GET') {
+            $this->page('reset', ['title' => 'Choose a new password · OurCircle', 'token' => $token, 'flashes' => $this->takeFlashes()]);
+        }
+        $password = (string) ($_POST['password'] ?? '');
+        if (strlen($password) < 8) {
+            $this->flash('Use at least 8 characters.', 'error');
+            Http::redirect('/reset/' . rawurlencode($token));
+        }
+        $this->db->prepare('UPDATE users SET password_hash=? WHERE id=?')
+            ->execute([password_hash($password, PASSWORD_DEFAULT), $row['user_id']]);
+        $this->db->prepare('DELETE FROM password_resets WHERE user_id=?')->execute([$row['user_id']]);
+        $this->flash('Password saved. Sign in. If 2FA is on, you still need the authenticator.', 'ok');
+        Http::redirect('/login');
+    }
+
+    private function account(): void
+    {
+        $u = $this->requireLogin();
+        $user = $this->userById((int) $u['id']);
+        $codes = $_SESSION['show_recovery'] ?? [];
+        unset($_SESSION['show_recovery']);
+        $this->page('account', [
+            'title' => 'Account',
+            'totp_on' => Auth::totpOn($user),
+            'recovery_codes' => is_array($codes) ? $codes : [],
+        ]);
+    }
+
+    private function accountPassword(): void
+    {
+        $u = $this->requireLogin();
+        $user = $this->userById((int) $u['id']);
+        $current = (string) ($_POST['current_password'] ?? '');
+        $password = (string) ($_POST['password'] ?? '');
+        if (!$user || !password_verify($current, (string) $user['password_hash'])) {
+            $this->flash('Current password did not match.', 'error');
+            Http::redirect('/account');
+        }
+        if (strlen($password) < 8) {
+            $this->flash('Use at least 8 characters.', 'error');
+            Http::redirect('/account');
+        }
+        $this->db->prepare('UPDATE users SET password_hash=? WHERE id=?')
+            ->execute([password_hash($password, PASSWORD_DEFAULT), $user['id']]);
+        $this->flash('Password updated.', 'ok');
+        Http::redirect('/account');
+    }
+
+    private function account2faSetup(): void
+    {
+        $u = $this->requireLogin();
+        $user = $this->userById((int) $u['id']);
+        if (Auth::totpOn($user)) {
+            Http::redirect('/account');
+        }
+        if (Http::method() === 'GET' || empty($_SESSION['totp_pending_secret'])) {
+            $_SESSION['totp_pending_secret'] = Auth::newSecret();
+        }
+        $secret = (string) $_SESSION['totp_pending_secret'];
+        $this->page('account_2fa_setup', [
+            'title' => 'Turn on 2FA',
+            'secret_grouped' => Auth::groupSecret($secret),
+            'otpauth' => Auth::otpauthUri((string) $u['email'], $secret),
+        ]);
+    }
+
+    private function account2faEnable(): void
+    {
+        $u = $this->requireLogin();
+        $secret = (string) ($_SESSION['totp_pending_secret'] ?? '');
+        $code = trim((string) ($_POST['code'] ?? ''));
+        if ($secret === '' || !Auth::verifyTotp($secret, $code)) {
+            $this->flash('That code did not match. Scan the key again and retry.', 'error');
+            Http::redirect('/account/2fa/setup');
+        }
+        $codes = Auth::newRecoveryCodes();
+        $this->db->prepare('UPDATE users SET totp_secret=?, totp_enabled=1, recovery_codes=? WHERE id=?')
+            ->execute([$secret, Auth::hashList($codes), $u['id']]);
+        unset($_SESSION['totp_pending_secret']);
+        $_SESSION['show_recovery'] = $codes;
+        $this->flash('Two-factor authentication is on. Save the recovery codes.', 'ok');
+        Http::redirect('/account');
+    }
+
+    private function account2faDisable(): void
+    {
+        $u = $this->requireLogin();
+        $user = $this->userById((int) $u['id']);
+        $code = trim((string) ($_POST['code'] ?? ''));
+        if (!$user || !$this->verifySecondFactor($user, $code, $code)) {
+            $this->flash('That code did not match.', 'error');
+            Http::redirect('/account');
+        }
+        $this->db->prepare('UPDATE users SET totp_secret=NULL, totp_enabled=0, recovery_codes=NULL WHERE id=?')
+            ->execute([$u['id']]);
+        $this->flash('Two-factor authentication is off.', 'ok');
+        Http::redirect('/account');
+    }
+
+    private function account2faRecovery(): void
+    {
+        $u = $this->requireLogin();
+        $user = $this->userById((int) $u['id']);
+        $code = trim((string) ($_POST['code'] ?? ''));
+        $secret = (string) ($user['totp_secret'] ?? '');
+        if (!$user || $secret === '' || !Auth::verifyTotp($secret, $code)) {
+            $this->flash('That authenticator code did not match.', 'error');
+            Http::redirect('/account');
+        }
+        $codes = Auth::newRecoveryCodes();
+        $this->db->prepare('UPDATE users SET recovery_codes=? WHERE id=?')->execute([Auth::hashList($codes), $u['id']]);
+        $_SESSION['show_recovery'] = $codes;
+        $this->flash('New recovery codes — save them now.', 'ok');
+        Http::redirect('/account');
     }
 
     private function home(): void

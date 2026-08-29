@@ -148,12 +148,15 @@ class AppTests(unittest.TestCase):
         self.assertIn("Disallow: /home", text)
         self.assertIn("Disallow: /uploads", text)
         self.assertIn("Allow: /signup", text)
+        self.assertIn("Allow: /forgot", text)
+        self.assertIn("Disallow: /account", text)
         sitemap = self.client.get("/sitemap.xml")
         self.assertEqual(sitemap.status_code, 200)
         xml = sitemap.data.decode("utf-8")
         self.assertIn("https://familyshieldpro.com/", xml)
         self.assertIn("https://familyshieldpro.com/signup", xml)
         self.assertIn("https://familyshieldpro.com/login", xml)
+        self.assertIn("https://familyshieldpro.com/forgot", xml)
         self.assertIn("https://familyshieldpro.com/offers", xml)
         self.assertNotIn("/home", xml)
         health = self.client.get("/healthz")
@@ -218,6 +221,72 @@ class AppTests(unittest.TestCase):
                 "STRIPE_PRICE_YEARLY",
             ):
                 os.environ.pop(key, None)
+
+    def test_forgot_2fa_and_recovery_codes(self) -> None:
+        import time
+
+        from auth import hash_list, new_recovery_codes, new_secret, totp_at, verify_totp
+
+        secret = new_secret()
+        self.assertTrue(verify_totp(secret, totp_at(secret, 1_111_111_111), 1_111_111_111))
+        codes = new_recovery_codes()
+        with db.session(self.db_path) as conn:
+            conn.execute(
+                "UPDATE users SET totp_secret=?, totp_enabled=1, recovery_codes=? WHERE lower(email)=?",
+                (secret, hash_list(codes), "family@ourcircle.app"),
+            )
+        step = self.client.post(
+            "/login",
+            data={"email": "family@ourcircle.app", "password": "password123"},
+            follow_redirects=False,
+        )
+        self.assertEqual(step.status_code, 302)
+        self.assertIn("/login/2fa", step.headers.get("Location", ""))
+        blocked = self.client.get("/home", follow_redirects=False)
+        self.assertEqual(blocked.status_code, 302)
+        bad = self.client.post("/login/2fa", data={"code": "000000"}, follow_redirects=True)
+        self.assertIn(b"did not match", bad.data)
+        ok = self.client.post(
+            "/login/2fa",
+            data={"code": totp_at(secret, int(time.time()))},
+            follow_redirects=True,
+        )
+        self.assertEqual(ok.status_code, 200)
+        self.assertIn(b"Check this with OurCircle", ok.data)
+        self.client.get("/logout")
+        forgot = self.client.get("/forgot")
+        self.assertEqual(forgot.status_code, 200)
+        self.assertIn(b"Forgot password", forgot.data)
+        self.assertIn(b"recovery code", forgot.data.lower())
+        self.client.post("/forgot", data={"email": "family@ourcircle.app"}, follow_redirects=True)
+        with db.session(self.db_path) as conn:
+            n = conn.execute("SELECT COUNT(*) AS c FROM password_resets").fetchone()["c"]
+        self.assertEqual(n, 1)
+        self.client.get("/logout")
+        rec = self.client.post(
+            "/forgot/code",
+            data={
+                "email": "family@ourcircle.app",
+                "recovery_code": codes[0],
+                "password": "newpass123",
+            },
+            follow_redirects=True,
+        )
+        self.assertEqual(rec.status_code, 200)
+        again = self.client.post(
+            "/login",
+            data={"email": "family@ourcircle.app", "password": "newpass123"},
+            follow_redirects=False,
+        )
+        self.assertIn("/login/2fa", again.headers.get("Location", ""))
+        via_code = self.client.post(
+            "/login/2fa",
+            data={"recovery_code": codes[1]},
+            follow_redirects=True,
+        )
+        self.assertIn(b"Check this with OurCircle", via_code.data)
+        login_page = self.client.get("/login")
+        self.assertIn(b"Forgot password", login_page.data)
 
 
 if __name__ == "__main__":

@@ -73,6 +73,9 @@ def init_db(path: str | None = None) -> None:
                 email TEXT NOT NULL UNIQUE,
                 password_hash TEXT NOT NULL,
                 role TEXT NOT NULL DEFAULT 'owner',
+                totp_secret TEXT,
+                totp_enabled INTEGER NOT NULL DEFAULT 0,
+                recovery_codes TEXT,
                 created_at TEXT NOT NULL,
                 FOREIGN KEY (household_id) REFERENCES households(id)
             );
@@ -131,6 +134,14 @@ def init_db(path: str | None = None) -> None:
                 created_at TEXT NOT NULL,
                 FOREIGN KEY (household_id) REFERENCES households(id)
             );
+            CREATE TABLE IF NOT EXISTS password_resets (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                token_hash TEXT NOT NULL UNIQUE,
+                expires_at TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            );
             CREATE TABLE IF NOT EXISTS reservations (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 product TEXT NOT NULL,
@@ -143,6 +154,7 @@ def init_db(path: str | None = None) -> None:
             """
         )
         _migrate_household_stripe(conn)
+        _migrate_user_auth(conn)
         n = conn.execute("SELECT COUNT(*) AS c FROM users").fetchone()["c"]
         if n == 0:
             _seed(conn)
@@ -157,6 +169,29 @@ def _migrate_household_stripe(conn: sqlite3.Connection) -> None:
     ):
         if name not in cols:
             conn.execute(f"ALTER TABLE households ADD COLUMN {name} {ddl}")
+
+
+def _migrate_user_auth(conn: sqlite3.Connection) -> None:
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(users)").fetchall()}
+    for name, ddl in (
+        ("totp_secret", "TEXT"),
+        ("totp_enabled", "INTEGER NOT NULL DEFAULT 0"),
+        ("recovery_codes", "TEXT"),
+    ):
+        if name not in cols:
+            conn.execute(f"ALTER TABLE users ADD COLUMN {name} {ddl}")
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS password_resets (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            token_hash TEXT NOT NULL UNIQUE,
+            expires_at TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+        """
+    )
 
 
 def _seed(conn: sqlite3.Connection) -> None:

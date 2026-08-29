@@ -34,7 +34,7 @@ $empty = Analyze::analyze('');
 check(Analyze::analyze('')['level'] === Analyze::UNKNOWN, 'empty unknown');
 
 require $root . '/php/src/Product.php';
-check(Product::version() === '1.0.2', 'product version 1.0.2');
+check(Product::version() === '1.1.0', 'product version 1.1.0');
 check(Product::NAME === 'Family Shield Pro', 'product name');
 check(Product::APP === 'OurCircle', 'app name');
 
@@ -52,6 +52,7 @@ check(is_file($root . '/php/src/Billing.php'), 'php billing class');
 
 require $root . '/php/src/Env.php';
 require $root . '/php/src/Billing.php';
+require $root . '/php/src/Auth.php';
 check(Billing::config()['enabled'] === false, 'stripe off without keys');
 $payload = '{"id":"evt_test","object":"event","type":"checkout.session.completed","data":{"object":{}}}';
 $secret = 'whsec_testsecret_abcdefghijklmnopqrstuvwxyz';
@@ -75,6 +76,19 @@ check($user !== null && $user['email'] === 'family@ourcircle.app', 'demo login')
 $cols = array_map(fn ($c) => $c['name'], $db->query('PRAGMA table_info(households)')->fetchAll());
 check(in_array('stripe_customer_id', $cols, true), 'household stripe_customer_id');
 check(in_array('stripe_subscription_id', $cols, true), 'household stripe_subscription_id');
+$ucols = array_map(fn ($c) => $c['name'], $db->query('PRAGMA table_info(users)')->fetchAll());
+check(in_array('totp_secret', $ucols, true), 'user totp_secret');
+check(in_array('recovery_codes', $ucols, true), 'user recovery_codes');
+$secret = Auth::newSecret();
+$code = Auth::totpAt($secret, 1_111_111_111);
+check(Auth::verifyTotp($secret, $code, 1_111_111_111), 'totp verifies at timestamp');
+check(!Auth::verifyTotp($secret, '000000', 1_111_111_111), 'totp rejects wrong code');
+$codes = Auth::newRecoveryCodes(3);
+$stored = Auth::hashList($codes);
+$after = Auth::consumeRecovery($stored, $codes[0]);
+check(is_string($after), 'recovery consume once');
+check(Auth::consumeRecovery($after, $codes[0]) === null, 'recovery code not reusable');
+check(str_contains($robots = file_get_contents($root . '/php/robots.txt') ?: '', 'Allow: /forgot'), 'robots allow forgot');
 
 $robots = file_get_contents($root . '/php/robots.txt') ?: '';
 check(str_contains($robots, 'familyshieldpro.com'), 'robots host');

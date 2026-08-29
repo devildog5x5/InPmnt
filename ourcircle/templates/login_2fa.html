@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Two-factor code · OurCircle{% endblock %}
+{% block body %}
+<div class="auth-page">
+  <div class="auth-card">
+    {% with brand_sub="Two-factor" %}{% include "_brand.html" %}{% endwith %}
+    <p class="core-rule">{{ core_rule }}</p>
+    {% for cat, msg in get_flashed_messages(with_categories=true) %}
+      <div class="flash {{ cat }}">{{ msg }}</div>
+    {% endfor %}
+    <p>Enter the 6-digit code from your authenticator app, or a one-time recovery code.</p>
+    <form method="post">
+      <label>Authenticator code</label>
+      <input class="otp" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="8" />
+      <p class="muted">Or</p>
+      <label>Recovery code</label>
+      <input name="recovery_code" placeholder="xxxx-xxxx" autocomplete="off" />
+      <p><button class="btn wide" type="submit">Continue</button></p>
+    </form>
+    <p><a href="{{ url_for('logout') }}">Cancel</a></p>
+  </div>
+</div>
+{% endblock %}

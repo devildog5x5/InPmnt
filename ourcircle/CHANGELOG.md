@@ -3,6 +3,11 @@
 Product: **Family Shield Pro** (app name in the UI: **OurCircle**).  
 Not InPmnt. Version file: `ourcircle/VERSION` (independent of repo-root InPmnt `VERSION`).
 
+## 1.1.0 — 2026-08-29
+
+- Password recovery: email reset link (SMTP/Resend) and one-time **recovery codes**.
+- Two-factor authentication (authenticator app TOTP) on **Account**. Recovery codes also complete sign-in.
+
 ## 1.0.2 — 2026-08-29
 
 - Stripe Checkout, Customer Portal, and webhook are wired for Family monthly **$14.99** and Family yearly **$119.99**.

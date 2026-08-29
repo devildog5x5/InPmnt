@@ -69,6 +69,7 @@ final class View
             . '<a href="/trusted">Trusted list</a>'
             . '<a href="/report">Report</a>'
             . '<a href="/billing">Plans</a>'
+            . '<a href="/account">Account</a>'
             . '<a class="btn ghost" href="/logout">Sign out</a>'
             . '</nav></header>'
             . '<p class="core-rule">' . Http::e((string) ($vars['core_rule'] ?? Analyze::CORE_RULE)) . '</p>'

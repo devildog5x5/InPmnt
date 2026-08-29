@@ -44,9 +44,10 @@ if static_src.is_dir():
 
 version = (root / "VERSION").read_text(encoding="utf-8").strip() or "0.0.0"
 shutil.copy2(root / "VERSION", stage / "VERSION")
-stripe_doc = root / "STRIPE.md"
-if stripe_doc.is_file():
-    shutil.copy2(stripe_doc, stage / "STRIPE.md")
+for doc in ("STRIPE.md", "AUTH.md"):
+    p = root / doc
+    if p.is_file():
+        shutil.copy2(p, stage / doc)
 import subprocess
 git = ""
 try:

@@ -1,0 +1,15 @@
+{% extends "shell.html" %}
+{% block heading %}Turn on 2FA{% endblock %}
+{% block main %}
+<p>Add this account in your authenticator app, then enter the 6-digit code to confirm.</p>
+<p><strong>Setup key</strong></p>
+<p class="otp-secret">{{ secret_grouped }}</p>
+<p><a class="btn" href="{{ otpauth }}">Add to authenticator app</a></p>
+<p class="muted">On a phone, that link opens the app. On a computer, choose “enter a setup key” and paste the key above.</p>
+<form method="post" action="{{ url_for('account_2fa_enable') }}">
+  <label>6-digit code</label>
+  <input class="otp" name="code" required inputmode="numeric" autocomplete="one-time-code" maxlength="8" />
+  <p><button class="btn gold wide" type="submit">Confirm and turn on 2FA</button></p>
+</form>
+<p><a href="{{ url_for('account') }}">Cancel</a></p>
+{% endblock %}

@@ -46,6 +46,9 @@ final class Db
                 email TEXT NOT NULL UNIQUE,
                 password_hash TEXT NOT NULL,
                 role TEXT NOT NULL DEFAULT 'owner',
+                totp_secret TEXT,
+                totp_enabled INTEGER NOT NULL DEFAULT 0,
+                recovery_codes TEXT,
                 created_at TEXT NOT NULL,
                 FOREIGN KEY (household_id) REFERENCES households(id)
             );
@@ -104,6 +107,14 @@ final class Db
                 created_at TEXT NOT NULL,
                 FOREIGN KEY (household_id) REFERENCES households(id)
             );
+            CREATE TABLE IF NOT EXISTS password_resets (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                token_hash TEXT NOT NULL UNIQUE,
+                expires_at TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            );
             CREATE TABLE IF NOT EXISTS reservations (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 product TEXT NOT NULL,
@@ -115,6 +126,7 @@ final class Db
             );
         SQL);
         self::migrateHouseholdStripe($db);
+        self::migrateUserAuth($db);
         $n = (int) $db->query('SELECT COUNT(*) FROM users')->fetchColumn();
         if ($n === 0) {
             self::seed($db);
@@ -138,6 +150,35 @@ final class Db
                 $db->exec("ALTER TABLE households ADD COLUMN {$col} {$type}");
             }
         }
+    }
+
+    public static function migrateUserAuth(PDO $db): void
+    {
+        $cols = $db->query('PRAGMA table_info(users)')->fetchAll();
+        $names = [];
+        foreach ($cols as $col) {
+            $names[] = (string) ($col['name'] ?? '');
+        }
+        $add = [
+            'totp_secret' => 'TEXT',
+            'totp_enabled' => 'INTEGER NOT NULL DEFAULT 0',
+            'recovery_codes' => 'TEXT',
+        ];
+        foreach ($add as $col => $type) {
+            if (!in_array($col, $names, true)) {
+                $db->exec("ALTER TABLE users ADD COLUMN {$col} {$type}");
+            }
+        }
+        $db->exec(<<<'SQL'
+            CREATE TABLE IF NOT EXISTS password_resets (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                token_hash TEXT NOT NULL UNIQUE,
+                expires_at TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            );
+        SQL);
     }
 
     public static function seed(PDO $db): void

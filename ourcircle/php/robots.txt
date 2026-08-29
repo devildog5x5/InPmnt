@@ -2,6 +2,7 @@ User-agent: *
 Allow: /
 Allow: /signup
 Allow: /login
+Allow: /forgot
 Allow: /offers
 Disallow: /home
 Disallow: /circle
@@ -11,6 +12,7 @@ Disallow: /uploads
 Disallow: /join
 Disallow: /billing
 Disallow: /report
+Disallow: /account
 Disallow: /logout
 
 Host: familyshieldpro.com

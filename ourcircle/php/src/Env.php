@@ -39,4 +39,9 @@ final class Env
         }
         return is_string($v) ? $v : $default;
     }
+
+    public static function truthy(string $key): bool
+    {
+        return in_array(strtolower(self::get($key)), ['1', 'true', 'yes', 'on'], true);
+    }
 }

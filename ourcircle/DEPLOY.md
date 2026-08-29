@@ -1,7 +1,7 @@
 # Family Shield Pro — deploy (no VPS)
 
 **Site:** https://familyshieldpro.com  
-**Zip:** https://raw.githubusercontent.com/devildog5x5/InPmnt/cursor/ourcircle-family-shield-4df6/patches/FamilyShieldPro-1.0.2.zip  
+**Zip:** https://raw.githubusercontent.com/devildog5x5/InPmnt/cursor/ourcircle-family-shield-4df6/patches/FamilyShieldPro-1.1.0.zip  
 (`robots.txt` and `sitemap.xml` are inside the zip.)  
 **Do not** put this in an InPmnt folder or overwrite a live `.env`.
 
@@ -18,6 +18,8 @@ You do not need Ubuntu, Nginx, systemd, or SSH.
 First visit creates `.env` (mode `640`) and `data/ourcircle.db`. Demo: `family@ourcircle.app` / `password123`.
 
 **Stripe:** the checkout code is already in the zip. Paste keys into the live `.env` — do not overwrite that file. Full steps: **[STRIPE.md](STRIPE.md)**.
+
+**Password reset / 2FA:** **[AUTH.md](AUTH.md)**. Email reset needs SMTP or Resend in `.env`. Recovery codes work without mail.
 
 Webhook URL: `https://familyshieldpro.com/billing/webhook`
 

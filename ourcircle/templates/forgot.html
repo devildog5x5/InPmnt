@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Forgot password · OurCircle{% endblock %}
+{% block body %}
+<div class="auth-page">
+  <div class="auth-card">
+    {% with brand_sub="Password recovery" %}{% include "_brand.html" %}{% endwith %}
+    {% for cat, msg in get_flashed_messages(with_categories=true) %}
+      <div class="flash {{ cat }}">{{ msg }}</div>
+    {% endfor %}
+    <h1>Reset with email</h1>
+    <p class="muted">We’ll send a one-hour link if this email is on a circle. We never say whether the email exists.</p>
+    <form method="post">
+      <label>Email</label>
+      <input name="email" type="email" required autocomplete="username" />
+      <p><button class="btn wide" type="submit">Send reset link</button></p>
+    </form>
+    <h2>Or use a recovery code</h2>
+    <p class="muted">If you turned on 2FA, you were shown one-time codes. That also works if email isn’t set up on this site yet.</p>
+    <form method="post" action="{{ url_for('forgot_code') }}">
+      <label>Email</label>
+      <input name="email" type="email" required autocomplete="username" />
+      <label>Recovery code</label>
+      <input name="recovery_code" required placeholder="xxxx-xxxx" autocomplete="off" />
+      <label>New password (8+)</label>
+      <input name="password" type="password" required minlength="8" autocomplete="new-password" />
+      <p><button class="btn ghost wide" type="submit">Reset with recovery code</button></p>
+    </form>
+    <p><a href="{{ url_for('login') }}">Back to sign in</a></p>
+  </div>
+</div>
+{% endblock %}

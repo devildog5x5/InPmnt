@@ -20,6 +20,17 @@ from flask import (
 from werkzeug.utils import secure_filename
 
 from analyze import CORE_RULE, DISCLAIMER, analyze
+from auth import (
+    consume_recovery,
+    group_secret,
+    hash_list,
+    new_recovery_codes,
+    new_reset_token,
+    new_secret,
+    otpauth_uri,
+    totp_on,
+    verify_totp,
+)
 from billing import (
     PLAN_LABELS,
     construct_event,
@@ -41,12 +52,14 @@ from database import (
     session as db_session,
     trusted_list,
 )
+from mail import mail_configured, send_email
+from werkzeug.security import check_password_hash, generate_password_hash
 
 ROOT = Path(__file__).resolve().parent
 UPLOADS = DATA / "uploads"
 ALLOWED_SHOT = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
 DEFAULT_SITE_URL = "https://familyshieldpro.com"
-PUBLIC_PATHS = ("/", "/signup", "/login", "/offers")
+PUBLIC_PATHS = ("/", "/signup", "/login", "/forgot", "/offers")
 PRIVATE_PREFIXES = (
     "/home",
     "/circle",
@@ -56,6 +69,7 @@ PRIVATE_PREFIXES = (
     "/join",
     "/billing",
     "/report",
+    "/account",
     "/logout",
 )
 
@@ -110,6 +124,7 @@ def create_app() -> Flask:
             "Allow: /",
             "Allow: /signup",
             "Allow: /login",
+            "Allow: /forgot",
             "Allow: /offers",
         ]
         for path in PRIVATE_PREFIXES:
@@ -164,6 +179,7 @@ def create_app() -> Flask:
             "version": ver,
             "not": "InPmnt",
             "stripe": load_stripe_config().enabled,
+            "mail": mail_configured(),
         }
 
     def current_user():
@@ -246,6 +262,12 @@ def create_app() -> Flask:
         if not user:
             flash("Email or password did not match.", "error")
             return render_template("login.html")
+        if totp_on(user):
+            session.clear()
+            session["pending_2fa"] = user["id"]
+            session["pending_2fa_tries"] = 0
+            session["pending_next"] = request.args.get("next") or url_for("home")
+            return redirect(url_for("login_2fa"))
         session["user_id"] = user["id"]
         session["household_id"] = user["household_id"]
         session["name"] = user["name"]
@@ -256,6 +278,254 @@ def create_app() -> Flask:
     def logout():
         session.clear()
         return redirect(url_for("landing"))
+
+    def _user_by_id(uid: int) -> dict[str, Any] | None:
+        with db_session() as conn:
+            row = conn.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
+        return dict(row) if row else None
+
+    def _verify_second(user: dict[str, Any], code: str, recovery: str) -> bool:
+        secret = (user.get("totp_secret") or "").strip()
+        if code and secret and verify_totp(secret, code):
+            return True
+        if not recovery:
+            return False
+        nxt = consume_recovery(user.get("recovery_codes") or "", recovery)
+        if nxt is None:
+            return False
+        with db_session() as conn:
+            conn.execute("UPDATE users SET recovery_codes=? WHERE id=?", (nxt, user["id"]))
+        user["recovery_codes"] = nxt
+        return True
+
+    @app.route("/login/2fa", methods=["GET", "POST"])
+    def login_2fa():
+        uid = int(session.get("pending_2fa") or 0)
+        if uid < 1:
+            return redirect(url_for("login"))
+        if request.method == "GET":
+            return render_template("login_2fa.html")
+        user = _user_by_id(uid)
+        if not user:
+            session.clear()
+            return redirect(url_for("login"))
+        tries = int(session.get("pending_2fa_tries") or 0)
+        if tries >= 8:
+            session.clear()
+            flash("Too many codes. Sign in again.", "error")
+            return redirect(url_for("login"))
+        code = (request.form.get("code") or "").strip()
+        recovery = (request.form.get("recovery_code") or "").strip()
+        if not _verify_second(user, code, recovery):
+            session["pending_2fa_tries"] = tries + 1
+            flash("That code did not match.", "error")
+            return redirect(url_for("login_2fa"))
+        nxt = session.get("pending_next") or url_for("home")
+        session.clear()
+        session["user_id"] = user["id"]
+        session["household_id"] = user["household_id"]
+        session["name"] = user["name"]
+        session["email"] = user["email"]
+        return redirect(nxt if isinstance(nxt, str) and nxt.startswith("/") else url_for("home"))
+
+    @app.route("/forgot", methods=["GET", "POST"])
+    def forgot():
+        generic = "If that email is on a circle, we sent reset instructions. Check spam. You can also use a recovery code on this page."
+        if request.method == "GET":
+            return render_template("forgot.html")
+        email = (request.form.get("email") or "").lower().strip()
+        if "@" in email:
+            with db_session() as conn:
+                user = conn.execute("SELECT * FROM users WHERE lower(email)=?", (email,)).fetchone()
+                if user:
+                    raw, token_hash = new_reset_token()
+                    conn.execute("DELETE FROM password_resets WHERE user_id=?", (user["id"],))
+                    from datetime import datetime, timedelta, timezone
+
+                    exp = (datetime.now(timezone.utc) + timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
+                    conn.execute(
+                        "INSERT INTO password_resets (user_id, token_hash, expires_at, created_at) VALUES (?,?,?,?)",
+                        (user["id"], token_hash, exp, now()),
+                    )
+                    link = site_url() + "/reset/" + raw
+                    body = (
+                        "Someone asked to reset the Family Shield Pro password for this email.\n\n"
+                        f"Open this link within one hour:\n{link}\n\n"
+                        "If you did not ask, ignore this message.\n"
+                    )
+                    try:
+                        send_email(
+                            to=user["email"],
+                            subject="Reset your Family Shield Pro password",
+                            body=body,
+                        )
+                    except Exception:
+                        pass
+        flash(generic, "ok")
+        return redirect(url_for("forgot"))
+
+    @app.post("/forgot/code")
+    def forgot_code():
+        email = (request.form.get("email") or "").lower().strip()
+        recovery = (request.form.get("recovery_code") or "").strip()
+        password = request.form.get("password") or ""
+        generic = "If that email and recovery code matched, the password is updated. Sign in."
+        if "@" in email and recovery and len(password) >= 8:
+            with db_session() as conn:
+                user = conn.execute("SELECT * FROM users WHERE lower(email)=?", (email,)).fetchone()
+                if user:
+                    nxt = consume_recovery(user["recovery_codes"] or "", recovery)
+                    if nxt is not None:
+                        conn.execute(
+                            "UPDATE users SET password_hash=?, recovery_codes=? WHERE id=?",
+                            (generate_password_hash(password), nxt, user["id"]),
+                        )
+                        conn.execute("DELETE FROM password_resets WHERE user_id=?", (user["id"],))
+        flash(generic, "ok")
+        return redirect(url_for("login"))
+
+    @app.route("/reset/<token>", methods=["GET", "POST"])
+    def reset_password(token: str):
+        import hashlib
+
+        token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+        with db_session() as conn:
+            row = conn.execute(
+                "SELECT * FROM password_resets WHERE token_hash=? AND expires_at >= ?",
+                (token_hash, now()),
+            ).fetchone()
+        if not row:
+            flash("That reset link is invalid or expired. Request a new one.", "error")
+            return redirect(url_for("forgot"))
+        if request.method == "GET":
+            return render_template("reset.html")
+        password = request.form.get("password") or ""
+        if len(password) < 8:
+            flash("Use at least 8 characters.", "error")
+            return redirect(url_for("reset_password", token=token))
+        with db_session() as conn:
+            conn.execute(
+                "UPDATE users SET password_hash=? WHERE id=?",
+                (generate_password_hash(password), row["user_id"]),
+            )
+            conn.execute("DELETE FROM password_resets WHERE user_id=?", (row["user_id"],))
+        flash("Password saved. Sign in. If 2FA is on, you still need the authenticator.", "ok")
+        return redirect(url_for("login"))
+
+    @app.get("/account")
+    def account():
+        gate = login_required()
+        if gate:
+            return gate
+        u = current_user()
+        user = _user_by_id(int(u["id"]))
+        codes = session.pop("show_recovery", [])
+        return render_template(
+            "account.html",
+            totp_on=totp_on(user),
+            recovery_codes=codes if isinstance(codes, list) else [],
+        )
+
+    @app.post("/account/password")
+    def account_password():
+        gate = login_required()
+        if gate:
+            return gate
+        u = current_user()
+        user = _user_by_id(int(u["id"]))
+        current = request.form.get("current_password") or ""
+        password = request.form.get("password") or ""
+        if not user or not check_password_hash(user["password_hash"], current):
+            flash("Current password did not match.", "error")
+            return redirect(url_for("account"))
+        if len(password) < 8:
+            flash("Use at least 8 characters.", "error")
+            return redirect(url_for("account"))
+        with db_session() as conn:
+            conn.execute(
+                "UPDATE users SET password_hash=? WHERE id=?",
+                (generate_password_hash(password), user["id"]),
+            )
+        flash("Password updated.", "ok")
+        return redirect(url_for("account"))
+
+    @app.route("/account/2fa/setup", methods=["GET", "POST"])
+    def account_2fa_setup():
+        gate = login_required()
+        if gate:
+            return gate
+        u = current_user()
+        user = _user_by_id(int(u["id"]))
+        if totp_on(user):
+            return redirect(url_for("account"))
+        if request.method == "GET" or not session.get("totp_pending_secret"):
+            session["totp_pending_secret"] = new_secret()
+        secret = session["totp_pending_secret"]
+        return render_template(
+            "account_2fa_setup.html",
+            secret_grouped=group_secret(secret),
+            otpauth=otpauth_uri(u["email"], secret),
+        )
+
+    @app.post("/account/2fa/enable")
+    def account_2fa_enable():
+        gate = login_required()
+        if gate:
+            return gate
+        u = current_user()
+        secret = session.get("totp_pending_secret") or ""
+        code = (request.form.get("code") or "").strip()
+        if not secret or not verify_totp(secret, code):
+            flash("That code did not match. Scan the key again and retry.", "error")
+            return redirect(url_for("account_2fa_setup"))
+        codes = new_recovery_codes()
+        with db_session() as conn:
+            conn.execute(
+                "UPDATE users SET totp_secret=?, totp_enabled=1, recovery_codes=? WHERE id=?",
+                (secret, hash_list(codes), u["id"]),
+            )
+        session.pop("totp_pending_secret", None)
+        session["show_recovery"] = codes
+        flash("Two-factor authentication is on. Save the recovery codes.", "ok")
+        return redirect(url_for("account"))
+
+    @app.post("/account/2fa/disable")
+    def account_2fa_disable():
+        gate = login_required()
+        if gate:
+            return gate
+        u = current_user()
+        user = _user_by_id(int(u["id"]))
+        code = (request.form.get("code") or "").strip()
+        if not user or not _verify_second(user, code, code):
+            flash("That code did not match.", "error")
+            return redirect(url_for("account"))
+        with db_session() as conn:
+            conn.execute(
+                "UPDATE users SET totp_secret=NULL, totp_enabled=0, recovery_codes=NULL WHERE id=?",
+                (u["id"],),
+            )
+        flash("Two-factor authentication is off.", "ok")
+        return redirect(url_for("account"))
+
+    @app.post("/account/2fa/recovery")
+    def account_2fa_recovery():
+        gate = login_required()
+        if gate:
+            return gate
+        u = current_user()
+        user = _user_by_id(int(u["id"]))
+        code = (request.form.get("code") or "").strip()
+        secret = (user.get("totp_secret") or "") if user else ""
+        if not user or not secret or not verify_totp(secret, code):
+            flash("That authenticator code did not match.", "error")
+            return redirect(url_for("account"))
+        codes = new_recovery_codes()
+        with db_session() as conn:
+            conn.execute("UPDATE users SET recovery_codes=? WHERE id=?", (hash_list(codes), u["id"]))
+        session["show_recovery"] = codes
+        flash("New recovery codes — save them now.", "ok")
+        return redirect(url_for("account"))
 
     @app.get("/home")
     def home():
