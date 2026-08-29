@@ -88,6 +88,35 @@ img { max-width: 100%; height: auto; }
   margin: 0 0 12px;
 }
 .lede { font-size: 1.15rem; color: var(--muted); }
+.story {
+  font-size: 1.12rem;
+  margin: 0 0 8px;
+}
+.story p { margin: 0 0 12px; }
+.too-good {
+  background: var(--gold-soft);
+  border: 2px solid var(--gold);
+  border-radius: var(--radius);
+  padding: 28px 24px;
+  margin: 12px 0 36px;
+  text-align: center;
+}
+.too-good h2 {
+  font-family: var(--font);
+  font-size: clamp(1.55rem, 3vw, 2.15rem);
+  line-height: 1.2;
+  margin: 0 0 10px;
+}
+.too-good .really {
+  font-weight: 800;
+  font-size: 1.25rem;
+  color: var(--warn);
+  margin: 0;
+}
+.rule-restated {
+  margin: 0 0 16px;
+  font-size: 1.05rem;
+}
 .hero-card, .panel, .auth-card, .flash, .check-card {
   background: var(--paper);
   border: 1px solid var(--line);

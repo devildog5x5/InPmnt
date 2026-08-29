@@ -20,8 +20,8 @@ View::start($title, $site_home, 'index,follow', '/');
   <section class="hero">
     <div>
       <p class="core-rule"><?= Http::e($core_rule) ?></p>
-      <h1>Not another AI scam detector. A circle that helps you pause.</h1>
-      <p class="lede">Forward a sketchy text, upload a screenshot, or paste a number or website. We show warning signs in plain language — then you ask someone you trust before you send a dime.</p>
+      <h1>A family pause before you send a dime.</h1>
+      <p class="lede">Family Shield Pro (OurCircle) is a trusted circle for the text, call, prize, or “urgent” payment that feels a little off. We are not an AI that stamps a request as safe. We help you stop, read the warning signs in plain language, and get someone you trust on the phone — then you decide.</p>
       <p>
         <a class="btn gold" href="/signup">Family yearly · $119.99</a>
         <a class="btn ghost" href="/signup">or $14.99/month</a>
@@ -34,11 +34,21 @@ View::start($title, $site_home, 'index,follow', '/');
       </a>
     </div>
   </section>
+  <div class="panel story">
+    <h2>Why we built this</h2>
+    <p>We are invested in this because we have personally been the victim of so many scams over the years. They keep getting better and more believable. Fake banks. “Grandkid in trouble.” Prize emails. Refunds that are not refunds. You really have to be on your toes.</p>
+    <p>So we built a place for a household to park the screenshot, look at the warning signs together, and call before anyone pays. Up to five people. A protected list of the real numbers for banks, doctors, and family. A “Please call me before I pay” button when it is urgent.</p>
+  </div>
+  <div class="too-good">
+    <p class="rule-restated"><strong><?= Http::e($core_rule) ?></strong></p>
+    <h2>If it sounds too good to be true, it usually is.</h2>
+    <p class="really">Really! Really! Really!</p>
+  </div>
   <h2>What you can do</h2>
   <div class="grid-3">
     <div class="panel step"><strong>1. Bring the request in</strong>Paste the email or text, upload a screenshot, or enter a phone number, website, offer, or payment ask.</div>
     <div class="panel step"><strong>2. Read the warning signs</strong>See why it might be a scam, whether a number or site resembles a known trick, and what to do next — never a “this is safe” stamp.</div>
-    <div class="panel step"><strong>3. Involve your circle</strong>Ask a family member to look. Tap “Please call me before I pay” when it is urgent.</div>
+    <div class="panel step"><strong>3. Involve your circle</strong>Ask a family member to look. Tap “Please call me before I pay” when it is urgent. Independently verify before money, crypto, gift cards, passwords, or account information moves.</div>
   </div>
   <div class="grid-2" style="margin-top:18px">
     <div class="panel">

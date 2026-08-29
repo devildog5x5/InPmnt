@@ -3,6 +3,10 @@
 Product: **Family Shield Pro** (app name in the UI: **OurCircle**).  
 Not InPmnt. Version file: `ourcircle/VERSION` (independent of repo-root InPmnt `VERSION`).
 
+## 1.1.1 — 2026-08-29
+
+- Homepage explains the service, why we built it (we have been scammed; they keep getting more believable), the core pause rule, and “if it sounds too good to be true, it usually is.”
+
 ## 1.1.0 — 2026-08-29
 
 - Password recovery: email reset link (SMTP/Resend) and one-time **recovery codes**.

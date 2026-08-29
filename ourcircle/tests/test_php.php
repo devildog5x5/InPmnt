@@ -34,13 +34,16 @@ $empty = Analyze::analyze('');
 check(Analyze::analyze('')['level'] === Analyze::UNKNOWN, 'empty unknown');
 
 require $root . '/php/src/Product.php';
-check(Product::version() === '1.1.0', 'product version 1.1.0');
+check(Product::version() === '1.1.1', 'product version 1.1.1');
 check(Product::NAME === 'Family Shield Pro', 'product name');
 check(Product::APP === 'OurCircle', 'app name');
 
 $landing = file_get_contents($root . '/php/views/landing.php') ?: '';
 check(str_contains($landing, '$14.99'), 'landing monthly price');
 check(str_contains($landing, '$119.99'), 'landing yearly price');
+check(str_contains($landing, 'too good to be true'), 'landing too-good rule');
+check(str_contains($landing, 'Really! Really! Really!'), 'landing really');
+check(str_contains($landing, 'Why we built this'), 'landing why');
 check(!str_contains($landing, '$7.99'), 'landing no old monthly');
 check(!str_contains($landing, 'Founding year'), 'landing no founding sku');
 $plans = file_get_contents($root . '/php/src/App.php') ?: '';
