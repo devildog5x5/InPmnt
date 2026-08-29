@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+from typing import Any
 
 from flask import (
     Flask,
@@ -19,6 +20,15 @@ from flask import (
 from werkzeug.utils import secure_filename
 
 from analyze import CORE_RULE, DISCLAIMER, analyze
+from billing import (
+    PLAN_LABELS,
+    construct_event,
+    create_checkout_session,
+    create_portal_session,
+    load_stripe_config,
+    plan_from_price_id,
+    retrieve_checkout,
+)
 from database import (
     DATA,
     accept_invite,
@@ -90,6 +100,7 @@ def create_app() -> Flask:
             "disclaimer": DISCLAIMER,
             "user_name": session.get("name"),
             "site_home": site_url(),
+            "stripe_enabled": load_stripe_config().enabled,
         }
 
     @app.get("/robots.txt")
@@ -152,6 +163,7 @@ def create_app() -> Flask:
             "app": "OurCircle",
             "version": ver,
             "not": "InPmnt",
+            "stripe": load_stripe_config().enabled,
         }
 
     def current_user():
@@ -545,7 +557,13 @@ def create_app() -> Flask:
         u = current_user()
         with db_session() as conn:
             hh = conn.execute("SELECT * FROM households WHERE id=?", (u["household_id"],)).fetchone()
-        return render_template("billing.html", plans=PLANS, household=dict(hh) if hh else {})
+        cfg = load_stripe_config()
+        return render_template(
+            "billing.html",
+            plans=PLANS,
+            household=dict(hh) if hh else {},
+            stripe_enabled=cfg.enabled,
+        )
 
     @app.post("/billing/choose")
     def choose_plan():
@@ -557,13 +575,187 @@ def create_app() -> Flask:
         if plan not in ("monthly", "yearly"):
             flash("Choose Family monthly or Family yearly.", "error")
             return redirect(url_for("billing"))
+        cfg = load_stripe_config()
+        if cfg.enabled:
+            with db_session() as conn:
+                hh = conn.execute("SELECT * FROM households WHERE id=?", (u["household_id"],)).fetchone()
+            try:
+                sess = create_checkout_session(
+                    plan=plan,
+                    customer_email=u["email"],
+                    household_id=u["household_id"],
+                    user_id=u["id"],
+                    customer_id=(dict(hh).get("stripe_customer_id") if hh else None) or None,
+                )
+            except Exception as exc:
+                flash(f"Stripe could not start checkout: {exc}", "error")
+                return redirect(url_for("billing"))
+            url = sess.get("url") or ""
+            if not url:
+                flash("Stripe did not return a checkout URL.", "error")
+                return redirect(url_for("billing"))
+            return redirect(url)
         with db_session() as conn:
             conn.execute(
                 "UPDATE households SET plan=?, founding=0 WHERE id=?",
                 (plan, u["household_id"]),
             )
-        label = "$14.99/month" if plan == "monthly" else "$119.99/year"
-        flash(f"This circle is on Family {plan} ({label}). No card is charged in this build — this is the plan flag.", "ok")
+        label = PLAN_LABELS[plan]
+        flash(f"This circle is on Family {plan} ({label}). Add Stripe keys to .env to charge a card.", "ok")
         return redirect(url_for("billing"))
+
+    @app.post("/billing/portal")
+    def billing_portal():
+        gate = login_required()
+        if gate:
+            return gate
+        u = current_user()
+        cfg = load_stripe_config()
+        if not cfg.enabled:
+            flash("Stripe is not configured yet. Add keys to .env (see STRIPE.md).", "error")
+            return redirect(url_for("billing"))
+        with db_session() as conn:
+            hh = conn.execute("SELECT * FROM households WHERE id=?", (u["household_id"],)).fetchone()
+        cid = (dict(hh).get("stripe_customer_id") if hh else None) or ""
+        if not cid:
+            flash("No Stripe customer yet — choose a plan and pay first.", "error")
+            return redirect(url_for("billing"))
+        try:
+            sess = create_portal_session(cid)
+        except Exception as exc:
+            flash(f"Stripe portal: {exc}", "error")
+            return redirect(url_for("billing"))
+        url = sess.get("url") or ""
+        if not url:
+            flash("Stripe did not return a portal URL. Enable Customer portal in the Stripe Dashboard.", "error")
+            return redirect(url_for("billing"))
+        return redirect(url)
+
+    @app.get("/billing/success")
+    def billing_success():
+        gate = login_required()
+        if gate:
+            return gate
+        session_id = (request.args.get("session_id") or "").strip()
+        cfg = load_stripe_config()
+        if session_id and cfg.enabled:
+            try:
+                checkout = retrieve_checkout(session_id)
+                _apply_checkout_session(checkout)
+                flash("Payment received. This circle is on a paid Family plan.", "ok")
+            except Exception:
+                flash("Paid, but we could not read the Stripe session yet. The webhook will finish this.", "error")
+        return redirect(url_for("billing"))
+
+    @app.post("/billing/webhook")
+    def stripe_webhook():
+        cfg = load_stripe_config()
+        payload = request.get_data(as_text=True) or ""
+        sig = request.headers.get("Stripe-Signature") or ""
+        if not cfg.secret_key or len(cfg.secret_key) < 20 or "..." in cfg.secret_key:
+            return {"error": "Stripe not configured"}, 503
+        wh = cfg.webhook_secret
+        if not wh or "..." in wh or not wh.startswith("whsec_") or len(wh) < 20:
+            return {"error": "STRIPE_WEBHOOK_SECRET is required"}, 503
+        try:
+            event = construct_event(payload, sig, wh)
+        except Exception as exc:
+            return {"error": str(exc)}, 400
+        etype = event.get("type") or ""
+        obj = (event.get("data") or {}).get("object") or {}
+        if not isinstance(obj, dict):
+            obj = {}
+        if etype == "checkout.session.completed":
+            _apply_checkout_session(obj)
+        elif etype in ("customer.subscription.updated", "customer.subscription.created"):
+            _apply_subscription(obj)
+        elif etype == "customer.subscription.deleted":
+            with db_session() as conn:
+                conn.execute(
+                    "UPDATE households SET stripe_subscription_id=NULL, stripe_status='canceled' WHERE stripe_customer_id=?",
+                    (obj.get("customer"),),
+                )
+        return {"received": True}
+
+    def _household_id_from(meta: dict, reference: Any, customer: Any) -> int | None:
+        hid = meta.get("household_id") if isinstance(meta, dict) else None
+        if hid not in (None, ""):
+            return int(hid)
+        if reference not in (None, ""):
+            return int(reference)
+        if customer:
+            with db_session() as conn:
+                row = conn.execute(
+                    "SELECT id FROM households WHERE stripe_customer_id=?",
+                    (str(customer),),
+                ).fetchone()
+            if row:
+                return int(row["id"])
+        return None
+
+    def _plan_from_subscription(sub: dict) -> str | None:
+        data = ((sub.get("items") or {}).get("data")) or None
+        if data:
+            price = data[0].get("price")
+            price_id = price if isinstance(price, str) else (price or {}).get("id")
+            found = plan_from_price_id(price_id)
+            if found:
+                return found
+        meta = sub.get("metadata") if isinstance(sub.get("metadata"), dict) else {}
+        plan = meta.get("plan")
+        return plan if isinstance(plan, str) else None
+
+    def _apply_checkout_session(checkout: dict) -> None:
+        customer = checkout.get("customer")
+        if isinstance(customer, dict):
+            customer = customer.get("id")
+        subscription = checkout.get("subscription")
+        sub_id = subscription if isinstance(subscription, str) else (subscription or {}).get("id") if isinstance(subscription, dict) else None
+        meta = checkout.get("metadata") if isinstance(checkout.get("metadata"), dict) else {}
+        plan = meta.get("plan")
+        if not plan and isinstance(subscription, dict):
+            plan = _plan_from_subscription(subscription)
+        if plan not in ("monthly", "yearly"):
+            plan = "yearly"
+        hid = _household_id_from(meta, checkout.get("client_reference_id"), customer)
+        if hid is None:
+            return
+        with db_session() as conn:
+            conn.execute(
+                """
+                UPDATE households SET plan=?, founding=0,
+                    stripe_customer_id=COALESCE(?, stripe_customer_id),
+                    stripe_subscription_id=COALESCE(?, stripe_subscription_id),
+                    stripe_status=?
+                WHERE id=?
+                """,
+                (plan, customer, sub_id, "active", hid),
+            )
+
+    def _apply_subscription(sub: dict) -> None:
+        customer = sub.get("customer")
+        if isinstance(customer, dict):
+            customer = customer.get("id")
+        sub_id = sub.get("id")
+        plan = _plan_from_subscription(sub)
+        if plan not in ("monthly", "yearly"):
+            plan = "yearly"
+        status = str(sub.get("status") or "")
+        meta = sub.get("metadata") if isinstance(sub.get("metadata"), dict) else {}
+        if status in ("canceled", "unpaid", "incomplete_expired"):
+            with db_session() as conn:
+                conn.execute(
+                    "UPDATE households SET stripe_subscription_id=NULL, stripe_status=? WHERE stripe_customer_id=?",
+                    (status, customer),
+                )
+            return
+        hid = _household_id_from(meta, meta.get("household_id"), customer)
+        if hid is None:
+            return
+        with db_session() as conn:
+            conn.execute(
+                "UPDATE households SET plan=?, stripe_customer_id=?, stripe_subscription_id=?, stripe_status=? WHERE id=?",
+                (plan, customer, sub_id, status or "active", hid),
+            )
 
     return app

@@ -93,6 +93,11 @@ class AppTests(unittest.TestCase):
         self.assertIn(b"$14.99/month", choose.data)
         self.assertIn(b"This household is on", choose.data)
         self.assertIn(b"monthly", choose.data)
+        self.assertIn(b"Stripe keys are not", billing.data)
+        health = self.client.get("/healthz")
+        self.assertFalse(health.get_json().get("stripe"))
+        hook = self.client.post("/billing/webhook", data=b"{}", content_type="application/json")
+        self.assertEqual(hook.status_code, 503)
 
     def test_check_alert_and_reservation(self) -> None:
         self.client.post("/login", data={"email": "family@ourcircle.app", "password": "password123"})
@@ -154,6 +159,65 @@ class AppTests(unittest.TestCase):
         health = self.client.get("/healthz")
         self.assertEqual(health.status_code, 200)
         self.assertTrue(health.get_json()["ok"])
+        self.assertFalse(health.get_json().get("stripe"))
+
+    def test_stripe_webhook_marks_household_paid(self) -> None:
+        import hashlib
+        import hmac
+        import json
+        import time
+
+        from billing import construct_event
+
+        payload_body = '{"id":"evt_test"}'
+        secret = "whsec_testsecret_abcdefghijklmnopqrstuvwxyz"
+        ts = str(int(time.time()))
+        sig = hmac.new(secret.encode(), f"{ts}.{payload_body}".encode(), hashlib.sha256).hexdigest()
+        event = construct_event(payload_body, f"t={ts},v1={sig}", secret)
+        self.assertEqual(event["id"], "evt_test")
+
+        os.environ["STRIPE_SECRET_KEY"] = "sk_test_abcdefghijklmnopqrstuvwxyz0123"
+        os.environ["STRIPE_WEBHOOK_SECRET"] = secret
+        os.environ["STRIPE_PRICE_MONTHLY"] = "price_abcdefghijklmnopqrstuvwxyz01"
+        os.environ["STRIPE_PRICE_YEARLY"] = "price_abcdefghijklmnopqrstuvwxyz02"
+        try:
+            payload = json.dumps(
+                {
+                    "id": "evt_paid",
+                    "type": "checkout.session.completed",
+                    "data": {
+                        "object": {
+                            "customer": "cus_testfamily",
+                            "subscription": "sub_testfamily",
+                            "client_reference_id": "1",
+                            "metadata": {"plan": "monthly", "household_id": "1"},
+                        }
+                    },
+                }
+            )
+            ts2 = str(int(time.time()))
+            sig2 = hmac.new(secret.encode(), f"{ts2}.{payload}".encode(), hashlib.sha256).hexdigest()
+            res = self.client.post(
+                "/billing/webhook",
+                data=payload,
+                headers={"Stripe-Signature": f"t={ts2},v1={sig2}"},
+                content_type="application/json",
+            )
+            self.assertEqual(res.status_code, 200)
+            self.assertTrue(res.get_json()["received"])
+            with db.session(self.db_path) as conn:
+                hh = conn.execute("SELECT * FROM households WHERE id=1").fetchone()
+            self.assertEqual(hh["plan"], "monthly")
+            self.assertEqual(hh["stripe_customer_id"], "cus_testfamily")
+            self.assertEqual(hh["stripe_status"], "active")
+        finally:
+            for key in (
+                "STRIPE_SECRET_KEY",
+                "STRIPE_WEBHOOK_SECRET",
+                "STRIPE_PRICE_MONTHLY",
+                "STRIPE_PRICE_YEARLY",
+            ):
+                os.environ.pop(key, None)
 
 
 if __name__ == "__main__":

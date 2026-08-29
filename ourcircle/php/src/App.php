@@ -44,6 +44,7 @@ final class App
                 'version' => Product::version(),
                 'channel' => Product::CHANNEL,
                 'not' => 'InPmnt',
+                'stripe' => Billing::config()['enabled'],
             ]);
         } elseif ($method === 'GET' && $path === '/') {
             $this->landing();
@@ -82,10 +83,16 @@ final class App
         } elseif ($method === 'GET' && $path === '/report') {
             $this->requireLogin();
             $this->page('report', ['title' => 'Report & recover']);
+        } elseif ($method === 'POST' && $path === '/billing/webhook') {
+            $this->stripeWebhook();
         } elseif ($method === 'GET' && $path === '/billing') {
             $this->billing();
         } elseif ($method === 'POST' && $path === '/billing/choose') {
             $this->choosePlan();
+        } elseif ($method === 'POST' && $path === '/billing/portal') {
+            $this->billingPortal();
+        } elseif ($method === 'GET' && $path === '/billing/success') {
+            $this->billingSuccess();
         } else {
             http_response_code(404);
             echo 'Not found';
@@ -199,6 +206,7 @@ final class App
             'title' => 'OurCircle — Pause. Ask family. Then pay.',
             'robots' => 'index,follow',
             'plans' => self::PLANS,
+            'stripe_enabled' => Billing::config()['enabled'],
             'flashes' => $this->takeFlashes(),
         ]);
     }
@@ -231,7 +239,12 @@ final class App
     private function signup(): void
     {
         if (Http::method() === 'GET') {
-            $this->page('signup', ['title' => 'Start a circle · OurCircle', 'robots' => 'index,follow', 'flashes' => $this->takeFlashes()]);
+            $this->page('signup', [
+                'title' => 'Start a circle · OurCircle',
+                'robots' => 'index,follow',
+                'stripe_enabled' => Billing::config()['enabled'],
+                'flashes' => $this->takeFlashes(),
+            ]);
         }
         $name = trim((string) ($_POST['name'] ?? ''));
         $household = trim((string) ($_POST['household'] ?? ''));
@@ -239,7 +252,12 @@ final class App
         $password = (string) ($_POST['password'] ?? '');
         if ($name === '' || !str_contains($email, '@') || strlen($password) < 8) {
             $this->flash('Name, email, and an 8+ character password are required.', 'error');
-            $this->page('signup', ['title' => 'Start a circle · OurCircle', 'robots' => 'index,follow', 'flashes' => $this->takeFlashes()]);
+            $this->page('signup', [
+                'title' => 'Start a circle · OurCircle',
+                'robots' => 'index,follow',
+                'stripe_enabled' => Billing::config()['enabled'],
+                'flashes' => $this->takeFlashes(),
+            ]);
         }
         $st = $this->db->prepare('SELECT id FROM users WHERE lower(email)=?');
         $st->execute([$email]);
@@ -532,6 +550,7 @@ final class App
             'title' => 'Plans',
             'plans' => self::PLANS,
             'household' => $st->fetch() ?: [],
+            'stripe_enabled' => Billing::config()['enabled'],
         ]);
     }
 
@@ -543,9 +562,201 @@ final class App
             $this->flash('Choose Family monthly or Family yearly.', 'error');
             Http::redirect('/billing');
         }
+        $cfg = Billing::config();
+        if ($cfg['enabled']) {
+            $st = $this->db->prepare('SELECT * FROM households WHERE id=?');
+            $st->execute([$u['household_id']]);
+            $hh = $st->fetch() ?: [];
+            try {
+                $sess = Billing::createCheckout([
+                    'plan' => $plan,
+                    'customer_email' => $u['email'],
+                    'household_id' => $u['household_id'],
+                    'user_id' => $u['id'],
+                    'customer_id' => $hh['stripe_customer_id'] ?? null,
+                ]);
+            } catch (Throwable $e) {
+                $this->flash('Stripe could not start checkout: ' . $e->getMessage(), 'error');
+                Http::redirect('/billing');
+            }
+            $url = $sess['url'] ?? '';
+            if ($url === '') {
+                $this->flash('Stripe did not return a checkout URL.', 'error');
+                Http::redirect('/billing');
+            }
+            Http::redirect($url);
+        }
         $this->db->prepare('UPDATE households SET plan=?, founding=0 WHERE id=?')->execute([$plan, $u['household_id']]);
         $label = $plan === 'monthly' ? '$14.99/month' : '$119.99/year';
-        $this->flash("This circle is on Family {$plan} ({$label}). No card is charged in this build — this is the plan flag.", 'ok');
+        $this->flash("This circle is on Family {$plan} ({$label}). Add Stripe keys to .env to charge a card.", 'ok');
         Http::redirect('/billing');
+    }
+
+    private function billingPortal(): void
+    {
+        $u = $this->requireLogin();
+        $cfg = Billing::config();
+        if (!$cfg['enabled']) {
+            $this->flash('Stripe is not configured yet. Add keys to .env (see STRIPE.md).', 'error');
+            Http::redirect('/billing');
+        }
+        $st = $this->db->prepare('SELECT * FROM households WHERE id=?');
+        $st->execute([$u['household_id']]);
+        $hh = $st->fetch() ?: [];
+        $cid = (string) ($hh['stripe_customer_id'] ?? '');
+        if ($cid === '') {
+            $this->flash('No Stripe customer yet — choose a plan and pay first.', 'error');
+            Http::redirect('/billing');
+        }
+        try {
+            $sess = Billing::createPortal($cid);
+        } catch (Throwable $e) {
+            $this->flash('Stripe portal: ' . $e->getMessage(), 'error');
+            Http::redirect('/billing');
+        }
+        $url = $sess['url'] ?? '';
+        if ($url === '') {
+            $this->flash('Stripe did not return a portal URL. Enable Customer portal in the Stripe Dashboard.', 'error');
+            Http::redirect('/billing');
+        }
+        Http::redirect($url);
+    }
+
+    private function billingSuccess(): void
+    {
+        $this->requireLogin();
+        $sessionId = trim((string) ($_GET['session_id'] ?? ''));
+        $cfg = Billing::config();
+        if ($sessionId !== '' && $cfg['enabled']) {
+            try {
+                $checkout = Billing::retrieveCheckout($sessionId);
+                $this->applyCheckoutSession($checkout);
+                $this->flash('Payment received. This circle is on a paid Family plan.', 'ok');
+            } catch (Throwable $e) {
+                $this->flash('Paid, but we could not read the Stripe session yet. The webhook will finish this.', 'error');
+            }
+        }
+        Http::redirect('/billing');
+    }
+
+    private function stripeWebhook(): void
+    {
+        $cfg = Billing::config();
+        $payload = file_get_contents('php://input') ?: '';
+        $sig = (string) ($_SERVER['HTTP_STRIPE_SIGNATURE'] ?? '');
+        if ($cfg['secret_key'] === '' || !Billing::configuredValue($cfg['secret_key'], 'sk_', 20)) {
+            Http::json(['error' => 'Stripe not configured'], 503);
+        }
+        $wh = $cfg['webhook_secret'];
+        if (!Billing::configuredValue($wh, 'whsec_', 20)) {
+            Http::json(['error' => 'STRIPE_WEBHOOK_SECRET is required'], 503);
+        }
+        try {
+            $event = Billing::constructEvent($payload, $sig, $wh);
+        } catch (Throwable $e) {
+            Http::json(['error' => $e->getMessage()], 400);
+        }
+        $etype = (string) ($event['type'] ?? '');
+        $obj = is_array($event['data']['object'] ?? null) ? $event['data']['object'] : [];
+        if ($etype === 'checkout.session.completed') {
+            $this->applyCheckoutSession($obj);
+        } elseif (in_array($etype, ['customer.subscription.updated', 'customer.subscription.created'], true)) {
+            $this->applySubscription($obj);
+        } elseif ($etype === 'customer.subscription.deleted') {
+            $this->db->prepare(
+                "UPDATE households SET stripe_subscription_id=NULL, stripe_status='canceled' WHERE stripe_customer_id=?"
+            )->execute([$obj['customer'] ?? null]);
+        }
+        Http::json(['received' => true]);
+    }
+
+    private function resolveHouseholdId(array $meta, mixed $reference, mixed $customer): ?int
+    {
+        $hid = $meta['household_id'] ?? null;
+        if ($hid !== null && trim((string) $hid) !== '') {
+            return (int) $hid;
+        }
+        if ($reference !== null && trim((string) $reference) !== '') {
+            return (int) $reference;
+        }
+        if ($customer) {
+            $st = $this->db->prepare('SELECT id FROM households WHERE stripe_customer_id=?');
+            $st->execute([(string) $customer]);
+            $row = $st->fetch();
+            if ($row) {
+                return (int) $row['id'];
+            }
+        }
+        return null;
+    }
+
+    private function applyCheckoutSession(array $checkout): void
+    {
+        $customer = $checkout['customer'] ?? null;
+        if (is_array($customer)) {
+            $customer = $customer['id'] ?? null;
+        }
+        $subscription = $checkout['subscription'] ?? null;
+        $subId = is_string($subscription) ? $subscription : (is_array($subscription) ? ($subscription['id'] ?? null) : null);
+        $meta = is_array($checkout['metadata'] ?? null) ? $checkout['metadata'] : [];
+        $plan = is_array($meta) ? ($meta['plan'] ?? null) : null;
+        if (!$plan && is_array($subscription)) {
+            $plan = $this->planFromSubscription($subscription);
+        }
+        if (!in_array($plan, ['monthly', 'yearly'], true)) {
+            $plan = 'yearly';
+        }
+        $hid = $this->resolveHouseholdId($meta, $checkout['client_reference_id'] ?? null, $customer);
+        if ($hid === null) {
+            return;
+        }
+        $this->db->prepare(
+            'UPDATE households SET plan=?, founding=0, stripe_customer_id=COALESCE(?, stripe_customer_id),
+                stripe_subscription_id=COALESCE(?, stripe_subscription_id), stripe_status=? WHERE id=?'
+        )->execute([$plan, $customer, $subId, 'active', $hid]);
+    }
+
+    private function applySubscription(array $sub): void
+    {
+        $customer = $sub['customer'] ?? null;
+        if (is_array($customer)) {
+            $customer = $customer['id'] ?? null;
+        }
+        $subId = $sub['id'] ?? null;
+        $plan = $this->planFromSubscription($sub);
+        if (!in_array($plan, ['monthly', 'yearly'], true)) {
+            $plan = 'yearly';
+        }
+        $status = (string) ($sub['status'] ?? '');
+        $meta = is_array($sub['metadata'] ?? null) ? $sub['metadata'] : [];
+        if (in_array($status, ['canceled', 'unpaid', 'incomplete_expired'], true)) {
+            $this->db->prepare(
+                "UPDATE households SET stripe_subscription_id=NULL, stripe_status=? WHERE stripe_customer_id=?"
+            )->execute([$status, $customer]);
+            return;
+        }
+        $hid = $this->resolveHouseholdId($meta, $meta['household_id'] ?? null, $customer);
+        if ($hid === null) {
+            return;
+        }
+        $this->db->prepare(
+            'UPDATE households SET plan=?, stripe_customer_id=?, stripe_subscription_id=?, stripe_status=? WHERE id=?'
+        )->execute([$plan, $customer, $subId, $status !== '' ? $status : 'active', $hid]);
+    }
+
+    private function planFromSubscription(array $sub): ?string
+    {
+        $data = $sub['items']['data'] ?? null;
+        if (is_array($data) && $data) {
+            $price = $data[0]['price'] ?? null;
+            $priceId = is_string($price) ? $price : (is_array($price) ? ($price['id'] ?? null) : null);
+            $fromPrice = Billing::planFromPriceId($priceId);
+            if ($fromPrice) {
+                return $fromPrice;
+            }
+        }
+        $meta = is_array($sub['metadata'] ?? null) ? $sub['metadata'] : [];
+        $plan = $meta['plan'] ?? null;
+        return is_string($plan) ? $plan : null;
     }
 }

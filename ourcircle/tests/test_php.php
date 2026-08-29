@@ -34,7 +34,7 @@ $empty = Analyze::analyze('');
 check(Analyze::analyze('')['level'] === Analyze::UNKNOWN, 'empty unknown');
 
 require $root . '/php/src/Product.php';
-check(Product::version() === '1.0.1', 'product version 1.0.1');
+check(Product::version() === '1.0.2', 'product version 1.0.2');
 check(Product::NAME === 'Family Shield Pro', 'product name');
 check(Product::APP === 'OurCircle', 'app name');
 
@@ -48,6 +48,23 @@ check(str_contains($plans, "'id' => 'monthly'"), 'php monthly plan');
 check(str_contains($plans, "'id' => 'yearly'"), 'php yearly plan');
 check(str_contains($plans, '$14.99/month'), 'php monthly price');
 check(str_contains($plans, '$119.99/year'), 'php yearly price');
+check(is_file($root . '/php/src/Billing.php'), 'php billing class');
+
+require $root . '/php/src/Env.php';
+require $root . '/php/src/Billing.php';
+check(Billing::config()['enabled'] === false, 'stripe off without keys');
+$payload = '{"id":"evt_test","object":"event","type":"checkout.session.completed","data":{"object":{}}}';
+$secret = 'whsec_testsecret_abcdefghijklmnopqrstuvwxyz';
+$ts = (string) time();
+$sig = hash_hmac('sha256', $ts . '.' . $payload, $secret);
+$event = Billing::constructEvent($payload, "t={$ts},v1={$sig}", $secret);
+check(($event['type'] ?? '') === 'checkout.session.completed', 'stripe signed webhook');
+try {
+    Billing::constructEvent($payload, "t={$ts},v1=deadbeef", $secret);
+    check(false, 'bad stripe sig should throw');
+} catch (Throwable $e) {
+    check(str_contains($e->getMessage(), 'Invalid Stripe signature'), 'bad stripe sig rejected');
+}
 
 $dir = sys_get_temp_dir() . '/ocphp-' . bin2hex(random_bytes(4));
 mkdir($dir, 0775, true);
@@ -55,6 +72,9 @@ $db = Db::connect($dir . '/t.db');
 Db::init($db);
 $user = Db::authenticate($db, 'family@ourcircle.app', 'password123');
 check($user !== null && $user['email'] === 'family@ourcircle.app', 'demo login');
+$cols = array_map(fn ($c) => $c['name'], $db->query('PRAGMA table_info(households)')->fetchAll());
+check(in_array('stripe_customer_id', $cols, true), 'household stripe_customer_id');
+check(in_array('stripe_subscription_id', $cols, true), 'household stripe_subscription_id');
 
 $robots = file_get_contents($root . '/php/robots.txt') ?: '';
 check(str_contains($robots, 'familyshieldpro.com'), 'robots host');

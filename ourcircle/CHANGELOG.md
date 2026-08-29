@@ -3,6 +3,11 @@
 Product: **Family Shield Pro** (app name in the UI: **OurCircle**).  
 Not InPmnt. Version file: `ourcircle/VERSION` (independent of repo-root InPmnt `VERSION`).
 
+## 1.0.2 — 2026-08-29
+
+- Stripe Checkout, Customer Portal, and webhook are wired for Family monthly **$14.99** and Family yearly **$119.99**.
+- Add keys to `.env` (see **STRIPE.md**). Until then, choosing a plan only saves the flag — no charge.
+
 ## 1.0.1 — 2026-08-29
 
 - Public pricing is two Family plans only: **$14.99/month** or **$119.99/year** (yearly highlighted).

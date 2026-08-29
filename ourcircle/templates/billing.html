@@ -1,7 +1,7 @@
 {% extends "shell.html" %}
 {% block heading %}Plans{% endblock %}
 {% block main %}
-<p>This household is on <strong>{{ household.plan or 'yearly' }}</strong>.</p>
+<p>This household is on <strong>{{ household.plan or 'yearly' }}</strong>{% if household.stripe_status %} · Stripe: {{ household.stripe_status }}{% endif %}.</p>
 <div class="plans">
   {% for p in plans %}
   <div class="panel{% if p.featured %} featured{% endif %}">
@@ -11,10 +11,19 @@
     <p>{{ p.detail }}</p>
     <form method="post" action="{{ url_for('choose_plan') }}">
       <input type="hidden" name="plan" value="{{ p.id }}" />
-      <p><button class="btn{% if p.featured %} gold{% endif %} wide" type="submit">Choose {{ p.name }}</button></p>
+      <p><button class="btn{% if p.featured %} gold{% endif %} wide" type="submit">{% if stripe_enabled %}Pay {{ p.price }}{% else %}Choose {{ p.name }}{% endif %}</button></p>
     </form>
   </div>
   {% endfor %}
 </div>
-<p class="disclaimer">No card is charged in this build. Churches, senior centers, and veterans groups: ask us about a shared license.</p>
+{% if stripe_enabled and household.stripe_customer_id %}
+<form method="post" action="{{ url_for('billing_portal') }}">
+  <p><button class="btn ghost wide" type="submit">Update card or cancel</button></p>
+</form>
+{% endif %}
+{% if stripe_enabled %}
+<p class="disclaimer">Choosing a plan opens Stripe Checkout. Churches, senior centers, and veterans groups: ask us about a shared license.</p>
+{% else %}
+<p class="disclaimer">Stripe keys are not in <code>.env</code> yet, so a plan choice is only saved on this circle. Add keys (see STRIPE.md) to charge $14.99/month or $119.99/year. Churches, senior centers, and veterans groups: ask us about a shared license.</p>
+{% endif %}
 {% endblock %}

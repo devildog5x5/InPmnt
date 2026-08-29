@@ -21,7 +21,7 @@ View::start($title, $site_home, 'index,follow', '/signup');
       <input name="password" type="password" required minlength="8" />
       <p><button class="btn gold wide" type="submit">Start family year · $119.99</button></p>
     </form>
-    <p class="disclaimer">No card is charged in this build. Default is Family yearly. Switch to $14.99/month anytime on Plans.</p>
+    <p class="disclaimer"><?php if (!empty($stripe_enabled)): ?>You’ll pay $119.99/year on Stripe after you create the circle, or switch to $14.99/month on Plans.<?php else: ?>No card is charged until Stripe keys are in .env. Default is Family yearly. Switch to $14.99/month anytime on Plans.<?php endif; ?></p>
     <p><a href="/login">Already have a login</a></p>
   </div>
 </div>

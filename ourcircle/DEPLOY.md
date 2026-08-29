@@ -1,7 +1,7 @@
 # Family Shield Pro — deploy (no VPS)
 
 **Site:** https://familyshieldpro.com  
-**Zip:** https://raw.githubusercontent.com/devildog5x5/InPmnt/cursor/ourcircle-family-shield-4df6/patches/FamilyShieldPro-1.0.1.zip  
+**Zip:** https://raw.githubusercontent.com/devildog5x5/InPmnt/cursor/ourcircle-family-shield-4df6/patches/FamilyShieldPro-1.0.2.zip  
 (`robots.txt` and `sitemap.xml` are inside the zip.)  
 **Do not** put this in an InPmnt folder or overwrite a live `.env`.
 
@@ -12,10 +12,14 @@ You do not need Ubuntu, Nginx, systemd, or SSH.
 1. Download **FamilyShieldPro.zip**.
 2. hPanel → **Files → File Manager** → open `public_html`.
 3. Upload the zip → **Extract** / Unzip **here** (you should see `index.php` and `.htaccess` in `public_html`, not inside a subfolder).
-4. hPanel → **Advanced → PHP Configuration**: PHP **8.2+**, enable **pdo_sqlite**.
+4. hPanel → **Advanced → PHP Configuration**: PHP **8.2+**, enable **pdo_sqlite** and **curl**.
 5. Open https://familyshieldpro.com
 
 First visit creates `.env` (mode `640`) and `data/ourcircle.db`. Demo: `family@ourcircle.app` / `password123`.
+
+**Stripe:** the checkout code is already in the zip. Paste keys into the live `.env` — do not overwrite that file. Full steps: **[STRIPE.md](STRIPE.md)**.
+
+Webhook URL: `https://familyshieldpro.com/billing/webhook`
 
 Point the domain’s DNS at Hostinger as you already do for other sites. Hostinger provides HTTPS.
 

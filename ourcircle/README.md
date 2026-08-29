@@ -34,7 +34,7 @@ Demo circle: `family@ourcircle.app` / `password123`
 - Keep a protected list of banks, doctors, insurers, utilities, and family contacts
 - Follow reporting steps (FTC, IC3, card freeze) if money already moved
 
-Family plan: up to **five people**. **$14.99/month** or **$119.99/year**.
+Family plan: up to **five people**. **$14.99/month** or **$119.99/year**. Stripe Checkout is wired — paste keys per **[STRIPE.md](STRIPE.md)**.
 
 ## Paid validation (seven days)
 
@@ -50,7 +50,7 @@ If none hits the bar, change the offer before writing more product code.
 
 ## Downloads
 
-**https://raw.githubusercontent.com/devildog5x5/InPmnt/cursor/ourcircle-family-shield-4df6/patches/FamilyShieldPro-1.0.1.zip**
+**https://raw.githubusercontent.com/devildog5x5/InPmnt/cursor/ourcircle-family-shield-4df6/patches/FamilyShieldPro-1.0.2.zip**
 
 That zip is the Hostinger site. `robots.txt` and `sitemap.xml` are already inside it (next to `index.php`). Unzip into `public_html`.
 
@@ -59,7 +59,7 @@ That zip is the Hostinger site. `robots.txt` and `sitemap.xml` are already insid
 Same motion as InPmnt: unzip **FamilyShieldPro.zip** into `public_html`. Full steps: **[DEPLOY.md](DEPLOY.md)**. Go-to-market: **[GO_TO_MARKET.md](GO_TO_MARKET.md)**.
 
 1. Upload `FamilyShieldPro.zip` in hPanel File Manager → `public_html` → Unzip here.
-2. PHP 8.2+ with **pdo_sqlite**.
+2. PHP 8.2+ with **pdo_sqlite** and **curl**. Stripe keys go in `.env` — **[STRIPE.md](STRIPE.md)**.
 3. Open https://familyshieldpro.com
 
 Permissions are preset in the zip: folders `755`, `data/` `775`, files `644`. Never `777`. Rebuild with `bash pack_zip.sh`.

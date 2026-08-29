@@ -1,7 +1,7 @@
 # Family Shield Pro — Go to market
 
 **Product:** OurCircle on **https://familyshieldpro.com**  
-**Owner offer:** Family yearly **$119.99** (default) or Family monthly **$14.99**. No card charge in this build.  
+**Owner offer:** Family yearly **$119.99** (default) or Family monthly **$14.99**. Stripe is wired — add keys (`STRIPE.md`).  
 **Positioning line:** Pause. Ask family. Then pay.
 
 This is **not** an AI scam-detector launch. Families do not buy “our model scored 94%.” They buy a **circle that makes them pause** before they send money, gift cards, crypto, passwords, or account information.
@@ -27,7 +27,7 @@ Do **not** lead with “AI.” Lead with the rule on every screen:
 
 **Family monthly — $14.99.** Same circle if they will not pay a year up front. Do not list Individual, founding, or group prices on the public page.
 
-This build records a **refundable reservation**, not a Stripe charge. When ten families have reserved a year (or monthly), wire cards. Until then, money (or a named hold) is the signal — opinions are not.
+This build records a **refundable reservation**, not a Stripe charge, until keys are in `.env`. Checkout is already wired: **[STRIPE.md](STRIPE.md)**. When ten families have reserved a year (or monthly), turn on live keys. Until then, money (or a named hold) is the signal — opinions are not.
 
 ## Seven-day paid validation
 

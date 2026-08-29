@@ -4,8 +4,9 @@ Site: https://familyshieldpro.com
 
 1. In hPanel → Files → File Manager, open public_html.
 2. Upload FamilyShieldPro.zip and Unzip here (files sit next to each other, not in a subfolder).
-3. hPanel → Advanced → PHP Configuration: PHP 8.2+ and enable pdo_sqlite.
+3. hPanel → Advanced → PHP Configuration: PHP 8.2+, enable pdo_sqlite and curl.
 4. Open https://familyshieldpro.com and sign up (or demo family@ourcircle.app / password123).
+5. Stripe: add keys to public_html/.env (see STRIPE.md in this zip). Do not overwrite a live .env.
 
 Permissions are already set in the zip:
   folders 755   (data/ and data/uploads/ 775 so the site can save the database)

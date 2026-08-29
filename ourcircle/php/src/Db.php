@@ -34,6 +34,9 @@ final class Db
                 name TEXT NOT NULL,
                 plan TEXT NOT NULL DEFAULT 'yearly',
                 founding INTEGER NOT NULL DEFAULT 0,
+                stripe_customer_id TEXT,
+                stripe_subscription_id TEXT,
+                stripe_status TEXT,
                 created_at TEXT NOT NULL
             );
             CREATE TABLE IF NOT EXISTS users (
@@ -111,9 +114,29 @@ final class Db
                 created_at TEXT NOT NULL
             );
         SQL);
+        self::migrateHouseholdStripe($db);
         $n = (int) $db->query('SELECT COUNT(*) FROM users')->fetchColumn();
         if ($n === 0) {
             self::seed($db);
+        }
+    }
+
+    public static function migrateHouseholdStripe(PDO $db): void
+    {
+        $cols = $db->query('PRAGMA table_info(households)')->fetchAll();
+        $names = [];
+        foreach ($cols as $col) {
+            $names[] = (string) ($col['name'] ?? '');
+        }
+        $add = [
+            'stripe_customer_id' => 'TEXT',
+            'stripe_subscription_id' => 'TEXT',
+            'stripe_status' => 'TEXT',
+        ];
+        foreach ($add as $col => $type) {
+            if (!in_array($col, $names, true)) {
+                $db->exec("ALTER TABLE households ADD COLUMN {$col} {$type}");
+            }
         }
     }
 

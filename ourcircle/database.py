@@ -61,6 +61,9 @@ def init_db(path: str | None = None) -> None:
                 name TEXT NOT NULL,
                 plan TEXT NOT NULL DEFAULT 'yearly',
                 founding INTEGER NOT NULL DEFAULT 0,
+                stripe_customer_id TEXT,
+                stripe_subscription_id TEXT,
+                stripe_status TEXT,
                 created_at TEXT NOT NULL
             );
             CREATE TABLE IF NOT EXISTS users (
@@ -139,9 +142,21 @@ def init_db(path: str | None = None) -> None:
             );
             """
         )
+        _migrate_household_stripe(conn)
         n = conn.execute("SELECT COUNT(*) AS c FROM users").fetchone()["c"]
         if n == 0:
             _seed(conn)
+
+
+def _migrate_household_stripe(conn: sqlite3.Connection) -> None:
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(households)").fetchall()}
+    for name, ddl in (
+        ("stripe_customer_id", "TEXT"),
+        ("stripe_subscription_id", "TEXT"),
+        ("stripe_status", "TEXT"),
+    ):
+        if name not in cols:
+            conn.execute(f"ALTER TABLE households ADD COLUMN {name} {ddl}")
 
 
 def _seed(conn: sqlite3.Connection) -> None:
