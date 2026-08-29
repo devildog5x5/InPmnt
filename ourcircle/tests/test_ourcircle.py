@@ -86,6 +86,8 @@ class AppTests(unittest.TestCase):
         self.assertNotIn(b"Hostinger PHP", land.data)
         self.assertNotIn(b"robots.txt", land.data)
         self.assertIn(b"guidance, not a guarantee", land.data)
+        self.assertIn(b"strategy and tactics", land.data)
+        self.assertIn(b"Not a guarantee", land.data)
         signup_page = self.client.get("/signup")
         self.assertEqual(signup_page.status_code, 200)
         self.assertIn(b"The Smith circle", signup_page.data)

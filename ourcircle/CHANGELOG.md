@@ -3,6 +3,10 @@
 Product: **Family Shield Pro** (app name in the UI: **OurCircle**).  
 Not InPmnt. Version file: `ourcircle/VERSION` (independent of repo-root InPmnt `VERSION`).
 
+## 1.2.12 — 2026-08-29
+
+- Homepage: **We offer strategy and tactics to help you and your family prevent being scammed. Not a guarantee.** Your circle and we help prevent you from being taken advantage of.
+
 ## 1.2.11 — 2026-08-29
 
 - Guidance line sits under each **Pay / Choose** plan button and next to **Please call me before I pay** on a check. Paying still does not make a request safe.

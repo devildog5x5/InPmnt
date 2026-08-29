@@ -34,7 +34,7 @@ $empty = Analyze::analyze('');
 check(Analyze::analyze('')['level'] === Analyze::UNKNOWN, 'empty unknown');
 
 require $root . '/php/src/Product.php';
-check(Product::version() === '1.2.11', 'product version 1.2.11');
+check(Product::version() === '1.2.12', 'product version 1.2.12');
 check(Product::NAME === 'Family Shield Pro', 'product name');
 check(Product::APP === 'OurCircle', 'app name');
 
@@ -56,6 +56,8 @@ check(str_contains($landing, 'Really! Really! Really!'), 'landing really');
 check(str_contains($landing, 'Why we built this'), 'landing why');
 check(str_contains($landing, 'CustomerService@FamilyShieldPro.com'), 'landing support email');
 check(str_contains($landing, 'guidance, not a guarantee'), 'landing guidance disclaimer');
+check(str_contains($landing, 'strategy and tactics'), 'landing strategy tactics');
+check(str_contains($landing, 'Not a guarantee'), 'landing not a guarantee');
 check(!str_contains($landing, 'href="/offers"'), 'landing no offers link');
 check(!is_file($root . '/php/views/offers.php'), 'php offers view gone');
 check(!str_contains($landing, 'not InPmnt'), 'landing no product-identity footer');
