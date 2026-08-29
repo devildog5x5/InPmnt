@@ -80,6 +80,7 @@ class AppTests(unittest.TestCase):
         self.assertNotIn(b"not InPmnt", land.data)
         self.assertNotIn(b"Hostinger PHP", land.data)
         self.assertNotIn(b"robots.txt", land.data)
+        self.assertIn(b"guidance, not a guarantee", land.data)
         login_page = self.client.get("/login")
         self.assertIn(b'href="https://familyshieldpro.com"', login_page.data)
         login = self.client.post(
@@ -89,6 +90,7 @@ class AppTests(unittest.TestCase):
         )
         self.assertEqual(login.status_code, 200)
         self.assertIn(b"Check this with OurCircle", login.data)
+        self.assertIn(b"guidance, not a guarantee", login.data)
         self.assertIn(b'href="https://familyshieldpro.com"', login.data)
         billing = self.client.get("/billing")
         self.assertEqual(billing.status_code, 200)

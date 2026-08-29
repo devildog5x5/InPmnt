@@ -14,10 +14,12 @@ CORE_RULE = (
     "until the request is independently verified."
 )
 
+GUIDANCE = "This application offers guidance, not a guarantee."
+
 DISCLAIMER = (
     "OurCircle cannot tell you that something is safe. We help you pause, look for "
     "warning signs, check your family's trusted list, and ask someone you trust "
-    "before you act."
+    "before you act. " + GUIDANCE
 )
 
 KNOWN_BRANDS = {

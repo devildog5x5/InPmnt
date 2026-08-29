@@ -3,6 +3,10 @@
 Product: **Family Shield Pro** (app name in the UI: **OurCircle**).  
 Not InPmnt. Version file: `ourcircle/VERSION` (independent of repo-root InPmnt `VERSION`).
 
+## 1.2.3 — 2026-08-29
+
+- Short disclaimer on the homepage, signed-in screens, checks, and chat: **This application offers guidance, not a guarantee.**
+
 ## 1.2.2 — 2026-08-29
 
 - Removed the public **Offers** page (`/offers`), nav link, and sitemap/robots entries.

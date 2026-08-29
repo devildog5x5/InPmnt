@@ -8,6 +8,7 @@ final class View
         $vars['site_home'] = $vars['site_home'] ?? rtrim(Env::get('OURCIRCLE_SITE_URL', Env::get('BASE_URL', 'https://familyshieldpro.com')), '/');
         $vars['core_rule'] = $vars['core_rule'] ?? Analyze::CORE_RULE;
         $vars['disclaimer'] = $vars['disclaimer'] ?? Analyze::DISCLAIMER;
+        $vars['guidance'] = $vars['guidance'] ?? Analyze::GUIDANCE;
         $vars['flashes'] = $vars['flashes'] ?? [];
         $vars['user_name'] = $vars['user_name'] ?? '';
         $vars['path'] = Http::path();
@@ -90,7 +91,7 @@ final class View
 
     public static function appClose(): void
     {
-        echo '</main></div>';
+        echo '</main><p class="disclaimer">' . Http::e(Analyze::GUIDANCE) . '</p></div>';
         self::end();
     }
 }

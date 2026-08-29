@@ -20,7 +20,7 @@ from flask import (
 )
 from werkzeug.utils import secure_filename
 
-from analyze import CORE_RULE, DISCLAIMER, analyze
+from analyze import CORE_RULE, DISCLAIMER, GUIDANCE, analyze
 from auth import (
     consume_recovery,
     group_secret,
@@ -115,6 +115,7 @@ def create_app() -> Flask:
         return {
             "core_rule": CORE_RULE,
             "disclaimer": DISCLAIMER,
+            "guidance": GUIDANCE,
             "user_name": session.get("name"),
             "site_home": site_url(),
             "stripe_enabled": load_stripe_config().enabled,

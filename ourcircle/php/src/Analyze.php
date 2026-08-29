@@ -9,7 +9,8 @@ final class Analyze
     public const UNKNOWN = 'unknown';
 
     public const CORE_RULE = 'Never send money, cryptocurrency, gift cards, passwords, or account information until the request is independently verified.';
-    public const DISCLAIMER = 'OurCircle cannot tell you that something is safe. We help you pause, look for warning signs, check your family\'s trusted list, and ask someone you trust before you act.';
+    public const GUIDANCE = 'This application offers guidance, not a guarantee.';
+    public const DISCLAIMER = 'OurCircle cannot tell you that something is safe. We help you pause, look for warning signs, check your family\'s trusted list, and ask someone you trust before you act. ' . self::GUIDANCE;
 
     public const KNOWN_BRANDS = [
         'irs.gov', 'ssa.gov', 'usa.gov', 'ftc.gov', 'paypal.com', 'amazon.com', 'apple.com',

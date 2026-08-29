@@ -88,7 +88,7 @@ View::start($title, $site_home, 'index,follow', '/');
     -->
   </section>
   <footer class="footer">
-    OurCircle is built for families — including parents, adult children, and grandparents — who want a second set of eyes. We do not guarantee that a request is legitimate.
+    OurCircle is built for families — including parents, adult children, and grandparents — who want a second set of eyes. This application offers guidance, not a guarantee.
   </footer>
 </div>
 <?php View::end(); ?>

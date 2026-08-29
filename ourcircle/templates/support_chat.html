@@ -12,6 +12,7 @@
       <button class="btn" type="submit">Send</button>
     </form>
     <p class="fsp-chat-mail">Email <a href="mailto:CustomerService@FamilyShieldPro.com">CustomerService@FamilyShieldPro.com</a></p>
+    <p class="fsp-chat-mail">This application offers guidance, not a guarantee.</p>
   </div>
 </div>
 <script>
