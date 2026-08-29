@@ -16,4 +16,4 @@ View::start($title, $site_home, 'noindex,nofollow', '/reset/' . ($token ?? ''));
     </form>
   </div>
 </div>
-</body></html>
+<?php View::end(); ?>

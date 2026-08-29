@@ -22,4 +22,4 @@ View::start($title, $site_home, 'index,follow', '/login');
     <p><a href="/signup">Start a circle</a></p>
   </div>
 </div>
-</body></html>
+<?php View::end(); ?>

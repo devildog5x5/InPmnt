@@ -22,4 +22,4 @@ View::start($title, $site_home, 'noindex,nofollow', '/login/2fa');
     <p><a href="/logout">Cancel</a></p>
   </div>
 </div>
-</body></html>
+<?php View::end(); ?>

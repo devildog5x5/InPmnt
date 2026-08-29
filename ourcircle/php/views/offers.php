@@ -52,4 +52,4 @@ View::start($title, $site_home, 'index,follow', '/offers');
     <p class="disclaimer">We store the reservation so we can count seven-day demand. Nothing is billed until you confirm.</p>
   </form>
 </div>
-</body></html>
+<?php View::end(); ?>

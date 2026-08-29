@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from pathlib import Path
 from typing import Any
 
@@ -53,6 +54,7 @@ from database import (
     trusted_list,
 )
 from mail import mail_configured, send_email
+from support_chat import handle_chat, openai_configured
 from werkzeug.security import check_password_hash, generate_password_hash
 
 ROOT = Path(__file__).resolve().parent
@@ -71,6 +73,7 @@ PRIVATE_PREFIXES = (
     "/report",
     "/account",
     "/logout",
+    "/support",
 )
 
 
@@ -180,6 +183,7 @@ def create_app() -> Flask:
             "not": "InPmnt",
             "stripe": load_stripe_config().enabled,
             "mail": mail_configured(),
+            "openai": openai_configured(),
         }
 
     def current_user():
@@ -199,6 +203,29 @@ def create_app() -> Flask:
         if current_user():
             return redirect(url_for("home"))
         return render_template("landing.html", plans=PLANS)
+
+    @app.post("/support/chat")
+    def support_chat():
+        data = request.get_json(silent=True) or {}
+        message = (data.get("message") or request.form.get("message") or "").strip()
+        history = data.get("history") if isinstance(data.get("history"), list) else []
+        n = int(session.get("support_chat_n") or 0)
+        started = int(session.get("support_chat_t") or 0)
+        now_ts = int(time.time())
+        if started and now_ts - started > 3600:
+            n = 0
+            started = now_ts
+        if not started:
+            started = now_ts
+        if n >= 30:
+            return {
+                "reply": "Please email CustomerService@FamilyShieldPro.com — this chat has a short hourly limit.",
+                "source": "limit",
+            }, 429
+        session["support_chat_n"] = n + 1
+        session["support_chat_t"] = started
+        reply, source = handle_chat(message, history)
+        return {"reply": reply, "source": source}
 
     @app.get("/offers")
     def offers():

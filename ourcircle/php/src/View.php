@@ -77,8 +77,20 @@ final class View
             . '<main class="app-main">';
     }
 
+    public static function chatWidget(): void
+    {
+        require dirname(__DIR__) . '/views/support_chat.php';
+    }
+
+    public static function end(): void
+    {
+        self::chatWidget();
+        echo '</body></html>';
+    }
+
     public static function appClose(): void
     {
-        echo '</main></div></body></html>';
+        echo '</main></div>';
+        self::end();
     }
 }

@@ -29,4 +29,4 @@ View::start($title, $site_home, 'index,follow', '/forgot');
     <p><a href="/login">Back to sign in</a></p>
   </div>
 </div>
-</body></html>
+<?php View::end(); ?>

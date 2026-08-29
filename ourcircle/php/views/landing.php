@@ -11,6 +11,7 @@ View::start($title, $site_home, 'index,follow', '/');
   <header class="site-header">
     <?= View::brand($site_home) ?>
     <nav class="nav">
+      <a class="btn ghost" href="#contact">Contact</a>
       <a class="btn ghost" href="/offers">Offers</a>
       <a class="btn ghost" href="/login">Sign in</a>
       <a class="btn" href="/signup">Start a circle</a>
@@ -72,10 +73,26 @@ View::start($title, $site_home, 'index,follow', '/');
     <?php endforeach; ?>
   </div>
   <p>Churches, senior centers, and veterans groups: ask us about a shared license. Credit unions and insurers: per-member partnership pricing.</p>
+  <section class="support-contact" id="contact">
+    <h2>Customer service</h2>
+    <p>Questions about your circle, billing, login, or this site? Email us. A person reads every message.</p>
+    <p><a class="btn" href="mailto:CustomerService@FamilyShieldPro.com">CustomerService@FamilyShieldPro.com</a></p>
+    <!--
+      CUSTOMER SERVICE PHONE — commented out until a number is assigned.
+
+      To bring it online (see SUPPORT.md):
+      1. Uncomment the <p class="support-phone"> line below (remove this HTML comment wrapper).
+      2. Replace +1XXXXXXXXXX and (XXX) XXX-XXXX with the live number.
+      3. Optional: set SUPPORT_PHONE in the live .env (notes only; visitors see this markup).
+
+      <p class="support-phone">Call us: <a href="tel:+1XXXXXXXXXX">(XXX) XXX-XXXX</a></p>
+    -->
+  </section>
   <footer class="footer">
     OurCircle is built for families — including parents, adult children, and grandparents — who want a second set of eyes. We do not guarantee that a request is legitimate.
     <span class="muted"> · <?= Http::e(Product::label()) ?> · Hostinger PHP · not InPmnt
+     · <a href="mailto:CustomerService@FamilyShieldPro.com">CustomerService@FamilyShieldPro.com</a>
      · <a href="<?= Http::e($site_home) ?>/robots.txt">robots.txt</a> · <a href="<?= Http::e($site_home) ?>/sitemap.xml">sitemap.xml</a></span>
   </footer>
 </div>
-</body></html>
+<?php View::end(); ?>

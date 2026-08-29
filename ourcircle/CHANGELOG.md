@@ -3,6 +3,12 @@
 Product: **Family Shield Pro** (app name in the UI: **OurCircle**).  
 Not InPmnt. Version file: `ourcircle/VERSION` (independent of repo-root InPmnt `VERSION`).
 
+## 1.2.0 — 2026-08-29
+
+- Customer-service email on the homepage: **CustomerService@FamilyShieldPro.com**.
+- Site-wide **Chat with us** widget (FAQ; optional OpenAI key — see **SUPPORT.md**). Never says a request is “safe.”
+- Phone number slot is in the homepage code, commented out, until a number is assigned.
+
 ## 1.1.1 — 2026-08-29
 
 - Homepage explains the service, why we built it (we have been scammed; they keep getting more believable), the core pause rule, and “if it sounds too good to be true, it usually is.”

@@ -23,4 +23,4 @@ View::start($title, $site_home, 'noindex,nofollow', '/join/' . ($token ?? ''));
     </form>
   </div>
 </div>
-</body></html>
+<?php View::end(); ?>

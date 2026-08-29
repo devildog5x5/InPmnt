@@ -25,4 +25,4 @@ View::start($title, $site_home, 'index,follow', '/signup');
     <p><a href="/login">Already have a login</a></p>
   </div>
 </div>
-</body></html>
+<?php View::end(); ?>

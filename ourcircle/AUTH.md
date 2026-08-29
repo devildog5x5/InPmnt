@@ -46,3 +46,7 @@ Until mail is set, `/forgot` still accepts the form (same “if that email is on
 Sign in → **Account** → **Turn on 2FA** → add the setup key in the app → enter the 6-digit code → **write down the recovery codes**.
 
 Lost phone: `/forgot` → recovery code + new password, then sign in (if 2FA is still on, use another recovery code at the 2FA screen).
+
+## Customer service
+
+Homepage email, **Chat with us** widget, and the commented-out phone number: **[SUPPORT.md](SUPPORT.md)**.

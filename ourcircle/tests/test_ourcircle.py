@@ -72,6 +72,10 @@ class AppTests(unittest.TestCase):
         self.assertNotIn(b"Founding year $49", land.data)
         self.assertIn(b"Family monthly", land.data)
         self.assertIn(b"Family yearly", land.data)
+        self.assertIn(b"CustomerService@FamilyShieldPro.com", land.data)
+        self.assertIn(b'id="contact"', land.data)
+        self.assertIn(b"CUSTOMER SERVICE PHONE", land.data)
+        self.assertIn(b"fsp-chat", land.data)
         login_page = self.client.get("/login")
         self.assertIn(b'href="https://familyshieldpro.com"', login_page.data)
         login = self.client.post(
@@ -154,6 +158,7 @@ class AppTests(unittest.TestCase):
         self.assertIn("Allow: /signup", text)
         self.assertIn("Allow: /forgot", text)
         self.assertIn("Disallow: /account", text)
+        self.assertIn("Disallow: /support", text)
         sitemap = self.client.get("/sitemap.xml")
         self.assertEqual(sitemap.status_code, 200)
         xml = sitemap.data.decode("utf-8")
@@ -291,6 +296,25 @@ class AppTests(unittest.TestCase):
         self.assertIn(b"Check this with OurCircle", via_code.data)
         login_page = self.client.get("/login")
         self.assertIn(b"Forgot password", login_page.data)
+        chat = self.client.post(
+            "/support/chat",
+            json={"message": "how much does a family plan cost?"},
+        )
+        self.assertEqual(chat.status_code, 200)
+        chat_body = chat.get_json()
+        self.assertIn("14.99", chat_body["reply"])
+        self.assertEqual(chat_body["source"], "faq")
+        safe_chat = self.client.post(
+            "/support/chat",
+            json={"message": "is this paypal email safe to pay?"},
+        )
+        self.assertEqual(safe_chat.status_code, 200)
+        safe_reply = safe_chat.get_json()["reply"].lower()
+        self.assertNotIn("this is safe", safe_reply)
+        self.assertIn("never", safe_reply)
+        self.assertIn("CustomerService@FamilyShieldPro.com", self.client.get("/login").data.decode())
+        health = self.client.get("/healthz")
+        self.assertFalse(health.get_json().get("openai"))
 
 
 if __name__ == "__main__":

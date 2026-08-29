@@ -20,7 +20,7 @@ final class App
         ],
     ];
 
-    public const PRIVATE = ['/home', '/circle', '/trusted', '/checks', '/uploads', '/join', '/billing', '/report', '/account', '/logout'];
+    public const PRIVATE = ['/home', '/circle', '/trusted', '/checks', '/uploads', '/join', '/billing', '/report', '/account', '/logout', '/support'];
 
     public function __construct(private PDO $db, private string $root)
     {
@@ -46,7 +46,10 @@ final class App
                 'not' => 'InPmnt',
                 'stripe' => Billing::config()['enabled'],
                 'mail' => Mailer::configured(),
+                'openai' => SupportChat::openaiConfigured(),
             ]);
+        } elseif ($method === 'POST' && $path === '/support/chat') {
+            $this->supportChat();
         } elseif ($method === 'GET' && $path === '/') {
             $this->landing();
         } elseif ($path === '/offers') {
@@ -217,6 +220,39 @@ final class App
         header('Content-Type: application/xml; charset=utf-8');
         echo $body;
         exit;
+    }
+
+    private function supportChat(): never
+    {
+        $raw = file_get_contents('php://input') ?: '';
+        $data = json_decode($raw, true);
+        if (!is_array($data)) {
+            $data = [];
+        }
+        $message = trim((string) ($data['message'] ?? $_POST['message'] ?? ''));
+        $history = $data['history'] ?? [];
+        if (!is_array($history)) {
+            $history = [];
+        }
+        $n = (int) ($_SESSION['support_chat_n'] ?? 0);
+        $started = (int) ($_SESSION['support_chat_t'] ?? 0);
+        $now = time();
+        if ($started && ($now - $started) > 3600) {
+            $n = 0;
+            $started = $now;
+        }
+        if (!$started) {
+            $started = $now;
+        }
+        if ($n >= 30) {
+            Http::json([
+                'reply' => 'Please email CustomerService@FamilyShieldPro.com — this chat has a short hourly limit.',
+                'source' => 'limit',
+            ], 429);
+        }
+        $_SESSION['support_chat_n'] = $n + 1;
+        $_SESSION['support_chat_t'] = $started;
+        Http::json(SupportChat::reply($message, $history));
     }
 
     private function landing(): void
