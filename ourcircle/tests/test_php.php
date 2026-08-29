@@ -34,7 +34,7 @@ $empty = Analyze::analyze('');
 check(Analyze::analyze('')['level'] === Analyze::UNKNOWN, 'empty unknown');
 
 require $root . '/php/src/Product.php';
-check(Product::version() === '1.2.10', 'product version 1.2.10');
+check(Product::version() === '1.2.11', 'product version 1.2.11');
 check(Product::NAME === 'Family Shield Pro', 'product name');
 check(Product::APP === 'OurCircle', 'app name');
 
@@ -45,6 +45,9 @@ check(str_contains($signup, 'Analyze::GUIDANCE') || str_contains($signup, 'guida
 $billingPhp = file_get_contents($root . '/php/views/billing.php') ?: '';
 check(str_contains($billingPhp, 'Paying for a plan does not make a request safe'), 'billing pay disclaimer');
 check(str_contains($billingPhp, 'Analyze::GUIDANCE'), 'billing guidance constant');
+$checkPhp = file_get_contents($root . '/php/views/check.php') ?: '';
+check(str_contains($checkPhp, 'Please call me before I pay'), 'check pay-alert button');
+check(str_contains($checkPhp, 'Analyze::GUIDANCE') || str_contains($checkPhp, 'guidance, not a guarantee'), 'check pay guidance');
 $landing = file_get_contents($root . '/php/views/landing.php') ?: '';
 check(str_contains($landing, '$14.99'), 'landing monthly price');
 check(str_contains($landing, '$119.99'), 'landing yearly price');

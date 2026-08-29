@@ -33,6 +33,7 @@ $level = Http::e((string) ($report['level'] ?? 'unknown'));
     <form method="post" action="/checks/<?= (int) $item['id'] ?>/alert">
       <button class="btn danger wide" type="submit">Please call me before I pay</button>
     </form>
+    <p class="disclaimer"><?= Http::e($guidance ?? Analyze::GUIDANCE) ?></p>
     <form method="post" action="/checks/<?= (int) $item['id'] ?>/review" style="margin-top:12px">
       <label>Ask your circle to look</label>
       <textarea name="comment" placeholder="Mom — can you look at this text before I send anything?"></textarea>

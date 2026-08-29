@@ -137,6 +137,7 @@ class AppTests(unittest.TestCase):
         self.assertIn(b"Pause", res.data)
         self.assertNotIn(b"this is safe", res.data.lower())
         self.assertIn(b"Please call me before I pay", res.data)
+        self.assertIn(b"guidance, not a guarantee", res.data)
         alert = self.client.post("/checks/1/alert", follow_redirects=True)
         self.assertEqual(alert.status_code, 200)
         home = self.client.get("/home")

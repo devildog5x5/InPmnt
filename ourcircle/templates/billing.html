@@ -14,6 +14,7 @@
       <input type="hidden" name="plan" value="{{ p.id }}" />
       <p><button class="btn{% if p.featured %} gold{% endif %} wide" type="submit">{% if stripe_enabled %}Pay {{ p.price }}{% else %}Choose {{ p.name }}{% endif %}</button></p>
     </form>
+    <p class="disclaimer">{{ guidance }}</p>
   </div>
   {% endfor %}
 </div>
@@ -21,6 +22,7 @@
 <form method="post" action="{{ url_for('billing_portal') }}">
   <p><button class="btn ghost wide" type="submit">Update card or cancel</button></p>
 </form>
+<p class="disclaimer">{{ guidance }}</p>
 {% endif %}
 {% if stripe_enabled %}
 <p class="disclaimer">Choosing a plan opens Stripe Checkout. {{ guidance }} Churches, senior centers, and veterans groups: ask us about a shared license.</p>

@@ -30,6 +30,7 @@
     <form method="post" action="{{ url_for('send_alert', check_id=item.id) }}">
       <button class="btn danger wide" type="submit">Please call me before I pay</button>
     </form>
+    <p class="disclaimer">{{ guidance }}</p>
     <form method="post" action="{{ url_for('ask_review', check_id=item.id) }}" style="margin-top:12px">
       <label>Ask your circle to look</label>
       <textarea name="comment" placeholder="Mom — can you look at this text before I send anything?"></textarea>

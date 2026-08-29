@@ -19,6 +19,7 @@ $status = (string) ($household['stripe_status'] ?? '');
       <input type="hidden" name="plan" value="<?= Http::e($p['id']) ?>" />
       <p><button class="btn<?= !empty($p['featured']) ? ' gold' : '' ?> wide" type="submit"><?= $stripeOn ? 'Pay ' . Http::e($p['price']) : 'Choose ' . Http::e($p['name']) ?></button></p>
     </form>
+    <p class="disclaimer"><?= Http::e(Analyze::GUIDANCE) ?></p>
   </div>
   <?php endforeach; ?>
 </div>
@@ -26,6 +27,7 @@ $status = (string) ($household['stripe_status'] ?? '');
 <form method="post" action="/billing/portal">
   <p><button class="btn ghost wide" type="submit">Update card or cancel</button></p>
 </form>
+<p class="disclaimer"><?= Http::e(Analyze::GUIDANCE) ?></p>
 <?php endif; ?>
 <?php if ($stripeOn): ?>
 <p class="disclaimer">Choosing a plan opens Stripe Checkout. <?= Http::e(Analyze::GUIDANCE) ?> Churches, senior centers, and veterans groups: ask us about a shared license.</p>
