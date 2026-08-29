@@ -131,8 +131,34 @@ class AppTests(unittest.TestCase):
         self.assertEqual(alert.status_code, 200)
         home = self.client.get("/home")
         self.assertIn(b"PLEASE CALL", home.data)
+        empty = self.client.post("/check", data={"text": ""}, follow_redirects=True)
+        self.assertEqual(empty.status_code, 200)
+        self.assertIn(b"Paste the message", empty.data)
+        look = self.client.post(
+            "/check",
+            data={"url": "https://paypa1.com/help"},
+            follow_redirects=True,
+        )
+        self.assertEqual(look.status_code, 200)
+        self.assertIn(b"lookalike", look.data.lower())
+        self.assertNotIn(b"this is safe", look.data.lower())
         gone = self.client.get("/offers")
         self.assertEqual(gone.status_code, 404)
+        unauth = self.client.get("/logout", follow_redirects=False)
+        self.assertEqual(unauth.status_code, 302)
+        blocked = self.client.get("/home", follow_redirects=False)
+        self.assertEqual(blocked.status_code, 302)
+        self.assertIn("/login", blocked.headers.get("Location", ""))
+        forgot = self.client.get("/forgot")
+        self.assertEqual(forgot.status_code, 200)
+        self.assertIn(b"Forgot password", forgot.data)
+        signup = self.client.post(
+            "/signup",
+            data={"name": "", "email": "not-an-email", "password": "short"},
+            follow_redirects=True,
+        )
+        self.assertEqual(signup.status_code, 200)
+        self.assertIn(b"required", signup.data.lower())
 
     def test_invite_limit_message_and_trusted(self) -> None:
         self.client.post("/login", data={"email": "family@ourcircle.app", "password": "password123"})

@@ -40,12 +40,11 @@ if ($secret === '' || $secret === 'change-me-to-a-long-random-string') {
 }
 $_ENV['APP_SECRET'] = $secret;
 
-$secure = str_starts_with(strtolower(Env::get('BASE_URL', Env::get('OURCIRCLE_SITE_URL', 'https://familyshieldpro.com'))), 'https://');
 session_name('ourcircle');
 session_set_cookie_params([
     'lifetime' => 0,
     'path' => '/',
-    'secure' => $secure,
+    'secure' => Http::sessionCookieSecure(),
     'httponly' => true,
     'samesite' => 'Lax',
 ]);

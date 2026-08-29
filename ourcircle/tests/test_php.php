@@ -34,7 +34,7 @@ $empty = Analyze::analyze('');
 check(Analyze::analyze('')['level'] === Analyze::UNKNOWN, 'empty unknown');
 
 require $root . '/php/src/Product.php';
-check(Product::version() === '1.2.6', 'product version 1.2.6');
+check(Product::version() === '1.2.7', 'product version 1.2.7');
 check(Product::NAME === 'Family Shield Pro', 'product name');
 check(Product::APP === 'OurCircle', 'app name');
 
@@ -67,6 +67,7 @@ check(str_contains($plans, '$119.99/year'), 'php yearly price');
 check(is_file($root . '/php/src/Billing.php'), 'php billing class');
 
 require $root . '/php/src/Env.php';
+require $root . '/php/src/Http.php';
 require $root . '/php/src/Billing.php';
 require $root . '/php/src/Auth.php';
 require $root . '/php/src/SupportChat.php';
@@ -83,6 +84,21 @@ $safeChat = strtolower(SupportChat::faqReply('is this paypal email safe to pay?'
 check(!str_contains($safeChat, 'this is safe'), 'chat never this is safe');
 check(str_contains($safeChat, 'never'), 'chat says never');
 $moneyChat = SupportChat::faqReply('if someone asks me to send them money, should i do it?');
+$prevServer = $_SERVER;
+$_SERVER['HTTPS'] = '';
+$_SERVER['SERVER_PORT'] = '8065';
+$_SERVER['HTTP_HOST'] = '127.0.0.1:8065';
+unset($_SERVER['HTTP_X_FORWARDED_PROTO']);
+check(Http::isHttps() === false, 'http localhost is not https');
+check(Http::isLocalHost() === true, '127.0.0.1 is local');
+check(Http::sessionCookieSecure() === false, 'local http cookies not Secure');
+$_SERVER['HTTP_HOST'] = 'familyshieldpro.com';
+check(Http::sessionCookieSecure() === true, 'public http still marks cookie Secure');
+$_SERVER['HTTPS'] = 'on';
+$_SERVER['HTTP_HOST'] = 'familyshieldpro.com';
+check(Http::isHttps() === true, 'https on');
+check(Http::sessionCookieSecure() === true, 'https cookies Secure');
+$_SERVER = $prevServer;
 check(str_contains($moneyChat, 'NO!!!'), 'chat send-money no');
 check(str_contains(strtolower($moneyChat), 'without a doubt'), 'chat send-money doubt');
 check(str_contains(strtolower($moneyChat), 'family member'), 'chat send-money family');

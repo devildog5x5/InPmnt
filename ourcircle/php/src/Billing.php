@@ -27,10 +27,7 @@ final class Billing
         if (self::configuredValue($env, '', 8) && (str_starts_with($env, 'https://') || str_starts_with($env, 'http://'))) {
             return $env;
         }
-        $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
-            || (string) ($_SERVER['SERVER_PORT'] ?? '') === '443'
-            || strtolower((string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')) === 'https';
-        $scheme = $https ? 'https' : 'http';
+        $scheme = Http::isHttps() ? 'https' : 'http';
         $host = (string) ($_SERVER['HTTP_HOST'] ?? '');
         if ($host !== '') {
             return $scheme . '://' . $host;

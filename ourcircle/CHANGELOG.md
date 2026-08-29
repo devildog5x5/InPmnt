@@ -3,6 +3,10 @@
 Product: **Family Shield Pro** (app name in the UI: **OurCircle**).  
 Not InPmnt. Version file: `ourcircle/VERSION` (independent of repo-root InPmnt `VERSION`).
 
+## 1.2.7 — 2026-08-29
+
+- Hostinger PHP login on `http://127.0.0.1` keeps the session cookie (Secure flag no longer follows the public HTTPS site URL on localhost). Live HTTPS is unchanged.
+
 ## 1.2.6 — 2026-08-29
 
 - Help box parks to a right-edge **Help** tab. **Hide** puts it away; tap **Help** to bring it back.

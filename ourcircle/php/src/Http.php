@@ -50,4 +50,33 @@ final class Http
         echo json_encode($data, JSON_UNESCAPED_SLASHES);
         exit;
     }
+
+    public static function isHttps(): bool
+    {
+        $https = strtolower((string) ($_SERVER['HTTPS'] ?? ''));
+        if ($https !== '' && $https !== 'off') {
+            return true;
+        }
+        if ((string) ($_SERVER['SERVER_PORT'] ?? '') === '443') {
+            return true;
+        }
+        $fwd = strtolower((string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? ''));
+        return $fwd === 'https' || str_starts_with($fwd, 'https,');
+    }
+
+    public static function isLocalHost(?string $host = null): bool
+    {
+        $h = strtolower((string) ($host ?? ($_SERVER['HTTP_HOST'] ?? '')));
+        $h = explode(':', $h)[0];
+        return in_array($h, ['127.0.0.1', 'localhost', '::1', '[::1]'], true);
+    }
+
+    /** Secure cookies on the live HTTPS site; plain HTTP on localhost so login sticks. */
+    public static function sessionCookieSecure(): bool
+    {
+        if (self::isHttps()) {
+            return true;
+        }
+        return !self::isLocalHost();
+    }
 }
