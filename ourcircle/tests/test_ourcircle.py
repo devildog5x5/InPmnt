@@ -335,6 +335,15 @@ class AppTests(unittest.TestCase):
         safe_reply = safe_chat.get_json()["reply"].lower()
         self.assertNotIn("this is safe", safe_reply)
         self.assertIn("never", safe_reply)
+        money_chat = self.client.post(
+            "/support/chat",
+            json={"message": "if someone asks me to send them money, should i do it?"},
+        )
+        self.assertEqual(money_chat.status_code, 200)
+        money_reply = money_chat.get_json()["reply"]
+        self.assertIn("NO!!!", money_reply)
+        self.assertIn("without a doubt", money_reply.lower())
+        self.assertIn("family member", money_reply.lower())
         self.assertIn("CustomerService@FamilyShieldPro.com", self.client.get("/login").data.decode())
         health = self.client.get("/healthz")
         self.assertFalse(health.get_json().get("openai"))

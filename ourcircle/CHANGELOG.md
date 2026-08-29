@@ -3,6 +3,10 @@
 Product: **Family Shield Pro** (app name in the UI: **OurCircle**).  
 Not InPmnt. Version file: `ourcircle/VERSION` (independent of repo-root InPmnt `VERSION`).
 
+## 1.2.5 — 2026-08-29
+
+- Chat: if someone asks you to send money, the answer is **NO!!!** unless a family member helps you vet it and you are sure it is the person you think it is.
+
 ## 1.2.4 — 2026-08-29
 
 - 2FA setup shows a QR code you can scan. “Open authenticator app” is for phones; a refresh no longer mints a new key.

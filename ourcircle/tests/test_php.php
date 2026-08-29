@@ -34,7 +34,7 @@ $empty = Analyze::analyze('');
 check(Analyze::analyze('')['level'] === Analyze::UNKNOWN, 'empty unknown');
 
 require $root . '/php/src/Product.php';
-check(Product::version() === '1.2.4', 'product version 1.2.4');
+check(Product::version() === '1.2.5', 'product version 1.2.5');
 check(Product::NAME === 'Family Shield Pro', 'product name');
 check(Product::APP === 'OurCircle', 'app name');
 
@@ -79,6 +79,10 @@ check(str_contains($priceChat, '14.99'), 'chat price faq');
 $safeChat = strtolower(SupportChat::faqReply('is this paypal email safe to pay?'));
 check(!str_contains($safeChat, 'this is safe'), 'chat never this is safe');
 check(str_contains($safeChat, 'never'), 'chat says never');
+$moneyChat = SupportChat::faqReply('if someone asks me to send them money, should i do it?');
+check(str_contains($moneyChat, 'NO!!!'), 'chat send-money no');
+check(str_contains(strtolower($moneyChat), 'without a doubt'), 'chat send-money doubt');
+check(str_contains(strtolower($moneyChat), 'family member'), 'chat send-money family');
 check(Billing::config()['enabled'] === false, 'stripe off without keys');
 $payload = '{"id":"evt_test","object":"event","type":"checkout.session.completed","data":{"object":{}}}';
 $secret = 'whsec_testsecret_abcdefghijklmnopqrstuvwxyz';

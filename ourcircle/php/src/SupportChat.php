@@ -23,6 +23,8 @@ final class SupportChat
             return 'Ask me about plans, login, or how the circle works. For a person, email ' . self::SUPPORT_EMAIL . '.';
         }
         $faq = [
+            [['send them money', 'asks me to send', 'should i send', 'should i do it', 'give them money', 'wire them', 'send money'],
+                'NO!!! Do not send the money. Not unless a family member helps you vet it, and you can make sure it is the person you think it is — without a doubt. Call a number you already have for them, not the one in the message. ' . Analyze::CORE_RULE],
             [['safe', 'scam', 'verify', 'legit', 'real or', 'too good'],
                 'I will never tell you a request is safe. ' . Analyze::CORE_RULE . ' If it sounds too good to be true, it usually is. Really! Really! Really! Pause, involve your circle, and call numbers you already trust — not the ones in the message.'],
             [['price', 'cost', 'plan', 'monthly', 'yearly', 'how much', 'subscription', '119', '14.99'],
@@ -99,6 +101,8 @@ final class SupportChat
             . 'Never tell anyone a request, message, phone number, or website is safe or legitimate. '
             . 'Always keep this rule in mind: ' . Analyze::CORE_RULE . ' '
             . 'If it sounds too good to be true, it usually is. '
+            . 'If they ask whether they should send money because someone asked them to: answer with a resounding NO!!! '
+            . 'Not unless a family member helps them vet it, and they can make sure it is the person they think it is — without a doubt. '
             . 'Support email: ' . self::SUPPORT_EMAIL . '. Do not invent a phone number — phone support is not published yet. '
             . 'Password reset is at /forgot. 2FA is on Account. '
             . 'Keep answers short (2–6 sentences). Do not ask for passwords, card numbers, or 2FA codes. '

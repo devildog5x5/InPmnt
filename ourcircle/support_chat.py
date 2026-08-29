@@ -21,13 +21,34 @@ SYSTEM = (
     "Never tell anyone a request, message, phone number, or website is safe or legitimate. "
     f"Always keep this rule in mind: {CORE_RULE} "
     "If it sounds too good to be true, it usually is. "
+    "If they ask whether they should send money because someone asked them to: answer with a resounding NO!!! "
+    "Not unless a family member helps them vet it, and they can make sure it is the person they think it is — without a doubt. "
     f"Support email: {SUPPORT_EMAIL}. Do not invent a phone number — phone support is not published yet. "
     "Password reset is at /forgot. 2FA is on Account. "
     "Keep answers short (2–6 sentences). Do not ask for passwords, card numbers, or 2FA codes. "
     "If you cannot help, point to the support email."
 )
 
+SEND_MONEY_NO = (
+    "NO!!! Do not send the money. Not unless a family member helps you vet it, "
+    "and you can make sure it is the person you think it is — without a doubt. "
+    "Call a number you already have for them, not the one in the message. "
+    f"{CORE_RULE}"
+)
+
 _FAQ: list[tuple[tuple[str, ...], str]] = [
+    (
+        (
+            "send them money",
+            "asks me to send",
+            "should i send",
+            "should i do it",
+            "give them money",
+            "wire them",
+            "send money",
+        ),
+        SEND_MONEY_NO,
+    ),
     (
         ("safe", "scam", "verify", "legit", "real or", "too good"),
         f"I will never tell you a request is safe. {CORE_RULE} "
