@@ -41,10 +41,10 @@ final class Mailer
         return self::safeDetail($raw);
     }
 
-    public static function send(string $to, string $subject, string $body, ?string $fromName = null): void
+    public static function send(string $to, string $subject, string $body, ?string $fromName = null, ?string $html = null): void
     {
         try {
-            self::deliver($to, $subject, $body, $fromName);
+            self::deliver($to, $subject, $body, $fromName, $html);
             self::rememberStatus('ok');
         } catch (Throwable $e) {
             self::rememberStatus($e->getMessage());
@@ -52,7 +52,15 @@ final class Mailer
         }
     }
 
-    private static function deliver(string $to, string $subject, string $body, ?string $fromName): void
+    public static function htmlFromText(string $text): string
+    {
+        $escaped = htmlspecialchars($text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $linked = preg_replace('#(https?://[^\s<]+)#', '<a href="$1">$1</a>', $escaped) ?? $escaped;
+        return '<!DOCTYPE html><html><body style="font-family:system-ui,sans-serif;line-height:1.5;color:#1d1e20">'
+            . '<div style="white-space:pre-wrap">' . $linked . '</div></body></html>';
+    }
+
+    private static function deliver(string $to, string $subject, string $body, ?string $fromName, ?string $html): void
     {
         $to = trim($to);
         if ($to === '' || !str_contains($to, '@')) {
@@ -64,10 +72,11 @@ final class Mailer
         }
         $display = trim($fromName ?: Env::get('MAIL_FROM_NAME', 'Family Shield Pro'));
         $fromHeader = "{$display} <{$mailFrom}>";
+        $html = $html !== null && trim($html) !== '' ? $html : self::htmlFromText($body);
 
         $resend = trim(Env::get('RESEND_API_KEY'));
         if ($resend !== '' && !str_contains($resend, '...')) {
-            self::resend($resend, $fromHeader, $to, $subject, $body);
+            self::resend($resend, $fromHeader, $to, $subject, $body, $html);
             return;
         }
         $host = trim(Env::get('SMTP_HOST'));
@@ -76,16 +85,17 @@ final class Mailer
                 'Email is not configured. Set SMTP_HOST, SMTP_USER, SMTP_PASSWORD, and MAIL_FROM in .env (or RESEND_API_KEY).'
             );
         }
-        self::smtp($host, $fromHeader, $mailFrom, $to, $subject, $body);
+        self::smtp($host, $fromHeader, $mailFrom, $to, $subject, $body, $html);
     }
 
-    private static function resend(string $apiKey, string $from, string $to, string $subject, string $body): void
+    private static function resend(string $apiKey, string $from, string $to, string $subject, string $body, string $html): void
     {
         $payload = json_encode([
             'from' => $from,
             'to' => [$to],
             'subject' => $subject !== '' ? $subject : '(no subject)',
             'text' => $body,
+            'html' => $html,
         ], JSON_UNESCAPED_SLASHES);
         $ch = curl_init('https://api.resend.com/emails');
         curl_setopt_array($ch, [
@@ -116,7 +126,8 @@ final class Mailer
         string $mailFrom,
         string $to,
         string $subject,
-        string $body
+        string $body,
+        string $html
     ): void {
         $port = (int) (Env::get('SMTP_PORT', '587') ?: '587');
         $user = trim(Env::get('SMTP_USER'));
@@ -133,7 +144,7 @@ final class Mailer
             );
         }
         // Do not fall back to PHP mail() — Hostinger often returns true without delivering.
-        self::smtpSocket($host, $port, $user, $password, $fromHeader, $mailFrom, $to, $subject, $body, $useSsl);
+        self::smtpSocket($host, $port, $user, $password, $fromHeader, $mailFrom, $to, $subject, $body, $html, $useSsl);
     }
 
     /** @return array{configured:bool,openssl:bool,host:string,port:string,ssl:bool,user:string,from:string,last:string} */
@@ -170,6 +181,7 @@ final class Mailer
         string $to,
         string $subject,
         string $body,
+        string $html,
         bool $ssl
     ): void {
         $ctx = stream_context_create([
@@ -206,6 +218,7 @@ final class Mailer
             self::smtpExpect($fp, [250, 251], 'RCPT TO:<' . $to . '>');
             self::smtpExpect($fp, [354], 'DATA');
             $msgid = bin2hex(random_bytes(12)) . '@' . $ehlo;
+            $boundary = '=_fsp_' . bin2hex(random_bytes(8));
             $msg = 'Date: ' . gmdate('D, d M Y H:i:s') . " +0000\r\n"
                 . 'Message-ID: <' . $msgid . ">\r\n"
                 . 'Subject: ' . self::headerSafe($subject !== '' ? $subject : '(no subject)') . "\r\n"
@@ -213,8 +226,16 @@ final class Mailer
                 . 'Reply-To: ' . $mailFrom . "\r\n"
                 . 'To: ' . $to . "\r\n"
                 . "MIME-Version: 1.0\r\n"
-                . "Content-Type: text/plain; charset=UTF-8\r\n\r\n"
-                . self::dotStuff($body);
+                . 'Content-Type: multipart/alternative; boundary="' . $boundary . "\"\r\n\r\n"
+                . '--' . $boundary . "\r\n"
+                . "Content-Type: text/plain; charset=UTF-8\r\n"
+                . "Content-Transfer-Encoding: 8bit\r\n\r\n"
+                . self::dotStuff($body) . "\r\n"
+                . '--' . $boundary . "\r\n"
+                . "Content-Type: text/html; charset=UTF-8\r\n"
+                . "Content-Transfer-Encoding: 8bit\r\n\r\n"
+                . self::dotStuff($html) . "\r\n"
+                . '--' . $boundary . "--";
             fwrite($fp, $msg . "\r\n.\r\n");
             self::smtpExpect($fp, [250]);
             try {

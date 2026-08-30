@@ -91,9 +91,10 @@ _FAQ: list[tuple[tuple[str, ...], str]] = [
     ),
     (
         ("invite email", "invite link", "join link", "invitation", "invite someone"),
-        "Circle → Invite someone. We email them a join link if mail is set up (SMTP or Resend in .env), and we can text it if Twilio and a mobile number are set. "
-        "You can also copy the full https://…/join/… link and tap Resend invite. They do not need to sign in first. "
-        f"Stuck? {SUPPORT_EMAIL}.",
+        "Circle → Invite someone. We email a tap-to-open join button if mail is set up (SMTP in .env), "
+        "and we can text the same https://…/join/… link if Twilio and a mobile number are set. "
+        "They tap the link — they do not need to copy and paste, and they do not need to sign in first. "
+        f"You can also tap Resend invite. Stuck? {SUPPORT_EMAIL}.",
     ),
     (
         ("email", "contact", "reach you", "customer service", "support"),

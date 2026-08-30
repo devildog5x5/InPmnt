@@ -144,9 +144,23 @@ final class App
     public static function inviteEmailBody(string $join): string
     {
         return "Someone invited you to a Family Shield Pro (OurCircle) family circle.\n\n"
-            . "Open this link to join. It is only for this email:\n{$join}\n\n"
-            . "If you did not expect this, ignore the message.\n\n"
+            . "Tap this link to join (you do not need to copy and paste it):\n{$join}\n\n"
+            . "It is only for this email. If you did not expect this, ignore the message.\n\n"
             . Analyze::GUIDANCE . "\n";
+    }
+
+    public static function inviteEmailHtml(string $join): string
+    {
+        $href = htmlspecialchars($join, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $guidance = htmlspecialchars(Analyze::GUIDANCE, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        return '<!DOCTYPE html><html><body style="margin:0;background:#f4efe6;padding:24px">'
+            . '<div style="max-width:560px;margin:0 auto;background:#fff8f0;padding:28px;border-radius:16px;font-family:Georgia,serif;color:#1d1e20;line-height:1.5">'
+            . '<p>Someone invited you to a Family Shield Pro (OurCircle) family circle.</p>'
+            . '<p><a href="' . $href . '" style="display:inline-block;background:#1f4f45;color:#ffffff;padding:14px 22px;border-radius:999px;text-decoration:none;font-weight:700">Join this family circle</a></p>'
+            . '<p>Or tap this link: <a href="' . $href . '">' . $href . '</a></p>'
+            . '<p>It is only for this email. If you did not expect this, ignore the message.</p>'
+            . '<p style="color:#5c5850;font-size:14px">' . $guidance . '</p>'
+            . '</div></body></html>';
     }
 
     public static function alertEmailBody(string $name, string $checkUrl, string $names): string
@@ -186,7 +200,9 @@ final class App
                 Mailer::send(
                     (string) $inv['email'],
                     'Join your family circle on Family Shield Pro',
-                    self::inviteEmailBody($join)
+                    self::inviteEmailBody($join),
+                    null,
+                    self::inviteEmailHtml($join)
                 );
                 $emailed = true;
             } catch (Throwable $e) {
@@ -922,7 +938,7 @@ final class App
                 )->execute([$user['id'], $tok['hash'], gmdate('Y-m-d\TH:i:s\Z', time() + 3600), Db::now()]);
                 $link = $this->siteHome() . '/reset/' . rawurlencode($tok['token']);
                 $body = "Someone asked to reset the Family Shield Pro password for this email.\n\n"
-                    . "Open this link within one hour:\n{$link}\n\n"
+                    . "Tap this link within one hour (you do not need to copy and paste it):\n{$link}\n\n"
                     . "If you did not ask, ignore this message.\n";
                 try {
                     Mailer::send((string) $user['email'], 'Reset your Family Shield Pro password', $body);

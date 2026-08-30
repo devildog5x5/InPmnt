@@ -35,8 +35,9 @@ final class Sms
     public static function inviteBody(string $join, string $inviter = ''): string
     {
         $who = trim($inviter) !== '' ? trim($inviter) : 'Your family';
-        return 'Family Shield Pro: ' . $who . ' invited you to their circle. Join: ' . $join
-            . ' ' . Analyze::CORE_RULE . ' Reply STOP to opt out.';
+        return 'Family Shield Pro: ' . $who . " invited you to their circle.\n"
+            . $join . "\n"
+            . 'Tap the link to join. ' . Analyze::CORE_RULE . ' Reply STOP to opt out.';
     }
 
     public static function alertBody(string $name, string $checkUrl): string

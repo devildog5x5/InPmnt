@@ -217,6 +217,8 @@ class AppTests(unittest.TestCase):
         self.assertTrue(mail_mod.mail_configured())
         os.environ["SMTP_PASSWORD"] = '"quoted-secret"'
         self.assertEqual(mail_mod._env("SMTP_PASSWORD"), "quoted-secret")
+        linked = mail_mod.html_from_text("Open:\nhttps://example.test/join/abc")
+        self.assertIn('<a href="https://example.test/join/abc">', linked)
         for k in ("SMTP_HOST", "SMTP_USER", "SMTP_PASSWORD", "MAIL_FROM"):
             os.environ.pop(k, None)
         self.assertFalse(mail_mod.mail_configured())
@@ -329,6 +331,8 @@ class AppTests(unittest.TestCase):
             self.assertEqual(sent[0]["to"], "cousin@example.com")
             self.assertIn("https://sandbox.familyshieldpro.com/join/", sent[0]["body"])
             self.assertIn("guidance, not a guarantee", sent[0]["body"])
+            self.assertIn("Join this family circle", sent[0]["html"])
+            self.assertIn('<a href="https://sandbox.familyshieldpro.com/join/', sent[0]["html"])
             cousin_at = mailed.data.rfind(b"cousin@example.com")
             cousin_chunk = mailed.data[cousin_at : cousin_at + 500]
             self.assertIn(b"Invite sent", cousin_chunk)
@@ -707,6 +711,7 @@ class AppTests(unittest.TestCase):
             self.assertIn(b"texted to +15550107777", invited.data)
             self.assertEqual(sent[0]["to"], "+15550107777")
             self.assertIn("familyshieldpro.com/join/", sent[0]["body"])
+            self.assertIn("Tap the link to join", sent[0]["body"])
             self.assertIn("STOP", sent[0]["body"])
             aunt_at = invited.data.rfind(b"aunt@example.com")
             aunt_chunk = invited.data[aunt_at : aunt_at + 700]

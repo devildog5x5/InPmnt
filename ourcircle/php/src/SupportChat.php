@@ -38,7 +38,7 @@ final class SupportChat
             [['phone', 'call us', 'telephone', 'support number', 'customer service number'],
                 'We do not publish a customer-service phone number yet. Email ' . self::SUPPORT_EMAIL . ' — a person reads every message.'],
             [['invite email', 'invite link', 'join link', 'invitation', 'invite someone'],
-                'Circle → Invite someone. We email them a join link if mail is set up (SMTP or Resend in .env), and we can text it if Twilio and a mobile number are set. You can also copy the full https://…/join/… link and tap Resend invite. They do not need to sign in first. Stuck? ' . self::SUPPORT_EMAIL . '.'],
+                'Circle → Invite someone. We email a tap-to-open join button if mail is set up (SMTP in .env), and we can text the same https://…/join/… link if Twilio and a mobile number are set. They tap the link — they do not need to copy and paste, and they do not need to sign in first. You can also tap Resend invite. Stuck? ' . self::SUPPORT_EMAIL . '.'],
             [['email', 'contact', 'reach you', 'customer service', 'support'],
                 'Email customer service at ' . self::SUPPORT_EMAIL . '. A person reads every message. There is no public phone number yet.'],
             [['circle', 'invite', 'member', 'five', '5 people', 'household'],

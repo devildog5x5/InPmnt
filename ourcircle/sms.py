@@ -41,8 +41,9 @@ def normalize_phone(raw: str) -> str:
 def invite_sms_body(join: str, inviter: str = "") -> str:
     who = (inviter or "Your family").strip() or "Your family"
     return (
-        f"Family Shield Pro: {who} invited you to their circle. Join: {join} "
-        f"{CORE_RULE} Reply STOP to opt out."
+        f"Family Shield Pro: {who} invited you to their circle.\n"
+        f"{join}\n"
+        f"Tap the link to join. {CORE_RULE} Reply STOP to opt out."
     )
 
 

@@ -17,7 +17,7 @@ final class Product
                 return $v;
             }
         }
-        return '1.2.21';
+        return '1.2.22';
     }
 
     public static function label(): string

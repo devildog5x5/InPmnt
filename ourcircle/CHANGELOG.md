@@ -3,6 +3,10 @@
 Product: **Family Shield Pro** (app name in the UI: **OurCircle**).  
 Not InPmnt. Version file: `ourcircle/VERSION` (independent of repo-root InPmnt `VERSION`).
 
+## 1.2.22 — 2026-08-30
+
+- Join emails are **HTML with a tap-to-open Join button** (plain text still included). Password-reset and call-me emails auto-link `https://` URLs. Invite texts put the join URL on its own line so phones make it tappable.
+
 ## 1.2.21 — 2026-08-30
 
 - **Mail for the whole product, not just reset.** Invites, password-reset links, and **Please call me before I pay** now all email through the same Hostinger SMTP mailbox. Call-me used to be in-app (and SMS) only — that is why “reminders” never arrived. Operator console has **Send test email** plus host/from/last-error so you can prove SMTP without guessing. Live sandbox was still on an old drop (`healthz` `"version":"0.0.0"`) that claimed mail success via PHP `mail()`.

@@ -85,9 +85,16 @@ def test_email_body() -> str:
     )
 
 
-def send_email(*, to: str, subject: str, body: str, from_name: str | None = None) -> dict[str, Any]:
+def send_email(
+    *,
+    to: str,
+    subject: str,
+    body: str,
+    from_name: str | None = None,
+    html: str | None = None,
+) -> dict[str, Any]:
     try:
-        result = _deliver(to=to, subject=subject, body=body, from_name=from_name)
+        result = _deliver(to=to, subject=subject, body=body, from_name=from_name, html=html)
         _remember_status("ok")
         return result
     except Exception as exc:
@@ -95,7 +102,25 @@ def send_email(*, to: str, subject: str, body: str, from_name: str | None = None
         raise
 
 
-def _deliver(*, to: str, subject: str, body: str, from_name: str | None = None) -> dict[str, Any]:
+def html_from_text(text: str) -> str:
+    import html as html_lib
+
+    escaped = html_lib.escape(text or "", quote=True)
+    linked = re.sub(r"(https?://[^\s<]+)", r'<a href="\1">\1</a>', escaped)
+    return (
+        '<!DOCTYPE html><html><body style="font-family:system-ui,sans-serif;line-height:1.5;color:#1d1e20">'
+        f'<div style="white-space:pre-wrap">{linked}</div></body></html>'
+    )
+
+
+def _deliver(
+    *,
+    to: str,
+    subject: str,
+    body: str,
+    from_name: str | None = None,
+    html: str | None = None,
+) -> dict[str, Any]:
     to = (to or "").strip()
     if not to or "@" not in to:
         raise RuntimeError("Need an email address")
@@ -106,26 +131,35 @@ def _deliver(*, to: str, subject: str, body: str, from_name: str | None = None) 
 
     display = (from_name or _env("MAIL_FROM_NAME") or "Family Shield Pro").strip()
     from_header = f"{display} <{mail_from}>"
+    html_body = html if (html or "").strip() else html_from_text(body)
 
     resend_key = _env("RESEND_API_KEY")
     if resend_key and "..." not in resend_key:
-        return _send_resend(resend_key, from_header, to, subject, body)
+        return _send_resend(resend_key, from_header, to, subject, body, html_body)
 
     host = _env("SMTP_HOST")
     if not host:
         raise RuntimeError(
             "Email is not configured. Set SMTP_HOST, SMTP_USER, SMTP_PASSWORD, and MAIL_FROM in .env (or RESEND_API_KEY)."
         )
-    return _send_smtp(host, from_header, mail_from, to, subject, body)
+    return _send_smtp(host, from_header, mail_from, to, subject, body, html_body)
 
 
-def _send_resend(api_key: str, from_header: str, to: str, subject: str, body: str) -> dict[str, Any]:
+def _send_resend(
+    api_key: str, from_header: str, to: str, subject: str, body: str, html: str
+) -> dict[str, Any]:
     import json
     import urllib.error
     import urllib.request
 
     payload = json.dumps(
-        {"from": from_header, "to": [to], "subject": subject or "(no subject)", "text": body or ""}
+        {
+            "from": from_header,
+            "to": [to],
+            "subject": subject or "(no subject)",
+            "text": body or "",
+            "html": html or "",
+        }
     ).encode("utf-8")
     req = urllib.request.Request(
         "https://api.resend.com/emails",
@@ -144,7 +178,13 @@ def _send_resend(api_key: str, from_header: str, to: str, subject: str, body: st
 
 
 def _send_smtp(
-    host: str, from_header: str, mail_from: str, to: str, subject: str, body: str
+    host: str,
+    from_header: str,
+    mail_from: str,
+    to: str,
+    subject: str,
+    body: str,
+    html: str,
 ) -> dict[str, Any]:
     port = int(_env("SMTP_PORT") or "587")
     user = _env("SMTP_USER")
@@ -160,6 +200,7 @@ def _send_smtp(
     msg["Reply-To"] = mail_from
     msg["To"] = to
     msg.set_content(body or "")
+    msg.add_alternative(html or html_from_text(body or ""), subtype="html")
 
     context = ssl.create_default_context()
     if use_ssl or port == 465:
