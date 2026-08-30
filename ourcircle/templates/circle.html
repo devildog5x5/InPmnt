@@ -59,7 +59,7 @@
 <div class="panel" style="margin-top:16px">
   <h2>Call-me alerts</h2>
   {% for a in alerts %}
-    <p>{{ a.created_at }} — {{ a.message }}</p>
+    <p>{{ a.created_at }} — {{ a.message }}{% if a.check_id %} <a href="{{ url_for('show_check', check_id=a.check_id) }}">Open this check</a>{% endif %}</p>
   {% endfor %}
 </div>
 {% endif %}

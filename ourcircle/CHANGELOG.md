@@ -3,6 +3,10 @@
 Product: **Family Shield Pro** (app name in the UI: **OurCircle**).  
 Not InPmnt. Version file: `ourcircle/VERSION` (independent of repo-root InPmnt `VERSION`).
 
+## 1.2.23 — 2026-08-30
+
+- Remaining tap-to-open surfaces: home trusted-list phones, join-page invite email, call-me banners (**Open this check**), Account forgot-password, and official Report links (SSA, IRS, Equifax, Experian, TransUnion). Suspect check numbers/sites stay plain text.
+
 ## 1.2.22 — 2026-08-30
 
 - Join, password-reset, and **Please call me** emails are **HTML with a tap-to-open button** (plain text still included). Test emails link the site. Invite, call-me, and check texts put the URL on its own line so phones make it tappable.

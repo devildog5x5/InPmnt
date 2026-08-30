@@ -4,7 +4,7 @@
 {% if alerts %}
   <div class="flash error">
     <strong>Urgent circle alert</strong>
-    <p>{{ alerts[0].message }}</p>
+    <p>{{ alerts[0].message }}{% if alerts[0].check_id %} <a href="{{ url_for('show_check', check_id=alerts[0].check_id) }}">Open this check</a>{% endif %}</p>
   </div>
 {% endif %}
 <div class="grid-2">
@@ -40,7 +40,7 @@
       <p>{{ trusted|length }} saved banks, doctors, utilities, and family numbers.</p>
       <ul class="list">
         {% for t in trusted %}
-        <li>{{ t.name }}{% if t.phone %} · {{ t.phone }}{% endif %}</li>
+        <li>{{ t.name }}{% if t.phone %} · {{ t.phone|tel_link }}{% endif %}</li>
         {% endfor %}
       </ul>
       <p><a class="btn ghost" href="{{ url_for('trusted') }}">Open list</a></p>

@@ -48,5 +48,5 @@ $codes = is_array($recovery_codes ?? null) ? $recovery_codes : [];
 <p>2FA is off. An authenticator app (Google Authenticator, Authy, 1Password, iCloud Keychain) adds a second step after the password.</p>
 <p><a class="btn gold" href="/account/2fa/setup">Turn on 2FA</a></p>
 <?php endif; ?>
-<p class="disclaimer">Password reset: email link (needs SMTP/Resend in .env) or a recovery code on the forgot-password page.</p>
+<p class="disclaimer">Password reset: email link (needs SMTP/Resend in .env) or a recovery code on the <a href="/forgot">forgot-password page</a>.</p>
 <?php View::appClose(); ?>

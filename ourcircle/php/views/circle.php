@@ -65,7 +65,7 @@ View::appOpen(get_defined_vars());
 <div class="panel" style="margin-top:16px">
   <h2>Call-me alerts</h2>
   <?php foreach ($alerts as $a): ?>
-    <p><?= Http::e($a['created_at']) ?> — <?= Http::e($a['message']) ?></p>
+    <p><?= Http::e($a['created_at']) ?> — <?= Http::e($a['message']) ?><?php if (!empty($a['check_id'])): ?> <a href="/checks/<?= (int) $a['check_id'] ?>">Open this check</a><?php endif; ?></p>
   <?php endforeach; ?>
 </div>
 <?php endif; ?>

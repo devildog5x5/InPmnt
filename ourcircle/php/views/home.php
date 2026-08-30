@@ -9,7 +9,7 @@ View::appOpen(get_defined_vars());
 <?php if (!empty($alerts)): ?>
   <div class="flash error">
     <strong>Urgent circle alert</strong>
-    <p><?= Http::e((string) $alerts[0]['message']) ?></p>
+    <p><?= Http::e((string) $alerts[0]['message']) ?><?php if (!empty($alerts[0]['check_id'])): ?> <a href="/checks/<?= (int) $alerts[0]['check_id'] ?>">Open this check</a><?php endif; ?></p>
   </div>
 <?php endif; ?>
 <div class="grid-2">
@@ -46,7 +46,7 @@ View::appOpen(get_defined_vars());
       <p><?= count($trusted) ?> saved banks, doctors, utilities, and family numbers.</p>
       <ul class="list">
         <?php foreach ($trusted as $t): ?>
-        <li><?= Http::e((string) ($t['name'] ?? '')) ?><?php if (!empty($t['phone'])): ?> · <?= Http::e((string) $t['phone']) ?><?php endif; ?></li>
+        <li><?= Http::e((string) ($t['name'] ?? '')) ?><?php if (!empty($t['phone'])): ?> · <?= Http::tel((string) $t['phone']) ?><?php endif; ?></li>
         <?php endforeach; ?>
       </ul>
       <p><a class="btn ghost" href="/trusted">Open list</a></p>

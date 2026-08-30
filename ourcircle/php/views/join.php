@@ -13,7 +13,7 @@ View::start($title, $site_home, 'noindex,nofollow', '/join/' . ($token ?? ''));
     <h1>Join this family circle</h1>
     <p class="core-rule"><?= Http::e($core_rule) ?></p>
     <?= View::flashesHtml($flashes) ?>
-    <p>Invite for <?= Http::e((string) ($invite['email'] ?? '')) ?></p>
+    <p>Invite for <?= Http::mailto((string) ($invite['email'] ?? '')) ?></p>
     <form method="post" action="/join/<?= Http::e((string) ($token ?? '')) ?>">
       <label>Your name</label>
       <input name="name" required value="<?= Http::e((string) ($invite['name'] ?? '')) ?>" />

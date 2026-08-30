@@ -8,7 +8,7 @@
     <h1>Join this family circle</h1>
     <p class="core-rule">{{ core_rule }}</p>
     {% include "_flashes.html" %}
-    <p>Invite for {{ invite.email }}</p>
+    <p>Invite for {{ invite.email|mailto_link }}</p>
     <form method="post" action="{{ url_for('join', token=token) }}">
       <label>Your name</label>
       <input name="name" required value="{{ invite.name or '' }}" />

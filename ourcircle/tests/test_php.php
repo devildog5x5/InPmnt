@@ -167,7 +167,7 @@ $inviteChat = SupportChat::faqReply('why does the invite email link not work?');
 check(str_contains(strtolower($inviteChat), 'join'), 'chat invite join');
 $resetChat = strtolower(SupportChat::faqReply('I forgot my password and the reset link did not arrive'));
 check(str_contains($resetChat, 'smtp_password') || str_contains($resetChat, 'does not pretend'), 'chat reset honest mail');
-check(Product::version() === '1.2.22', 'product version 1.2.22');
+check(Product::version() === '1.2.23', 'product version 1.2.23');
 check(Product::NAME === 'Family Shield Pro', 'product name');
 check(Product::APP === 'OurCircle', 'app name');
 
@@ -181,6 +181,15 @@ check(str_contains($billingPhp, 'Analyze::GUIDANCE'), 'billing guidance constant
 $checkPhp = file_get_contents($root . '/php/views/check.php') ?: '';
 check(str_contains($checkPhp, 'Please call me before I pay'), 'check pay-alert button');
 check(str_contains($checkPhp, 'Analyze::GUIDANCE') || str_contains($checkPhp, 'guidance, not a guarantee'), 'check pay guidance');
+$reportPhp = file_get_contents($root . '/php/views/report.php') ?: '';
+check(str_contains($reportPhp, 'https://www.ssa.gov'), 'report ssa official link');
+check(str_contains($reportPhp, 'https://www.irs.gov'), 'report irs official link');
+check(str_contains($reportPhp, 'equifax.com'), 'report equifax freeze');
+$homePhp = file_get_contents($root . '/php/views/home.php') ?: '';
+check(str_contains($homePhp, 'Http::tel'), 'home trusted tel');
+check(str_contains($homePhp, 'Open this check'), 'home alert open-check link');
+$joinPhp = file_get_contents($root . '/php/views/join.php') ?: '';
+check(str_contains($joinPhp, 'Http::mailto'), 'join invite mailto');
 $landing = file_get_contents($root . '/php/views/landing.php') ?: '';
 check(str_contains($landing, '$14.99'), 'landing monthly price');
 check(str_contains($landing, '$119.99'), 'landing yearly price');
