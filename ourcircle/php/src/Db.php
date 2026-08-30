@@ -570,6 +570,132 @@ final class Db
         return $row ?: null;
     }
 
+    public static function adminOwnerIds(PDO $db, int $hid): array
+    {
+        $st = $db->prepare("SELECT id FROM users WHERE household_id=? AND role='owner' ORDER BY id");
+        $st->execute([$hid]);
+        return array_map(static fn ($r) => (int) $r['id'], $st->fetchAll());
+    }
+
+    /** @param array<string,mixed> $user */
+    public static function adminIsLastOwner(PDO $db, array $user): bool
+    {
+        if (($user['role'] ?? '') !== 'owner') {
+            return false;
+        }
+        return count(self::adminOwnerIds($db, (int) $user['household_id'])) <= 1;
+    }
+
+    /** @return list<array<string,mixed>> */
+    public static function adminListHouseholds(PDO $db, string $q = ''): array
+    {
+        $q = trim($q);
+        $sql = 'SELECT h.*,
+            (SELECT COUNT(*) FROM users u WHERE u.household_id=h.id) AS user_count,
+            (SELECT COUNT(*) FROM invitations i WHERE i.household_id=h.id AND i.status=\'pending\') AS invite_count,
+            (SELECT COUNT(*) FROM trusted_contacts t WHERE t.household_id=h.id) AS trusted_count,
+            (SELECT COUNT(*) FROM checks c WHERE c.household_id=h.id) AS check_count
+            FROM households h';
+        $params = [];
+        if ($q !== '') {
+            $sql .= ' WHERE lower(h.name) LIKE ? OR CAST(h.id AS TEXT)=?';
+            $params = [self::adminLike($q), $q];
+        }
+        $sql .= ' ORDER BY h.id LIMIT 500';
+        $st = $db->prepare($sql);
+        $st->execute($params);
+        return $st->fetchAll();
+    }
+
+    public static function adminHouseholdDetail(PDO $db, int $hid): ?array
+    {
+        foreach (self::adminListHouseholds($db) as $row) {
+            if ((int) $row['id'] === $hid) {
+                return $row;
+            }
+        }
+        return self::adminGetHousehold($db, $hid);
+    }
+
+    /** @return list<array<string,mixed>> */
+    public static function adminListChecks(PDO $db, ?int $hid = null, int $limit = 50): array
+    {
+        $sql = 'SELECT c.id, c.household_id, c.user_id, c.kind, c.risk, c.created_at,
+                u.name AS user_name, u.email AS user_email, h.name AS household_name
+            FROM checks c
+            JOIN users u ON u.id = c.user_id
+            JOIN households h ON h.id = c.household_id';
+        $params = [];
+        if ($hid !== null) {
+            $sql .= ' WHERE c.household_id=?';
+            $params[] = $hid;
+        }
+        $sql .= ' ORDER BY c.id DESC LIMIT ?';
+        $params[] = $limit;
+        $st = $db->prepare($sql);
+        $st->execute($params);
+        return $st->fetchAll();
+    }
+
+    private static function deleteCheckRow(PDO $db, int $checkId): void
+    {
+        $db->prepare('DELETE FROM reviews WHERE check_id=?')->execute([$checkId]);
+        $db->prepare('DELETE FROM alerts WHERE check_id=?')->execute([$checkId]);
+        $db->prepare('DELETE FROM checks WHERE id=?')->execute([$checkId]);
+    }
+
+    public static function adminDeleteCheck(PDO $db, int $checkId): bool
+    {
+        $st = $db->prepare('SELECT id FROM checks WHERE id=?');
+        $st->execute([$checkId]);
+        if (!$st->fetch()) {
+            return false;
+        }
+        self::deleteCheckRow($db, $checkId);
+        return true;
+    }
+
+    public static function adminAddTrusted(
+        PDO $db,
+        int $hid,
+        string $kind,
+        string $name,
+        string $phone = '',
+        string $website = '',
+        string $notes = ''
+    ): int {
+        if (!self::adminGetHousehold($db, $hid)) {
+            throw new RuntimeException('That circle is not in Family Shield Pro.');
+        }
+        $kind = trim($kind) !== '' ? trim($kind) : 'other';
+        if (!in_array($kind, ['bank', 'doctor', 'insurer', 'utility', 'family', 'other'], true)) {
+            $kind = 'other';
+        }
+        $name = trim($name);
+        if ($name === '') {
+            throw new RuntimeException('Give this contact a name you will recognize.');
+        }
+        $db->prepare(
+            'INSERT INTO trusted_contacts (household_id, kind, name, phone, website, notes, created_at) VALUES (?,?,?,?,?,?,?)'
+        )->execute([
+            $hid,
+            $kind,
+            $name,
+            trim($phone) !== '' ? trim($phone) : null,
+            trim($website) !== '' ? trim($website) : null,
+            trim($notes) !== '' ? trim($notes) : null,
+            self::now(),
+        ]);
+        return (int) $db->lastInsertId();
+    }
+
+    public static function adminDeleteTrusted(PDO $db, int $contactId): bool
+    {
+        $st = $db->prepare('DELETE FROM trusted_contacts WHERE id=?');
+        $st->execute([$contactId]);
+        return $st->rowCount() > 0;
+    }
+
     public static function adminUpdateUser(
         PDO $db,
         int $userId,
@@ -577,7 +703,9 @@ final class Db
         string $email,
         string $phone = '',
         bool $smsOptOut = false,
-        string $password = ''
+        string $password = '',
+        ?string $role = null,
+        ?int $householdId = null
     ): array {
         $user = self::adminGetUser($db, $userId);
         if (!$user) {
@@ -596,7 +724,20 @@ final class Db
         if ($taken->fetch()) {
             throw new RuntimeException('That email already has a Family Shield Pro login.');
         }
-        $db->prepare('UPDATE users SET name=?, email=? WHERE id=?')->execute([$name, $email, $userId]);
+        $nextRole = strtolower(trim((string) ($role ?? $user['role'] ?? 'member')));
+        if ($nextRole !== 'owner' && $nextRole !== 'member') {
+            throw new RuntimeException('Role must be owner or member.');
+        }
+        $nextHid = $householdId !== null ? $householdId : (int) $user['household_id'];
+        if (!self::adminGetHousehold($db, $nextHid)) {
+            throw new RuntimeException('That circle is not in Family Shield Pro.');
+        }
+        $leaving = $nextHid !== (int) $user['household_id'] || $nextRole !== (string) ($user['role'] ?? '');
+        if ($leaving && self::adminIsLastOwner($db, $user) && ($nextRole !== 'owner' || $nextHid !== (int) $user['household_id'])) {
+            throw new RuntimeException('That login is the last owner. Add another owner first, or delete the whole circle.');
+        }
+        $db->prepare('UPDATE users SET name=?, email=?, role=?, household_id=? WHERE id=?')
+            ->execute([$name, $email, $nextRole, $nextHid, $userId]);
         self::setUserPhone($db, $userId, $phone, $smsOptOut);
         $password = trim($password);
         if ($password !== '') {
@@ -611,6 +752,173 @@ final class Db
             throw new RuntimeException('That login is not in Family Shield Pro.');
         }
         return $updated;
+    }
+
+    public static function adminDisable2fa(PDO $db, int $userId): array
+    {
+        $user = self::adminGetUser($db, $userId);
+        if (!$user) {
+            throw new RuntimeException('That login is not in Family Shield Pro.');
+        }
+        $db->prepare('UPDATE users SET totp_secret=NULL, totp_enabled=0, recovery_codes=NULL WHERE id=?')->execute([$userId]);
+        $updated = self::adminGetUser($db, $userId);
+        if (!$updated) {
+            throw new RuntimeException('That login is not in Family Shield Pro.');
+        }
+        return $updated;
+    }
+
+    public static function adminCreateUser(
+        PDO $db,
+        int $hid,
+        string $name,
+        string $email,
+        string $password,
+        string $role = 'member',
+        string $phone = ''
+    ): array {
+        if (!self::adminGetHousehold($db, $hid)) {
+            throw new RuntimeException('That circle is not in Family Shield Pro.');
+        }
+        $name = trim($name);
+        $email = strtolower(trim($email));
+        $role = strtolower(trim($role));
+        $password = trim($password);
+        if ($name === '') {
+            throw new RuntimeException('Name cannot be empty.');
+        }
+        if ($email === '' || !str_contains($email, '@')) {
+            throw new RuntimeException('Need a valid email address.');
+        }
+        if ($role !== 'owner' && $role !== 'member') {
+            throw new RuntimeException('Role must be owner or member.');
+        }
+        if (strlen($password) < 8) {
+            throw new RuntimeException('Use at least 8 characters for a new password.');
+        }
+        $taken = $db->prepare('SELECT id FROM users WHERE lower(email)=?');
+        $taken->execute([$email]);
+        if ($taken->fetch()) {
+            throw new RuntimeException('That email already has a Family Shield Pro login.');
+        }
+        $db->prepare(
+            'INSERT INTO users (household_id, name, email, password_hash, role, created_at, phone) VALUES (?,?,?,?,?,?,?)'
+        )->execute([$hid, $name, $email, password_hash($password, PASSWORD_DEFAULT), $role, self::now(), $phone !== '' ? $phone : null]);
+        $uid = (int) $db->lastInsertId();
+        if ($phone !== '') {
+            try {
+                self::setUserPhone($db, $uid, $phone, false);
+            } catch (RuntimeException) {
+                $db->prepare('UPDATE users SET phone=NULL WHERE id=?')->execute([$uid]);
+            }
+        }
+        $created = self::adminGetUser($db, $uid);
+        if (!$created) {
+            throw new RuntimeException('Could not create that login.');
+        }
+        return $created;
+    }
+
+    public static function adminDeleteUser(PDO $db, int $userId): void
+    {
+        $user = self::adminGetUser($db, $userId);
+        if (!$user) {
+            throw new RuntimeException('That login is not in Family Shield Pro.');
+        }
+        if (self::adminIsLastOwner($db, $user)) {
+            throw new RuntimeException('That login is the last owner. Add another owner first, or delete the whole circle.');
+        }
+        $st = $db->prepare('SELECT id FROM checks WHERE user_id=?');
+        $st->execute([$userId]);
+        foreach ($st->fetchAll() as $row) {
+            self::deleteCheckRow($db, (int) $row['id']);
+        }
+        $db->prepare('DELETE FROM reviews WHERE requester_id=?')->execute([$userId]);
+        $db->prepare('DELETE FROM alerts WHERE user_id=?')->execute([$userId]);
+        $db->prepare('DELETE FROM password_resets WHERE user_id=?')->execute([$userId]);
+        $db->prepare('DELETE FROM users WHERE id=?')->execute([$userId]);
+    }
+
+    public static function adminCreateHousehold(
+        PDO $db,
+        string $name,
+        string $plan,
+        string $ownerName,
+        string $ownerEmail,
+        string $ownerPassword,
+        string $phone = ''
+    ): array {
+        $ownerEmail = strtolower(trim($ownerEmail));
+        $ownerName = trim($ownerName);
+        $name = trim($name);
+        $ownerPassword = trim($ownerPassword);
+        if ($name === '') {
+            $name = $ownerName . "'s circle";
+        }
+        if ($ownerName === '') {
+            throw new RuntimeException('Name cannot be empty.');
+        }
+        if ($ownerEmail === '' || !str_contains($ownerEmail, '@')) {
+            throw new RuntimeException('Need a valid email address.');
+        }
+        if (strlen($ownerPassword) < 8) {
+            throw new RuntimeException('Use at least 8 characters for a new password.');
+        }
+        $taken = $db->prepare('SELECT id FROM users WHERE lower(email)=?');
+        $taken->execute([$ownerEmail]);
+        if ($taken->fetch()) {
+            throw new RuntimeException('That email already has a Family Shield Pro login.');
+        }
+        $hid = self::createHousehold($db, $name, $ownerName, $ownerEmail, $ownerPassword, $phone);
+        self::adminUpdateHousehold($db, $hid, $name, $plan);
+        $detail = self::adminHouseholdDetail($db, $hid);
+        if (!$detail) {
+            throw new RuntimeException('Could not create that circle.');
+        }
+        return $detail;
+    }
+
+    public static function adminDeleteHousehold(PDO $db, int $hid): void
+    {
+        if (!self::adminGetHousehold($db, $hid)) {
+            throw new RuntimeException('That circle is not in Family Shield Pro.');
+        }
+        $st = $db->prepare('SELECT id FROM checks WHERE household_id=?');
+        $st->execute([$hid]);
+        foreach ($st->fetchAll() as $row) {
+            self::deleteCheckRow($db, (int) $row['id']);
+        }
+        $db->prepare('DELETE FROM alerts WHERE household_id=?')->execute([$hid]);
+        $db->prepare('DELETE FROM reviews WHERE household_id=?')->execute([$hid]);
+        $db->prepare('DELETE FROM trusted_contacts WHERE household_id=?')->execute([$hid]);
+        $db->prepare('DELETE FROM invitations WHERE household_id=?')->execute([$hid]);
+        $users = $db->prepare('SELECT id FROM users WHERE household_id=?');
+        $users->execute([$hid]);
+        foreach ($users->fetchAll() as $row) {
+            $db->prepare('DELETE FROM password_resets WHERE user_id=?')->execute([(int) $row['id']]);
+        }
+        $db->prepare('DELETE FROM users WHERE household_id=?')->execute([$hid]);
+        $db->prepare('DELETE FROM households WHERE id=?')->execute([$hid]);
+    }
+
+    public static function adminCreateInvite(PDO $db, int $hid, string $email, string $name = '', string $phone = ''): array
+    {
+        if (!self::adminGetHousehold($db, $hid)) {
+            throw new RuntimeException('That circle is not in Family Shield Pro.');
+        }
+        $email = strtolower(trim($email));
+        if ($email === '' || !str_contains($email, '@')) {
+            throw new RuntimeException('Need an email address to invite.');
+        }
+        $phone = trim($phone);
+        if ($phone !== '' && self::userByPhone($db, $phone)) {
+            $phone = '';
+        }
+        $token = rtrim(strtr(base64_encode(random_bytes(16)), '+/', '-_'), '=');
+        $db->prepare(
+            "INSERT INTO invitations (household_id, email, name, token, status, created_at, phone) VALUES (?,?,?,?,'pending',?,?)"
+        )->execute([$hid, $email, trim($name), $token, self::now(), $phone !== '' ? $phone : null]);
+        return ['email' => $email, 'token' => $token, 'id' => (int) $db->lastInsertId(), 'phone' => $phone];
     }
 
     public static function adminUpdateHousehold(PDO $db, int $hid, string $name, string $plan): array

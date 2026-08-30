@@ -72,6 +72,11 @@ check(is_file($root . '/php/src/Admin.php'), 'php admin class');
 check(is_file($root . '/php/views/admin.php'), 'php admin view');
 check(is_file($root . '/php/views/admin_login.php'), 'php admin login view');
 check(is_file($root . '/php/views/admin_user.php'), 'php admin user view');
+check(is_file($root . '/php/views/admin_household.php'), 'php admin household view');
+$adminPhp = file_get_contents($root . '/php/views/admin.php') ?: '';
+check(str_contains($adminPhp, 'Add a circle'), 'admin add circle');
+check(str_contains($adminPhp, 'Add a user'), 'admin add user');
+check(str_contains($adminPhp, 'Delete circle'), 'admin delete circle');
 $adminChat = SupportChat::faqReply('would a management console show how many users?');
 check(str_contains($adminChat, 'ADMIN.md'), 'chat admin faq');
 check(str_contains($adminChat, '/admin is not found'), 'chat admin off until password');
@@ -97,7 +102,7 @@ $mailPos = strpos($mailPhp, '@mail(');
 check(is_int($smtpPos) && is_int($mailPos) && $smtpPos < $mailPos, 'smtp before php mail()');
 $inviteChat = SupportChat::faqReply('why does the invite email link not work?');
 check(str_contains(strtolower($inviteChat), 'join'), 'chat invite join');
-check(Product::version() === '1.2.18', 'product version 1.2.18');
+check(Product::version() === '1.2.19', 'product version 1.2.19');
 check(Product::NAME === 'Family Shield Pro', 'product name');
 check(Product::APP === 'OurCircle', 'app name');
 
@@ -288,6 +293,22 @@ check(($edited['phone'] ?? '') === '+15550104242', 'admin update phone');
 $house = Db::adminUpdateHousehold($db, $hid, 'Foster operator circle', 'monthly');
 check($house['name'] === 'Foster operator circle', 'admin household name');
 check($house['plan'] === 'monthly', 'admin household plan flag');
+$added = Db::adminCreateUser($db, $hid, 'Operator Kid', 'operator-kid@example.com', 'password123', 'member');
+check(($added['email'] ?? '') === 'operator-kid@example.com', 'admin create user');
+try {
+    Db::adminDeleteUser($db, (int) $user['id']);
+    check(false, 'last owner delete should throw');
+} catch (Throwable $e) {
+    check(str_contains($e->getMessage(), 'last owner'), 'admin refuse last owner delete');
+}
+Db::adminDeleteUser($db, (int) $added['id']);
+$gone = $db->query("SELECT id FROM users WHERE lower(email)='operator-kid@example.com'")->fetch();
+check($gone === false, 'admin deleted member');
+$newHouse = Db::adminCreateHousehold($db, 'Temp operator circle', 'yearly', 'Temp Owner', 'temp-owner@example.com', 'password123');
+check(($newHouse['name'] ?? '') === 'Temp operator circle', 'admin create household');
+Db::adminDeleteHousehold($db, (int) $newHouse['id']);
+$houseGone = $db->query("SELECT id FROM households WHERE name='Temp operator circle'")->fetch();
+check($houseGone === false, 'admin deleted household');
 $trustedPhp = file_get_contents($root . '/php/views/trusted.php') ?: '';
 check(str_contains($trustedPhp, 'trusted-delete'), 'trusted shared delete form');
 check(str_contains($trustedPhp, 'table-wrap'), 'trusted full-width table');

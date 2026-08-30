@@ -79,8 +79,9 @@ _FAQ: list[tuple[tuple[str, ...], str]] = [
     (
         ("admin", "console", "management", "operator", "how many users", "list users"),
         "A management console exists for the product owner when ADMIN_PASSWORD is set in .env (see ADMIN.md). "
-        "It shows user counts, names, emails, and safe edits. It is not a family page and is not in the public nav. "
-        "Until that password is set, /admin is not found. Families use Circle and Account for their own people. "
+        "You can add, edit, and delete circles, logins, invites, trusted contacts, and checks. "
+        "The last owner of a circle cannot be deleted unless you delete the circle. "
+        "It is not a family page and is not in the public nav. Until that password is set, /admin is not found. "
         f"Stuck? {SUPPORT_EMAIL}.",
     ),
     (

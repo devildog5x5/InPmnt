@@ -1,0 +1,185 @@
+{% extends "admin_shell.html" %}
+{% block heading %}{{ household.name }}{% endblock %}
+{% block main %}
+<p><a href="{{ url_for('admin_home') }}">← Console</a></p>
+<h2>{{ household.name }}</h2>
+<p class="muted">{{ household.user_count }} people · {{ household.invite_count }} invites · {{ household.trusted_count }} trusted · {{ household.check_count }} checks · Stripe: {{ household.stripe_status or "not billed yet" }}</p>
+<form class="panel" method="post">
+  <label>Circle name</label>
+  <input name="name" value="{{ household.name }}" required />
+  <label>Plan flag</label>
+  <select name="plan">
+    <option value="monthly"{% if household.plan == 'monthly' %} selected{% endif %}>Family monthly</option>
+    <option value="yearly"{% if household.plan == 'yearly' %} selected{% endif %}>Family yearly</option>
+  </select>
+  <p class="muted">This only stores monthly or yearly. It does not charge a card or change Stripe.</p>
+  <p><button class="btn" type="submit">Save circle</button></p>
+</form>
+
+<div class="panel" style="margin-top:16px">
+  <h2>People</h2>
+  <form id="admin-user-delete" method="post" action="{{ url_for('admin_user_delete') }}">
+    <input type="hidden" name="return_household" value="{{ household.id }}" />
+  </form>
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Name</th><th>Email</th><th>Mobile</th><th>Role</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        {% for u in members %}
+        <tr>
+          <td>{{ u.name }}</td>
+          <td>{{ u.email }}</td>
+          <td>{{ u.phone or "—" }}</td>
+          <td>{{ u.role }}</td>
+          <td><span class="pill status-{{ u.circle_status_key }}">{{ u.circle_status }}</span></td>
+          <td>
+            <a class="btn ghost" href="{{ url_for('admin_user', user_id=u.id) }}">Edit</a>
+            <button class="btn danger" type="submit" form="admin-user-delete" name="user_id" value="{{ u.id }}" onclick="return confirm('Delete this login?')">Delete</button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+<form class="panel" method="post" action="{{ url_for('admin_user_create') }}" style="margin-top:16px">
+  <h2>Add a user to this circle</h2>
+  <input type="hidden" name="household_id" value="{{ household.id }}" />
+  <input type="hidden" name="return_household" value="{{ household.id }}" />
+  <label>Name</label>
+  <input name="name" required autocomplete="off" />
+  <label>Email</label>
+  <input name="email" type="email" required autocomplete="off" />
+  <label>Password (8+)</label>
+  <input name="password" type="password" required minlength="8" autocomplete="new-password" />
+  <label>Role</label>
+  <select name="role">
+    <option value="member">member</option>
+    <option value="owner">owner</option>
+  </select>
+  <label>Mobile (optional)</label>
+  <input name="phone" type="tel" autocomplete="off" />
+  <p><button class="btn" type="submit">Add user</button></p>
+</form>
+
+<div class="panel" style="margin-top:16px">
+  <h2>Pending invites</h2>
+  <form id="admin-invite-resend" method="post" action="{{ url_for('admin_invite_resend') }}">
+    <input type="hidden" name="return_household" value="{{ household.id }}" />
+  </form>
+  <form id="admin-invite-delete" method="post" action="{{ url_for('admin_invite_delete') }}">
+    <input type="hidden" name="return_household" value="{{ household.id }}" />
+  </form>
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Name</th><th>Email</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        {% for p in pending %}
+        <tr>
+          <td>{{ p.name or "—" }}</td>
+          <td>{{ p.email }}</td>
+          <td><span class="pill status-{{ p.circle_status_key }}">{{ p.circle_status }}</span></td>
+          <td>
+            <button class="btn ghost" type="submit" form="admin-invite-resend" name="invite_id" value="{{ p.id }}">Resend</button>
+            <button class="btn danger" type="submit" form="admin-invite-delete" name="invite_id" value="{{ p.id }}">Delete invite</button>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4">None waiting.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+<form class="panel" method="post" action="{{ url_for('admin_invite_create') }}" style="margin-top:16px">
+  <input type="hidden" name="household_id" value="{{ household.id }}" />
+  <input type="hidden" name="return_household" value="{{ household.id }}" />
+  <label>Invite name</label>
+  <input name="name" autocomplete="off" />
+  <label>Invite email</label>
+  <input name="email" type="email" required autocomplete="off" />
+  <label>Mobile (optional)</label>
+  <input name="phone" type="tel" autocomplete="off" />
+  <p><button class="btn" type="submit">Add invite</button></p>
+</form>
+
+<div class="panel" style="margin-top:16px">
+  <h2>Trusted list</h2>
+  <form id="admin-trusted-delete" method="post" action="{{ url_for('admin_trusted_delete') }}">
+    <input type="hidden" name="return_household" value="{{ household.id }}" />
+  </form>
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Kind</th><th>Name</th><th>Phone</th><th></th></tr></thead>
+      <tbody>
+        {% for t in trusted %}
+        <tr>
+          <td>{{ t.kind }}</td>
+          <td>{{ t.name }}</td>
+          <td>{{ t.phone or "—" }}</td>
+          <td>
+            <button class="btn danger" type="submit" form="admin-trusted-delete" name="contact_id" value="{{ t.id }}" onclick="return confirm('Remove this contact?')">Delete</button>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4">None saved.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+<form class="panel" method="post" action="{{ url_for('admin_trusted_create') }}" style="margin-top:16px">
+  <input type="hidden" name="household_id" value="{{ household.id }}" />
+  <input type="hidden" name="return_household" value="{{ household.id }}" />
+  <label>Kind</label>
+  <select name="kind">
+    <option value="bank">bank</option>
+    <option value="doctor">doctor</option>
+    <option value="insurer">insurer</option>
+    <option value="utility">utility</option>
+    <option value="family">family</option>
+    <option value="other">other</option>
+  </select>
+  <label>Name</label>
+  <input name="name" required />
+  <label>Phone</label>
+  <input name="phone" />
+  <label>Website</label>
+  <input name="website" />
+  <label>Notes</label>
+  <input name="notes" />
+  <p><button class="btn" type="submit">Add trusted contact</button></p>
+</form>
+
+<div class="panel" style="margin-top:16px">
+  <h2>Checks</h2>
+  <form id="admin-check-delete" method="post" action="{{ url_for('admin_check_delete') }}">
+    <input type="hidden" name="return_household" value="{{ household.id }}" />
+  </form>
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>When</th><th>Who</th><th>Kind</th><th>Risk</th><th></th></tr></thead>
+      <tbody>
+        {% for c in checks %}
+        <tr>
+          <td>{{ c.created_at }}</td>
+          <td>{{ c.user_name }}</td>
+          <td>{{ c.kind }}</td>
+          <td>{{ c.risk }}</td>
+          <td>
+            <button class="btn danger" type="submit" form="admin-check-delete" name="check_id" value="{{ c.id }}" onclick="return confirm('Delete this check?')">Delete</button>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5">No checks.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<form class="panel" method="post" action="{{ url_for('admin_household_delete') }}" style="margin-top:16px" onsubmit="return confirm('Delete this circle and everyone in it?')">
+  <input type="hidden" name="household_id" value="{{ household.id }}" />
+  <p><button class="btn danger" type="submit">Delete this circle</button></p>
+</form>
+{% endblock %}

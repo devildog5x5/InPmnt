@@ -549,6 +549,113 @@ def admin_get_household(conn: sqlite3.Connection, hid: int) -> dict[str, Any] | 
     return dict(row) if row else None
 
 
+def admin_owner_ids(conn: sqlite3.Connection, hid: int) -> list[int]:
+    return [
+        int(r["id"])
+        for r in conn.execute(
+            "SELECT id FROM users WHERE household_id=? AND role='owner' ORDER BY id",
+            (hid,),
+        ).fetchall()
+    ]
+
+
+def admin_is_last_owner(conn: sqlite3.Connection, user: dict[str, Any]) -> bool:
+    if (user.get("role") or "") != "owner":
+        return False
+    return len(admin_owner_ids(conn, int(user["household_id"]))) <= 1
+
+
+def admin_list_households(conn: sqlite3.Connection, q: str = "") -> list[dict[str, Any]]:
+    q = (q or "").strip()
+    sql = """
+        SELECT h.*,
+            (SELECT COUNT(*) FROM users u WHERE u.household_id=h.id) AS user_count,
+            (SELECT COUNT(*) FROM invitations i WHERE i.household_id=h.id AND i.status='pending') AS invite_count,
+            (SELECT COUNT(*) FROM trusted_contacts t WHERE t.household_id=h.id) AS trusted_count,
+            (SELECT COUNT(*) FROM checks c WHERE c.household_id=h.id) AS check_count
+        FROM households h
+    """
+    params: list[Any] = []
+    if q:
+        like = _admin_like(q)
+        sql += " WHERE lower(h.name) LIKE ? OR CAST(h.id AS TEXT)=?"
+        params = [like, q]
+    sql += " ORDER BY h.id LIMIT 500"
+    return [dict(r) for r in conn.execute(sql, params).fetchall()]
+
+
+def admin_household_detail(conn: sqlite3.Connection, hid: int) -> dict[str, Any] | None:
+    rows = admin_list_households(conn)
+    for row in rows:
+        if int(row["id"]) == int(hid):
+            return row
+    return admin_get_household(conn, hid)
+
+
+def admin_list_checks(conn: sqlite3.Connection, hid: int | None = None, limit: int = 50) -> list[dict[str, Any]]:
+    sql = """
+        SELECT c.id, c.household_id, c.user_id, c.kind, c.risk, c.created_at,
+               u.name AS user_name, u.email AS user_email, h.name AS household_name
+        FROM checks c
+        JOIN users u ON u.id = c.user_id
+        JOIN households h ON h.id = c.household_id
+    """
+    params: list[Any] = []
+    if hid is not None:
+        sql += " WHERE c.household_id=?"
+        params.append(hid)
+    sql += " ORDER BY c.id DESC LIMIT ?"
+    params.append(limit)
+    return [dict(r) for r in conn.execute(sql, params).fetchall()]
+
+
+def _delete_check_row(conn: sqlite3.Connection, check_id: int) -> None:
+    conn.execute("DELETE FROM reviews WHERE check_id=?", (check_id,))
+    conn.execute("DELETE FROM alerts WHERE check_id=?", (check_id,))
+    conn.execute("DELETE FROM checks WHERE id=?", (check_id,))
+
+
+def admin_delete_check(conn: sqlite3.Connection, check_id: int) -> bool:
+    row = conn.execute("SELECT id FROM checks WHERE id=?", (check_id,)).fetchone()
+    if not row:
+        return False
+    _delete_check_row(conn, check_id)
+    return True
+
+
+def admin_add_trusted(
+    conn: sqlite3.Connection,
+    hid: int,
+    *,
+    kind: str,
+    name: str,
+    phone: str = "",
+    website: str = "",
+    notes: str = "",
+) -> int:
+    if not admin_get_household(conn, hid):
+        raise ValueError("That circle is not in Family Shield Pro.")
+    kind = (kind or "other").strip()
+    if kind not in ("bank", "doctor", "insurer", "utility", "family", "other"):
+        kind = "other"
+    name = name.strip()
+    if not name:
+        raise ValueError("Give this contact a name you will recognize.")
+    cur = conn.execute(
+        """
+        INSERT INTO trusted_contacts (household_id, kind, name, phone, website, notes, created_at)
+        VALUES (?,?,?,?,?,?,?)
+        """,
+        (hid, kind, name, phone.strip() or None, website.strip() or None, notes.strip() or None, now()),
+    )
+    return int(cur.lastrowid or 0)
+
+
+def admin_delete_trusted(conn: sqlite3.Connection, contact_id: int) -> bool:
+    cur = conn.execute("DELETE FROM trusted_contacts WHERE id=?", (contact_id,))
+    return int(cur.rowcount or 0) > 0
+
+
 def admin_update_user(
     conn: sqlite3.Connection,
     user_id: int,
@@ -558,6 +665,8 @@ def admin_update_user(
     phone: str = "",
     sms_opt_out: bool = False,
     password: str = "",
+    role: str | None = None,
+    household_id: int | None = None,
 ) -> dict[str, Any]:
     user = admin_get_user(conn, user_id)
     if not user:
@@ -574,9 +683,18 @@ def admin_update_user(
     ).fetchone()
     if taken:
         raise ValueError("That email already has a Family Shield Pro login.")
+    next_role = (role or user.get("role") or "member").strip().lower()
+    if next_role not in ("owner", "member"):
+        raise ValueError("Role must be owner or member.")
+    next_hid = int(household_id) if household_id is not None else int(user["household_id"])
+    if not admin_get_household(conn, next_hid):
+        raise ValueError("That circle is not in Family Shield Pro.")
+    leaving = next_hid != int(user["household_id"]) or next_role != (user.get("role") or "")
+    if leaving and admin_is_last_owner(conn, user) and (next_role != "owner" or next_hid != int(user["household_id"])):
+        raise ValueError("That login is the last owner. Add another owner first, or delete the whole circle.")
     conn.execute(
-        "UPDATE users SET name=?, email=? WHERE id=?",
-        (name, email, user_id),
+        "UPDATE users SET name=?, email=?, role=?, household_id=? WHERE id=?",
+        (name, email, next_role, next_hid, user_id),
     )
     set_user_phone(conn, user_id, phone, sms_opt_out)
     password = (password or "").strip()
@@ -591,6 +709,166 @@ def admin_update_user(
     if not updated:
         raise ValueError("That login is not in Family Shield Pro.")
     return updated
+
+
+def admin_disable_2fa(conn: sqlite3.Connection, user_id: int) -> dict[str, Any]:
+    user = admin_get_user(conn, user_id)
+    if not user:
+        raise ValueError("That login is not in Family Shield Pro.")
+    conn.execute(
+        "UPDATE users SET totp_secret=NULL, totp_enabled=0, recovery_codes=NULL WHERE id=?",
+        (user_id,),
+    )
+    updated = admin_get_user(conn, user_id)
+    if not updated:
+        raise ValueError("That login is not in Family Shield Pro.")
+    return updated
+
+
+def admin_create_user(
+    conn: sqlite3.Connection,
+    hid: int,
+    *,
+    name: str,
+    email: str,
+    password: str,
+    role: str = "member",
+    phone: str = "",
+) -> dict[str, Any]:
+    if not admin_get_household(conn, hid):
+        raise ValueError("That circle is not in Family Shield Pro.")
+    name = name.strip()
+    email = email.lower().strip()
+    role = (role or "member").strip().lower()
+    password = (password or "").strip()
+    if not name:
+        raise ValueError("Name cannot be empty.")
+    if not email or "@" not in email:
+        raise ValueError("Need a valid email address.")
+    if role not in ("owner", "member"):
+        raise ValueError("Role must be owner or member.")
+    if len(password) < 8:
+        raise ValueError("Use at least 8 characters for a new password.")
+    taken = conn.execute("SELECT id FROM users WHERE lower(email)=?", (email,)).fetchone()
+    if taken:
+        raise ValueError("That email already has a Family Shield Pro login.")
+    cur = conn.execute(
+        """
+        INSERT INTO users (household_id, name, email, password_hash, role, created_at, phone)
+        VALUES (?,?,?,?,?,?,?)
+        """,
+        (hid, name, email, generate_password_hash(password), role, now(), phone or None),
+    )
+    uid = int(cur.lastrowid or 0)
+    if phone:
+        try:
+            set_user_phone(conn, uid, phone, False)
+        except ValueError:
+            conn.execute("UPDATE users SET phone=NULL WHERE id=?", (uid,))
+    created = admin_get_user(conn, uid)
+    if not created:
+        raise ValueError("Could not create that login.")
+    return created
+
+
+def admin_delete_user(conn: sqlite3.Connection, user_id: int) -> None:
+    user = admin_get_user(conn, user_id)
+    if not user:
+        raise ValueError("That login is not in Family Shield Pro.")
+    if admin_is_last_owner(conn, user):
+        raise ValueError("That login is the last owner. Add another owner first, or delete the whole circle.")
+    check_ids = [
+        int(r["id"])
+        for r in conn.execute("SELECT id FROM checks WHERE user_id=?", (user_id,)).fetchall()
+    ]
+    for cid in check_ids:
+        _delete_check_row(conn, cid)
+    conn.execute("DELETE FROM reviews WHERE requester_id=?", (user_id,))
+    conn.execute("DELETE FROM alerts WHERE user_id=?", (user_id,))
+    conn.execute("DELETE FROM password_resets WHERE user_id=?", (user_id,))
+    conn.execute("DELETE FROM users WHERE id=?", (user_id,))
+
+
+def admin_create_household(
+    conn: sqlite3.Connection,
+    *,
+    name: str,
+    plan: str,
+    owner_name: str,
+    owner_email: str,
+    owner_password: str,
+    phone: str = "",
+) -> dict[str, Any]:
+    owner_email = owner_email.lower().strip()
+    owner_name = owner_name.strip()
+    name = name.strip() or f"{owner_name}'s circle"
+    owner_password = (owner_password or "").strip()
+    if not owner_name:
+        raise ValueError("Name cannot be empty.")
+    if not owner_email or "@" not in owner_email:
+        raise ValueError("Need a valid email address.")
+    if len(owner_password) < 8:
+        raise ValueError("Use at least 8 characters for a new password.")
+    if conn.execute("SELECT id FROM users WHERE lower(email)=?", (owner_email,)).fetchone():
+        raise ValueError("That email already has a Family Shield Pro login.")
+    hid = create_household(
+        conn,
+        name=name,
+        owner_name=owner_name,
+        email=owner_email,
+        password=owner_password,
+        phone=phone,
+    )
+    admin_update_household(conn, hid, name=name, plan=plan)
+    detail = admin_household_detail(conn, hid)
+    if not detail:
+        raise ValueError("Could not create that circle.")
+    return detail
+
+
+def admin_delete_household(conn: sqlite3.Connection, hid: int) -> None:
+    if not admin_get_household(conn, hid):
+        raise ValueError("That circle is not in Family Shield Pro.")
+    check_ids = [
+        int(r["id"])
+        for r in conn.execute("SELECT id FROM checks WHERE household_id=?", (hid,)).fetchall()
+    ]
+    for cid in check_ids:
+        _delete_check_row(conn, cid)
+    conn.execute("DELETE FROM alerts WHERE household_id=?", (hid,))
+    conn.execute("DELETE FROM reviews WHERE household_id=?", (hid,))
+    conn.execute("DELETE FROM trusted_contacts WHERE household_id=?", (hid,))
+    conn.execute("DELETE FROM invitations WHERE household_id=?", (hid,))
+    user_ids = [
+        int(r["id"])
+        for r in conn.execute("SELECT id FROM users WHERE household_id=?", (hid,)).fetchall()
+    ]
+    for uid in user_ids:
+        conn.execute("DELETE FROM password_resets WHERE user_id=?", (uid,))
+    conn.execute("DELETE FROM users WHERE household_id=?", (hid,))
+    conn.execute("DELETE FROM households WHERE id=?", (hid,))
+
+
+def admin_create_invite(
+    conn: sqlite3.Connection, hid: int, email: str, name: str = "", phone: str = ""
+) -> dict[str, Any]:
+    if not admin_get_household(conn, hid):
+        raise ValueError("That circle is not in Family Shield Pro.")
+    email = email.lower().strip()
+    if not email or "@" not in email:
+        raise ValueError("Need an email address to invite.")
+    phone = (phone or "").strip()
+    if phone and find_user_by_phone(conn, phone):
+        phone = ""
+    token = secrets.token_urlsafe(16)
+    cur = conn.execute(
+        """
+        INSERT INTO invitations (household_id, email, name, token, status, created_at, phone)
+        VALUES (?,?,?,?, 'pending', ?, ?)
+        """,
+        (hid, email, name.strip(), token, now(), phone or None),
+    )
+    return {"email": email, "token": token, "id": int(cur.lastrowid or 0), "phone": phone}
 
 
 def admin_update_household(conn: sqlite3.Connection, hid: int, *, name: str, plan: str) -> dict[str, Any]:

@@ -45,8 +45,20 @@ from billing import (
 from database import (
     DATA,
     accept_invite,
+    admin_add_trusted,
     admin_counts,
+    admin_create_household,
+    admin_create_invite,
+    admin_create_user,
+    admin_delete_check,
+    admin_delete_household,
+    admin_delete_trusted,
+    admin_delete_user,
+    admin_disable_2fa,
     admin_get_user,
+    admin_household_detail,
+    admin_list_checks,
+    admin_list_households,
     admin_list_invites,
     admin_list_users,
     admin_update_household,
@@ -381,7 +393,29 @@ def create_app() -> Flask:
             counts = admin_counts(conn)
             users = admin_list_users(conn, q)
             invites = admin_list_invites(conn, q)
-        return render_template("admin.html", counts=counts, users=users, invites=invites, q=q)
+            households = admin_list_households(conn, q)
+            checks = admin_list_checks(conn, limit=20)
+        return render_template(
+            "admin.html",
+            counts=counts,
+            users=users,
+            invites=invites,
+            households=households,
+            checks=checks,
+            q=q,
+        )
+
+    def _admin_back():
+        hid = int(request.form.get("return_household") or 0)
+        if hid:
+            return redirect(url_for("admin_household", hid=hid))
+        uid = int(request.form.get("return_user") or 0)
+        if uid:
+            return redirect(url_for("admin_user", user_id=uid))
+        return redirect(url_for("admin_home"))
+
+    def _admin_phone():
+        return parse_phone_field(request.form.get("phone") or "")
 
     @app.route("/admin/users/<int:user_id>", methods=["GET", "POST"])
     def admin_user(user_id: int):
@@ -390,10 +424,11 @@ def create_app() -> Flask:
             return gate
         if request.method == "POST":
             try:
-                phone = parse_phone_field(request.form.get("phone") or "")
+                phone = _admin_phone()
             except ValueError as exc:
                 flash(str(exc), "error")
                 return redirect(url_for("admin_user", user_id=user_id))
+            hid_raw = request.form.get("household_id")
             try:
                 with db_session() as conn:
                     person = admin_update_user(
@@ -404,6 +439,8 @@ def create_app() -> Flask:
                         phone=phone,
                         sms_opt_out=(request.form.get("sms_opt_out") or "") == "1",
                         password=request.form.get("password") or "",
+                        role=request.form.get("role") or None,
+                        household_id=int(hid_raw) if hid_raw else None,
                     )
             except ValueError as exc:
                 flash(str(exc), "error")
@@ -411,36 +448,190 @@ def create_app() -> Flask:
             if session.get("user_id") == person["id"]:
                 session["name"] = person["name"]
                 session["email"] = person["email"]
+                session["household_id"] = person["household_id"]
             flash("Login saved.", "ok")
             return redirect(url_for("admin_user", user_id=user_id))
         with db_session() as conn:
             person = admin_get_user(conn, user_id)
+            households = admin_list_households(conn)
         if not person:
             flash("That login is not in Family Shield Pro.", "error")
             return redirect(url_for("admin_home"))
-        return render_template("admin_user.html", person=person)
+        return render_template("admin_user.html", person=person, households=households)
 
-    @app.post("/admin/households/<int:hid>")
+    @app.post("/admin/users/create")
+    def admin_user_create():
+        gate = require_admin()
+        if gate:
+            return gate
+        try:
+            phone = _admin_phone()
+        except ValueError as exc:
+            flash(str(exc), "error")
+            return _admin_back()
+        try:
+            with db_session() as conn:
+                person = admin_create_user(
+                    conn,
+                    int(request.form.get("household_id") or 0),
+                    name=request.form.get("name") or "",
+                    email=request.form.get("email") or "",
+                    password=request.form.get("password") or "",
+                    role=request.form.get("role") or "member",
+                    phone=phone,
+                )
+        except ValueError as exc:
+            flash(str(exc), "error")
+            return _admin_back()
+        flash(f"Login added: {person['email']}.", "ok")
+        return _admin_back()
+
+    @app.post("/admin/users/delete")
+    def admin_user_delete():
+        gate = require_admin()
+        if gate:
+            return gate
+        uid = int(request.form.get("user_id") or 0)
+        try:
+            with db_session() as conn:
+                admin_delete_user(conn, uid)
+        except ValueError as exc:
+            flash(str(exc), "error")
+            return _admin_back()
+        if session.get("user_id") == uid:
+            session.pop("user_id", None)
+            session.pop("household_id", None)
+            session.pop("name", None)
+            session.pop("email", None)
+        flash("Login deleted.", "ok")
+        return _admin_back()
+
+    @app.post("/admin/users/disable-2fa")
+    def admin_user_disable_2fa():
+        gate = require_admin()
+        if gate:
+            return gate
+        uid = int(request.form.get("user_id") or 0)
+        try:
+            with db_session() as conn:
+                admin_disable_2fa(conn, uid)
+        except ValueError as exc:
+            flash(str(exc), "error")
+            return redirect(url_for("admin_user", user_id=uid) if uid else url_for("admin_home"))
+        flash("2FA turned off for that login.", "ok")
+        return redirect(url_for("admin_user", user_id=uid) if uid else url_for("admin_home"))
+
+    @app.route("/admin/households/<int:hid>", methods=["GET", "POST"])
     def admin_household(hid: int):
         gate = require_admin()
         if gate:
             return gate
-        return_user = int(request.form.get("return_user") or 0)
+        if request.method == "POST":
+            try:
+                with db_session() as conn:
+                    admin_update_household(
+                        conn,
+                        hid,
+                        name=request.form.get("name") or "",
+                        plan=request.form.get("plan") or "",
+                    )
+            except ValueError as exc:
+                flash(str(exc), "error")
+            else:
+                flash("Circle saved. Plan flag only — no Stripe charge.", "ok")
+            return_user = int(request.form.get("return_user") or 0)
+            if return_user:
+                return redirect(url_for("admin_user", user_id=return_user))
+            return redirect(url_for("admin_household", hid=hid))
+        with db_session() as conn:
+            household = admin_household_detail(conn, hid)
+            if not household:
+                flash("That circle is not in Family Shield Pro.", "error")
+                return redirect(url_for("admin_home"))
+            members, pending = household_members(conn, hid)
+            trusted = trusted_list(conn, hid)
+            checks = admin_list_checks(conn, hid)
+        return render_template(
+            "admin_household.html",
+            household=household,
+            members=members,
+            pending=pending,
+            trusted=trusted,
+            checks=checks,
+        )
+
+    @app.post("/admin/households/create")
+    def admin_household_create():
+        gate = require_admin()
+        if gate:
+            return gate
+        try:
+            phone = _admin_phone()
+        except ValueError as exc:
+            flash(str(exc), "error")
+            return redirect(url_for("admin_home"))
         try:
             with db_session() as conn:
-                admin_update_household(
+                house = admin_create_household(
                     conn,
-                    hid,
                     name=request.form.get("name") or "",
-                    plan=request.form.get("plan") or "",
+                    plan=request.form.get("plan") or "yearly",
+                    owner_name=request.form.get("owner_name") or "",
+                    owner_email=request.form.get("owner_email") or "",
+                    owner_password=request.form.get("owner_password") or "",
+                    phone=phone,
                 )
         except ValueError as exc:
             flash(str(exc), "error")
-        else:
-            flash("Circle saved. Plan flag only — no Stripe charge.", "ok")
-        if return_user:
-            return redirect(url_for("admin_user", user_id=return_user))
+            return redirect(url_for("admin_home"))
+        flash("Circle added.", "ok")
+        return redirect(url_for("admin_household", hid=int(house["id"])))
+
+    @app.post("/admin/households/delete")
+    def admin_household_delete():
+        gate = require_admin()
+        if gate:
+            return gate
+        hid = int(request.form.get("household_id") or 0)
+        try:
+            with db_session() as conn:
+                if session.get("household_id") == hid:
+                    session.pop("user_id", None)
+                    session.pop("household_id", None)
+                    session.pop("name", None)
+                    session.pop("email", None)
+                admin_delete_household(conn, hid)
+        except ValueError as exc:
+            flash(str(exc), "error")
+            return redirect(url_for("admin_home"))
+        flash("Circle deleted.", "ok")
         return redirect(url_for("admin_home"))
+
+    @app.post("/admin/invites/create")
+    def admin_invite_create():
+        gate = require_admin()
+        if gate:
+            return gate
+        try:
+            phone = _admin_phone()
+        except ValueError as exc:
+            flash(str(exc), "error")
+            return _admin_back()
+        try:
+            with db_session() as conn:
+                inv = admin_create_invite(
+                    conn,
+                    int(request.form.get("household_id") or 0),
+                    request.form.get("email") or "",
+                    request.form.get("name") or "",
+                    phone,
+                )
+        except ValueError as exc:
+            flash(str(exc), "error")
+            return _admin_back()
+        msg, cat = notify_invite(inv, "Family Shield Pro")
+        flash(msg, cat)
+        return _admin_back()
 
     @app.post("/admin/invites/resend")
     def admin_invite_resend():
@@ -452,10 +643,10 @@ def create_app() -> Flask:
             inv = pending_invite_by_id(conn, invite_id)
         if not inv:
             flash("That invite is not waiting anymore.", "error")
-            return redirect(url_for("admin_home"))
+            return _admin_back()
         msg, cat = notify_invite(inv, "Family Shield Pro")
         flash(msg, cat)
-        return redirect(url_for("admin_home"))
+        return _admin_back()
 
     @app.post("/admin/invites/delete")
     def admin_invite_delete():
@@ -469,7 +660,49 @@ def create_app() -> Flask:
             flash("Pending invite deleted.", "ok")
         else:
             flash("That invite is not waiting anymore.", "error")
-        return redirect(url_for("admin_home"))
+        return _admin_back()
+
+    @app.post("/admin/trusted/create")
+    def admin_trusted_create():
+        gate = require_admin()
+        if gate:
+            return gate
+        try:
+            with db_session() as conn:
+                admin_add_trusted(
+                    conn,
+                    int(request.form.get("household_id") or 0),
+                    kind=request.form.get("kind") or "other",
+                    name=request.form.get("name") or "",
+                    phone=request.form.get("phone") or "",
+                    website=request.form.get("website") or "",
+                    notes=request.form.get("notes") or "",
+                )
+        except ValueError as exc:
+            flash(str(exc), "error")
+            return _admin_back()
+        flash("Trusted contact saved.", "ok")
+        return _admin_back()
+
+    @app.post("/admin/trusted/delete")
+    def admin_trusted_delete():
+        gate = require_admin()
+        if gate:
+            return gate
+        with db_session() as conn:
+            gone = admin_delete_trusted(conn, int(request.form.get("contact_id") or 0))
+        flash("Trusted contact removed." if gone else "That contact was already gone.", "ok" if gone else "error")
+        return _admin_back()
+
+    @app.post("/admin/checks/delete")
+    def admin_check_delete():
+        gate = require_admin()
+        if gate:
+            return gate
+        with db_session() as conn:
+            gone = admin_delete_check(conn, int(request.form.get("check_id") or 0))
+        flash("Check deleted." if gone else "That check was already gone.", "ok" if gone else "error")
+        return _admin_back()
 
     @app.get("/")
     def landing():

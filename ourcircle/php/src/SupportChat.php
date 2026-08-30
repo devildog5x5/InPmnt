@@ -34,7 +34,7 @@ final class SupportChat
             [['sms', 'text message', 'text me', 'twilio', 'forward a text', 'text the number'],
                 'Circle SMS is optional (Twilio in .env). Save a mobile on Account. Invites and “Please call me before I pay” can go by text. Forward a sketchy message to the Family Shield Pro number to open a check. Reply STOP to opt out. We never say a request is safe. This is not a customer-service phone. ' . Analyze::CORE_RULE . ' Setup: SMS.md. Stuck? ' . self::SUPPORT_EMAIL . '.'],
             [['admin', 'console', 'management', 'operator', 'how many users', 'list users'],
-                'A management console exists for the product owner when ADMIN_PASSWORD is set in .env (see ADMIN.md). It shows user counts, names, emails, and safe edits. It is not a family page and is not in the public nav. Until that password is set, /admin is not found. Families use Circle and Account for their own people. Stuck? ' . self::SUPPORT_EMAIL . '.'],
+                'A management console exists for the product owner when ADMIN_PASSWORD is set in .env (see ADMIN.md). You can add, edit, and delete circles, logins, invites, trusted contacts, and checks. The last owner of a circle cannot be deleted unless you delete the circle. It is not a family page and is not in the public nav. Until that password is set, /admin is not found. Stuck? ' . self::SUPPORT_EMAIL . '.'],
             [['phone', 'call us', 'telephone', 'support number', 'customer service number'],
                 'We do not publish a customer-service phone number yet. Email ' . self::SUPPORT_EMAIL . ' — a person reads every message.'],
             [['invite email', 'invite link', 'join link', 'invitation', 'invite someone'],

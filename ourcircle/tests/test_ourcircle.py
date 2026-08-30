@@ -649,6 +649,7 @@ class AppTests(unittest.TestCase):
         self.assertNotIn(b'href="/admin"', home.data)
         chat = faq_reply("would a management console be useful for how many users?")
         self.assertIn("ADMIN.md", chat)
+        self.assertIn("add, edit, and delete", chat.lower())
         self.assertIn("/admin is not found", chat)
         self.assertNotIn("this is safe", chat.lower())
 
@@ -717,6 +718,66 @@ class AppTests(unittest.TestCase):
         self.assertIn(b"Pending invite deleted", deleted.data)
         gone = self.client.get("/admin?q=aunt-admin")
         self.assertNotIn(b"aunt-admin@example.com", gone.data)
+        dash = self.client.get("/admin")
+        self.assertIn(b"Add a circle", dash.data)
+        self.assertIn(b"Add a user", dash.data)
+        self.assertIn(b"Delete circle", dash.data)
+        created_user = self.client.post(
+            "/admin/users/create",
+            data={
+                "household_id": str(hid),
+                "name": "Operator Kid",
+                "email": "operator-kid@example.com",
+                "password": "password123",
+                "role": "member",
+            },
+            follow_redirects=True,
+        )
+        self.assertIn(b"Login added", created_user.data)
+        self.assertIn(b"operator-kid@example.com", created_user.data)
+        with db.session(self.db_path) as conn:
+            kid = conn.execute(
+                "SELECT id FROM users WHERE email=?",
+                ("operator-kid@example.com",),
+            ).fetchone()
+            kid_id = int(kid["id"])
+        blocked = self.client.post(
+            "/admin/users/delete",
+            data={"user_id": str(uid)},
+            follow_redirects=True,
+        )
+        self.assertIn(b"last owner", blocked.data)
+        removed = self.client.post(
+            "/admin/users/delete",
+            data={"user_id": str(kid_id)},
+            follow_redirects=True,
+        )
+        self.assertIn(b"Login deleted", removed.data)
+        made = self.client.post(
+            "/admin/households/create",
+            data={
+                "name": "Temp operator circle",
+                "plan": "yearly",
+                "owner_name": "Temp Owner",
+                "owner_email": "temp-owner@example.com",
+                "owner_password": "password123",
+            },
+            follow_redirects=True,
+        )
+        self.assertIn(b"Circle added", made.data)
+        self.assertIn(b"Temp operator circle", made.data)
+        with db.session(self.db_path) as conn:
+            temp = conn.execute(
+                "SELECT id FROM households WHERE name=?",
+                ("Temp operator circle",),
+            ).fetchone()
+            temp_id = int(temp["id"])
+        wiped = self.client.post(
+            "/admin/households/delete",
+            data={"household_id": str(temp_id)},
+            follow_redirects=True,
+        )
+        self.assertIn(b"Circle deleted", wiped.data)
         os.environ.pop("ADMIN_PASSWORD", None)
 
     def test_admin_email_elevates_family_session(self) -> None:

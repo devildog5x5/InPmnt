@@ -1,22 +1,24 @@
 # Family Shield Pro — operator console
 
-A **management console for you**, not for families. Counts, names, emails, phones, circle status, and safe edits. **Not InPmnt.**
+A **management console for you**, not for families. Add, edit, and delete circles, logins, invites, trusted contacts, and checks. **Not InPmnt.**
 
 Until `ADMIN_PASSWORD` is in `.env`, **`/admin` is not found** (404). It is not in the public nav, sitemap, or family screens. `/healthz` shows `"admin": true` only when the password is configured — not whether someone is signed in.
 
 **Site:** https://familyshieldpro.com
 
-This cannot change `.env`, SMTP, Stripe, or Twilio keys. Families still use Circle and Account for their own people.
+This cannot change `.env`, SMTP, Stripe, or Twilio keys.
 
 ## What you can do
 
 - See **households, users, pending invites, trusted contacts, and checks**
-- Search by name, email, phone, or circle name
-- Edit a login: name, email, mobile, SMS opt-out, optional new password (8+)
-- Edit a circle name and the **monthly / yearly plan flag** (does not charge a card)
-- Resend or delete a **pending** invite
+- **Add / edit / delete** circles (a circle delete removes everyone in it)
+- **Add / edit / delete** logins (name, email, mobile, password, role, which circle)
+- Turn **2FA off** if someone is locked out
+- **Add / resend / delete** pending invites
+- **Add / delete** trusted contacts
+- **Delete** checks
 
-You cannot delete the last owner, turn 2FA on/off here, or paste secrets. Leave the password field blank to keep the current one.
+The **last owner** of a circle cannot be deleted or demoted. Add another owner first, or delete the whole circle.
 
 ## Turn it on (Hostinger)
 
@@ -39,7 +41,7 @@ Rules:
 
 Save. Open `/admin/login`, enter that operator password (no family email required). Sign out of console when you are done.
 
-`ADMIN_EMAIL` is optional. If that exact login email is already signed in as a family user **and** `ADMIN_PASSWORD` is configured, the Console link appears in the family nav. Stolen family sessions for that mailbox would also get the console — prefer a dedicated operator password and a mailbox only you use.
+`ADMIN_EMAIL` is optional. If that exact login email is already signed in as a family user **and** `ADMIN_PASSWORD` is configured, the Console link appears in the family nav.
 
 ## Local Flask
 

@@ -339,14 +339,32 @@ final class App
         $this->requireAdmin();
         if ($path === '/admin' && $method === 'GET') {
             $this->adminHome();
+        } elseif ($path === '/admin/users/create' && $method === 'POST') {
+            $this->adminUserCreate();
+        } elseif ($path === '/admin/users/delete' && $method === 'POST') {
+            $this->adminUserDelete();
+        } elseif ($path === '/admin/users/disable-2fa' && $method === 'POST') {
+            $this->adminUserDisable2fa();
         } elseif (preg_match('#^/admin/users/(\d+)$#', $path, $m)) {
             $this->adminUser((int) $m[1]);
+        } elseif ($path === '/admin/households/create' && $method === 'POST') {
+            $this->adminHouseholdCreate();
+        } elseif ($path === '/admin/households/delete' && $method === 'POST') {
+            $this->adminHouseholdDelete();
+        } elseif (preg_match('#^/admin/households/(\d+)$#', $path, $m)) {
+            $this->adminHousehold((int) $m[1]);
+        } elseif ($path === '/admin/invites/create' && $method === 'POST') {
+            $this->adminInviteCreate();
         } elseif ($path === '/admin/invites/resend' && $method === 'POST') {
             $this->adminInviteResend();
         } elseif ($path === '/admin/invites/delete' && $method === 'POST') {
             $this->adminInviteDelete();
-        } elseif (preg_match('#^/admin/households/(\d+)$#', $path, $m) && $method === 'POST') {
-            $this->adminHousehold((int) $m[1]);
+        } elseif ($path === '/admin/trusted/create' && $method === 'POST') {
+            $this->adminTrustedCreate();
+        } elseif ($path === '/admin/trusted/delete' && $method === 'POST') {
+            $this->adminTrustedDelete();
+        } elseif ($path === '/admin/checks/delete' && $method === 'POST') {
+            $this->adminCheckDelete();
         } else {
             $this->adminNotFound();
         }
@@ -376,8 +394,23 @@ final class App
             'counts' => Db::adminCounts($this->db),
             'users' => Db::adminListUsers($this->db, $q),
             'invites' => Db::adminListInvites($this->db, $q),
+            'households' => Db::adminListHouseholds($this->db, $q),
+            'checks' => Db::adminListChecks($this->db, null, 20),
             'q' => $q,
         ]);
+    }
+
+    private function adminBack(): never
+    {
+        $hid = (int) ($_POST['return_household'] ?? 0);
+        if ($hid > 0) {
+            Http::redirect('/admin/households/' . $hid);
+        }
+        $uid = (int) ($_POST['return_user'] ?? 0);
+        if ($uid > 0) {
+            Http::redirect('/admin/users/' . $uid);
+        }
+        Http::redirect('/admin');
     }
 
     private function adminUser(int $userId): void
@@ -385,6 +418,7 @@ final class App
         if (Http::method() === 'POST') {
             try {
                 $phone = $this->parsePhoneField((string) ($_POST['phone'] ?? ''));
+                $hidRaw = trim((string) ($_POST['household_id'] ?? ''));
                 $person = Db::adminUpdateUser(
                     $this->db,
                     $userId,
@@ -392,11 +426,14 @@ final class App
                     (string) ($_POST['email'] ?? ''),
                     $phone,
                     (string) ($_POST['sms_opt_out'] ?? '') === '1',
-                    (string) ($_POST['password'] ?? '')
+                    (string) ($_POST['password'] ?? ''),
+                    (string) ($_POST['role'] ?? '') !== '' ? (string) $_POST['role'] : null,
+                    $hidRaw !== '' ? (int) $hidRaw : null
                 );
                 if ((int) ($_SESSION['user_id'] ?? 0) === (int) $person['id']) {
                     $_SESSION['name'] = $person['name'];
                     $_SESSION['email'] = $person['email'];
+                    $_SESSION['household_id'] = $person['household_id'];
                 }
                 $this->flash('Login saved.', 'ok');
             } catch (RuntimeException $e) {
@@ -412,27 +449,146 @@ final class App
         $this->page('admin_user', [
             'title' => 'Edit ' . (string) $person['name'] . ' · Console',
             'person' => $person,
+            'households' => Db::adminListHouseholds($this->db),
         ]);
+    }
+
+    private function adminUserCreate(): void
+    {
+        try {
+            $phone = $this->parsePhoneField((string) ($_POST['phone'] ?? ''));
+            $person = Db::adminCreateUser(
+                $this->db,
+                (int) ($_POST['household_id'] ?? 0),
+                (string) ($_POST['name'] ?? ''),
+                (string) ($_POST['email'] ?? ''),
+                (string) ($_POST['password'] ?? ''),
+                (string) ($_POST['role'] ?? 'member'),
+                $phone
+            );
+            $this->flash('Login added: ' . $person['email'] . '.', 'ok');
+        } catch (RuntimeException $e) {
+            $this->flash($e->getMessage(), 'error');
+        }
+        $this->adminBack();
+    }
+
+    private function adminUserDelete(): void
+    {
+        $uid = (int) ($_POST['user_id'] ?? 0);
+        try {
+            Db::adminDeleteUser($this->db, $uid);
+            if ((int) ($_SESSION['user_id'] ?? 0) === $uid) {
+                unset($_SESSION['user_id'], $_SESSION['household_id'], $_SESSION['name'], $_SESSION['email']);
+            }
+            $this->flash('Login deleted.', 'ok');
+        } catch (RuntimeException $e) {
+            $this->flash($e->getMessage(), 'error');
+        }
+        $this->adminBack();
+    }
+
+    private function adminUserDisable2fa(): void
+    {
+        $uid = (int) ($_POST['user_id'] ?? 0);
+        try {
+            Db::adminDisable2fa($this->db, $uid);
+            $this->flash('2FA turned off for that login.', 'ok');
+        } catch (RuntimeException $e) {
+            $this->flash($e->getMessage(), 'error');
+        }
+        Http::redirect($uid > 0 ? '/admin/users/' . $uid : '/admin');
     }
 
     private function adminHousehold(int $hid): void
     {
-        $returnUser = (int) ($_POST['return_user'] ?? 0);
+        if (Http::method() === 'POST') {
+            try {
+                Db::adminUpdateHousehold(
+                    $this->db,
+                    $hid,
+                    (string) ($_POST['name'] ?? ''),
+                    (string) ($_POST['plan'] ?? '')
+                );
+                $this->flash('Circle saved. Plan flag only — no Stripe charge.', 'ok');
+            } catch (RuntimeException $e) {
+                $this->flash($e->getMessage(), 'error');
+            }
+            $returnUser = (int) ($_POST['return_user'] ?? 0);
+            if ($returnUser > 0) {
+                Http::redirect('/admin/users/' . $returnUser);
+            }
+            Http::redirect('/admin/households/' . $hid);
+        }
+        $household = Db::adminHouseholdDetail($this->db, $hid);
+        if (!$household) {
+            $this->flash('That circle is not in Family Shield Pro.', 'error');
+            Http::redirect('/admin');
+        }
+        [$members, $pending] = Db::decorateCircleStatus(Db::members($this->db, $hid), Db::pending($this->db, $hid));
+        $this->page('admin_household', [
+            'title' => (string) $household['name'] . ' · Console',
+            'household' => $household,
+            'members' => $members,
+            'pending' => $pending,
+            'trusted' => Db::trusted($this->db, $hid),
+            'checks' => Db::adminListChecks($this->db, $hid),
+        ]);
+    }
+
+    private function adminHouseholdCreate(): void
+    {
         try {
-            Db::adminUpdateHousehold(
+            $phone = $this->parsePhoneField((string) ($_POST['phone'] ?? ''));
+            $house = Db::adminCreateHousehold(
                 $this->db,
-                $hid,
                 (string) ($_POST['name'] ?? ''),
-                (string) ($_POST['plan'] ?? '')
+                (string) ($_POST['plan'] ?? 'yearly'),
+                (string) ($_POST['owner_name'] ?? ''),
+                (string) ($_POST['owner_email'] ?? ''),
+                (string) ($_POST['owner_password'] ?? ''),
+                $phone
             );
-            $this->flash('Circle saved. Plan flag only — no Stripe charge.', 'ok');
+            $this->flash('Circle added.', 'ok');
+            Http::redirect('/admin/households/' . (int) $house['id']);
+        } catch (RuntimeException $e) {
+            $this->flash($e->getMessage(), 'error');
+            Http::redirect('/admin');
+        }
+    }
+
+    private function adminHouseholdDelete(): void
+    {
+        $hid = (int) ($_POST['household_id'] ?? 0);
+        try {
+            if ((int) ($_SESSION['household_id'] ?? 0) === $hid) {
+                unset($_SESSION['user_id'], $_SESSION['household_id'], $_SESSION['name'], $_SESSION['email']);
+            }
+            Db::adminDeleteHousehold($this->db, $hid);
+            $this->flash('Circle deleted.', 'ok');
         } catch (RuntimeException $e) {
             $this->flash($e->getMessage(), 'error');
         }
-        if ($returnUser > 0) {
-            Http::redirect('/admin/users/' . $returnUser);
-        }
         Http::redirect('/admin');
+    }
+
+    private function adminInviteCreate(): void
+    {
+        try {
+            $phone = $this->parsePhoneField((string) ($_POST['phone'] ?? ''));
+            $inv = Db::adminCreateInvite(
+                $this->db,
+                (int) ($_POST['household_id'] ?? 0),
+                (string) ($_POST['email'] ?? ''),
+                (string) ($_POST['name'] ?? ''),
+                $phone
+            );
+            [$msg, $cat] = $this->notifyInvite($inv, 'Family Shield Pro');
+            $this->flash($msg, $cat);
+        } catch (RuntimeException $e) {
+            $this->flash($e->getMessage(), 'error');
+        }
+        $this->adminBack();
     }
 
     private function adminInviteResend(): void
@@ -441,11 +597,11 @@ final class App
         $inv = Db::pendingInviteById($this->db, $inviteId);
         if (!$inv) {
             $this->flash('That invite is not waiting anymore.', 'error');
-            Http::redirect('/admin');
+            $this->adminBack();
         }
         [$msg, $cat] = $this->notifyInvite($inv, 'Family Shield Pro');
         $this->flash($msg, $cat);
-        Http::redirect('/admin');
+        $this->adminBack();
     }
 
     private function adminInviteDelete(): void
@@ -456,7 +612,40 @@ final class App
         } else {
             $this->flash('That invite is not waiting anymore.', 'error');
         }
-        Http::redirect('/admin');
+        $this->adminBack();
+    }
+
+    private function adminTrustedCreate(): void
+    {
+        try {
+            Db::adminAddTrusted(
+                $this->db,
+                (int) ($_POST['household_id'] ?? 0),
+                (string) ($_POST['kind'] ?? 'other'),
+                (string) ($_POST['name'] ?? ''),
+                (string) ($_POST['phone'] ?? ''),
+                (string) ($_POST['website'] ?? ''),
+                (string) ($_POST['notes'] ?? '')
+            );
+            $this->flash('Trusted contact saved.', 'ok');
+        } catch (RuntimeException $e) {
+            $this->flash($e->getMessage(), 'error');
+        }
+        $this->adminBack();
+    }
+
+    private function adminTrustedDelete(): void
+    {
+        $gone = Db::adminDeleteTrusted($this->db, (int) ($_POST['contact_id'] ?? 0));
+        $this->flash($gone ? 'Trusted contact removed.' : 'That contact was already gone.', $gone ? 'ok' : 'error');
+        $this->adminBack();
+    }
+
+    private function adminCheckDelete(): void
+    {
+        $gone = Db::adminDeleteCheck($this->db, (int) ($_POST['check_id'] ?? 0));
+        $this->flash($gone ? 'Check deleted.' : 'That check was already gone.', $gone ? 'ok' : 'error');
+        $this->adminBack();
     }
 
     private function robots(): never
