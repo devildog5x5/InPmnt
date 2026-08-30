@@ -11,11 +11,13 @@ final class Product
     public static function version(): string
     {
         $path = dirname(__DIR__) . '/VERSION';
-        if (!is_file($path)) {
-            return '0.0.0';
+        if (is_file($path)) {
+            $v = trim((string) file_get_contents($path));
+            if ($v !== '') {
+                return $v;
+            }
         }
-        $v = trim((string) file_get_contents($path));
-        return $v !== '' ? $v : '0.0.0';
+        return '1.2.21';
     }
 
     public static function label(): string

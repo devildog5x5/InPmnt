@@ -12,14 +12,26 @@ View::adminOpen(get_defined_vars());
 <p class="muted">Add, edit, and delete circles, logins, invites, trusted contacts, and checks. This is not shown to families. It cannot change .env, SMTP, Stripe, or Twilio keys. The last owner of a circle cannot be deleted — delete the circle, or add another owner first.</p>
 <div class="panel" style="margin-bottom:16px">
   <h2>Mail</h2>
-  <?php if (!empty($mail_configured)): ?>
-  <p>SMTP or Resend is configured. Reset links and invite emails use that mailbox.</p>
+  <?php $info = $mail_info ?? []; ?>
+  <?php if (!empty($info['configured'])): ?>
+  <p>SMTP is set. Host <?= Http::e((string) ($info['host'] ?? '')) ?>:<?= Http::e((string) ($info['port'] ?? '')) ?>
+    <?= !empty($info['ssl']) ? '(SSL)' : '' ?>
+    · From <?= Http::e((string) ($info['from'] ?? '')) ?>
+    · User <?= Http::e((string) ($info['user'] ?? '')) ?>
+    <?= empty($info['openssl']) ? ' · PHP openssl is OFF (enable it in hPanel)' : '' ?>
+  </p>
   <?php else: ?>
-  <p class="flash error" style="margin:0">Mail is not configured. Reset links will not send until SMTP_HOST, SMTP_USER, SMTP_PASSWORD, and MAIL_FROM are in .env (Hostinger: smtp.hostinger.com, port 465, SSL). See AUTH.md.</p>
+  <p class="flash error" style="margin:0">Mail is not configured. Invites, password reset, and “Please call me before I pay” emails will not send until SMTP_HOST, SMTP_USER, SMTP_PASSWORD, and MAIL_FROM are in .env (Hostinger: smtp.hostinger.com, port 465, SSL). See AUTH.md.</p>
   <?php endif; ?>
-  <?php if (!empty($mail_last_error)): ?>
-  <p class="muted">Last mail attempt: <?= Http::e((string) $mail_last_error) ?></p>
+  <?php if (!empty($info['last']) || !empty($mail_last_error)): ?>
+  <p class="muted">Last mail attempt: <?= Http::e((string) ($info['last'] ?? $mail_last_error ?? '')) ?></p>
   <?php endif; ?>
+  <form method="post" action="/admin/mail/test" style="margin-top:12px">
+    <label>Send a test email to</label>
+    <input name="to" type="email" required value="<?= Http::e((string) ($info['from'] ?? '')) ?>" />
+    <p><button class="btn" type="submit">Send test email</button></p>
+  </form>
+  <p class="muted">Invoice chase reminders are InPmnt, not this product. This mailbox is Family Shield Pro only.</p>
 </div>
 <div class="stat-grid">
   <div class="stat"><strong><?= (int) ($counts['households'] ?? 0) ?></strong><span>Households</span></div>

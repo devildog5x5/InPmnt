@@ -82,7 +82,15 @@ from database import (
     touch_last_access,
     trusted_list,
 )
-from mail import last_mail_status, mail_configured, not_setup_message, send_email, send_failed_message
+from mail import (
+    last_mail_status,
+    mail_configured,
+    not_setup_message,
+    public_info,
+    send_email,
+    send_failed_message,
+    test_email_body,
+)
 from sms import (
     alert_sms_body,
     check_sms_body,
@@ -137,6 +145,16 @@ def invite_email_body(join: str) -> str:
         "Someone invited you to a Family Shield Pro (OurCircle) family circle.\n\n"
         f"Open this link to join. It is only for this email:\n{join}\n\n"
         "If you did not expect this, ignore the message.\n\n"
+        f"{GUIDANCE}\n"
+    )
+
+
+def alert_email_body(name: str, check_url: str, names: str) -> str:
+    return (
+        f"PLEASE CALL {name} BEFORE THEY PAY.\n\n"
+        f"They asked the circle ({names}) to stop a payment or information request.\n\n"
+        f"Open this check:\n{check_url}\n\n"
+        f"{CORE_RULE}\n"
         f"{GUIDANCE}\n"
     )
 
@@ -408,6 +426,7 @@ def create_app() -> Flask:
             checks=checks,
             q=q,
             mail_last_error=last_mail_status(),
+            mail_info=public_info(),
         )
 
     def _admin_back():
@@ -708,6 +727,29 @@ def create_app() -> Flask:
             gone = admin_delete_check(conn, int(request.form.get("check_id") or 0))
         flash("Check deleted." if gone else "That check was already gone.", "ok" if gone else "error")
         return _admin_back()
+
+    @app.post("/admin/mail/test")
+    def admin_mail_test():
+        gate = require_admin()
+        if gate:
+            return gate
+        to = (request.form.get("to") or "").strip().lower()
+        if "@" not in to:
+            flash("Enter an email address for the test.", "error")
+            return redirect(url_for("admin_home"))
+        if not mail_configured():
+            flash(not_setup_message(), "error")
+            return redirect(url_for("admin_home"))
+        try:
+            send_email(to=to, subject="Family Shield Pro test email", body=test_email_body())
+            flash(
+                f"Test email accepted by SMTP for {to}. Check inbox and spam. "
+                "If it is not there, the mailbox password or From address is still wrong.",
+                "ok",
+            )
+        except Exception as exc:
+            flash("Test email did not send. " + (last_mail_status() or str(exc)), "error")
+        return redirect(url_for("admin_home"))
 
     @app.get("/")
     def landing():
@@ -1312,6 +1354,9 @@ def create_app() -> Flask:
         if gate:
             return gate
         u = current_user()
+        emailed = 0
+        texted = 0
+        mail_fail = ""
         with db_session() as conn:
             row = conn.execute(
                 "SELECT * FROM checks WHERE id=? AND household_id=?",
@@ -1330,9 +1375,25 @@ def create_app() -> Flask:
                 "INSERT INTO alerts (check_id, household_id, user_id, message, created_at) VALUES (?,?,?,?,?)",
                 (check_id, u["household_id"], u["id"], msg, now()),
             )
-            texted = 0
+            check_link = site_url() + f"/checks/{check_id}"
+            if mail_configured():
+                email_body = alert_email_body(u["name"], check_link, names)
+                for member in members:
+                    if int(member["id"]) == int(u["id"]):
+                        continue
+                    dest = (member.get("email") or "").strip()
+                    if not dest or "@" not in dest:
+                        continue
+                    try:
+                        send_email(
+                            to=dest,
+                            subject=f"PLEASE CALL {u['name']} before they pay",
+                            body=email_body,
+                        )
+                        emailed += 1
+                    except Exception as exc:
+                        mail_fail = last_mail_status() or str(exc)
             if sms_configured():
-                check_link = site_url() + f"/checks/{check_id}"
                 body = alert_sms_body(u["name"], check_link)
                 for member in members:
                     if int(member["id"]) == int(u["id"]):
@@ -1346,11 +1407,17 @@ def create_app() -> Flask:
                     except Exception:
                         pass
         note = "Urgent alert is on the circle home. Call them by voice if you can — do not rely on a banner alone."
+        if emailed:
+            note += f" Emailed {emailed} circle member{'s' if emailed != 1 else ''}."
+        elif mail_configured() and mail_fail:
+            note += f" Email did not send ({mail_fail})."
+        elif not mail_configured():
+            note += " Mail is not set up, so nobody was emailed."
         if texted:
             note += f" Texted {texted} circle member{'s' if texted != 1 else ''}."
         elif sms_configured():
             note += " Nobody else in the circle has a mobile number on Account yet (or they opted out)."
-        flash(note, "ok")
+        flash(note, "error" if mail_fail and not emailed else "ok")
         return redirect(url_for("show_check", check_id=check_id))
 
     @app.get("/uploads/<path:name>")

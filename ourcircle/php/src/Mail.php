@@ -127,8 +127,37 @@ final class Mailer
                 'SMTP_PASSWORD is not set. Use the Hostinger mailbox password in .env (no quotes).'
             );
         }
+        if ($useSsl && !extension_loaded('openssl')) {
+            throw new RuntimeException(
+                'PHP openssl is off. In hPanel → Advanced → PHP Configuration, enable openssl. Hostinger SMTP on port 465 needs it.'
+            );
+        }
         // Do not fall back to PHP mail() — Hostinger often returns true without delivering.
         self::smtpSocket($host, $port, $user, $password, $fromHeader, $mailFrom, $to, $subject, $body, $useSsl);
+    }
+
+    /** @return array{configured:bool,openssl:bool,host:string,port:string,ssl:bool,user:string,from:string,last:string} */
+    public static function publicInfo(): array
+    {
+        $port = trim(Env::get('SMTP_PORT', '587') ?: '587');
+        return [
+            'configured' => self::configured(),
+            'openssl' => extension_loaded('openssl'),
+            'host' => trim(Env::get('SMTP_HOST')),
+            'port' => $port,
+            'ssl' => Env::truthy('SMTP_SSL') || $port === '465',
+            'user' => trim(Env::get('SMTP_USER')),
+            'from' => trim(Env::get('MAIL_FROM') ?: Env::get('SMTP_USER')),
+            'last' => self::lastStatus(),
+        ];
+    }
+
+    public static function testEmailBody(): string
+    {
+        return "If you received this, Family Shield Pro SMTP is working.\n\n"
+            . 'Product: ' . Product::label() . "\n"
+            . "Not InPmnt.\n\n"
+            . "Invites, password-reset links, and “Please call me before I pay” emails all use this mailbox.\n";
     }
 
     private static function smtpSocket(
@@ -171,23 +200,20 @@ final class Mailer
                 self::smtpExpect($fp, [250], 'EHLO ' . $ehlo);
             }
             if ($user !== '') {
-                self::smtpExpect($fp, [334], 'AUTH LOGIN');
-                self::smtpExpect($fp, [334], base64_encode($user));
-                $auth = self::smtpTry($fp, base64_encode($password));
-                if (!str_starts_with($auth, '235')) {
-                    throw new RuntimeException(
-                        'SMTP login failed. SMTP_USER and SMTP_PASSWORD must match the Hostinger mailbox exactly.'
-                    );
-                }
+                self::smtpAuth($fp, $user, $password);
             }
             self::smtpExpect($fp, [250], 'MAIL FROM:<' . $mailFrom . '>');
             self::smtpExpect($fp, [250, 251], 'RCPT TO:<' . $to . '>');
             self::smtpExpect($fp, [354], 'DATA');
-            $msg = 'Subject: ' . self::headerSafe($subject !== '' ? $subject : '(no subject)') . "\r\n"
+            $msgid = bin2hex(random_bytes(12)) . '@' . $ehlo;
+            $msg = 'Date: ' . gmdate('D, d M Y H:i:s') . " +0000\r\n"
+                . 'Message-ID: <' . $msgid . ">\r\n"
+                . 'Subject: ' . self::headerSafe($subject !== '' ? $subject : '(no subject)') . "\r\n"
                 . 'From: ' . $fromHeader . "\r\n"
+                . 'Reply-To: ' . $mailFrom . "\r\n"
                 . 'To: ' . $to . "\r\n"
-                . "Content-Type: text/plain; charset=UTF-8\r\n"
-                . "MIME-Version: 1.0\r\n\r\n"
+                . "MIME-Version: 1.0\r\n"
+                . "Content-Type: text/plain; charset=UTF-8\r\n\r\n"
                 . self::dotStuff($body);
             fwrite($fp, $msg . "\r\n.\r\n");
             self::smtpExpect($fp, [250]);
@@ -198,6 +224,26 @@ final class Mailer
             }
         } finally {
             fclose($fp);
+        }
+    }
+
+    /** @param resource $fp */
+    private static function smtpAuth($fp, string $user, string $password): void
+    {
+        $offer = self::smtpTry($fp, 'AUTH LOGIN');
+        if (str_starts_with($offer, '334')) {
+            self::smtpExpect($fp, [334], base64_encode($user));
+            $auth = self::smtpTry($fp, base64_encode($password));
+            if (str_starts_with($auth, '235')) {
+                return;
+            }
+        }
+        $plain = base64_encode("\0{$user}\0{$password}");
+        $auth = self::smtpTry($fp, 'AUTH PLAIN ' . $plain);
+        if (!str_starts_with($auth, '235')) {
+            throw new RuntimeException(
+                'SMTP login failed. SMTP_USER and SMTP_PASSWORD must match the Hostinger mailbox exactly (no quotes).'
+            );
         }
     }
 

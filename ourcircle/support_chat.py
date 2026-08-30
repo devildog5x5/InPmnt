@@ -110,7 +110,8 @@ _FAQ: list[tuple[tuple[str, ...], str]] = [
         ("circle", "invite", "member", "five", "5 people", "household"),
         "A circle is up to five people in one household. Invite them from Circle after you sign in. "
         "Circle status is Invited → Invite sent → Invite Accepted → User Accesses the Circle. "
-        "Anyone in the circle can look at a check and you can tap “Please call me before I pay” when it is urgent.",
+        "Anyone in the circle can look at a check. Tap “Please call me before I pay” to email "
+        "(and optionally text) the rest of the circle. ",
     ),
     (
         ("login", "sign in", "signin", "account", "demo"),

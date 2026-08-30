@@ -5,14 +5,23 @@
 <p class="muted">Add, edit, and delete circles, logins, invites, trusted contacts, and checks. This is not shown to families. It cannot change .env, SMTP, Stripe, or Twilio keys. The last owner of a circle cannot be deleted — delete the circle, or add another owner first.</p>
 <div class="panel" style="margin-bottom:16px">
   <h2>Mail</h2>
-  {% if mail_configured %}
-  <p>SMTP or Resend is configured. Reset links and invite emails use that mailbox.</p>
+  {% if mail_info and mail_info.configured %}
+  <p>SMTP is set. Host {{ mail_info.host }}:{{ mail_info.port }}{% if mail_info.ssl %} (SSL){% endif %}
+    · From {{ mail_info.from }}
+    · User {{ mail_info.user }}
+  </p>
   {% else %}
-  <p class="flash error" style="margin:0">Mail is not configured. Reset links will not send until SMTP_HOST, SMTP_USER, SMTP_PASSWORD, and MAIL_FROM are in .env (Hostinger: smtp.hostinger.com, port 465, SSL). See AUTH.md.</p>
+  <p class="flash error" style="margin:0">Mail is not configured. Invites, password reset, and “Please call me before I pay” emails will not send until SMTP_HOST, SMTP_USER, SMTP_PASSWORD, and MAIL_FROM are in .env (Hostinger: smtp.hostinger.com, port 465, SSL). See AUTH.md.</p>
   {% endif %}
-  {% if mail_last_error %}
-  <p class="muted">Last mail attempt: {{ mail_last_error }}</p>
+  {% if (mail_info and mail_info.last) or mail_last_error %}
+  <p class="muted">Last mail attempt: {{ mail_info.last if mail_info and mail_info.last else mail_last_error }}</p>
   {% endif %}
+  <form method="post" action="{{ url_for('admin_mail_test') }}" style="margin-top:12px">
+    <label>Send a test email to</label>
+    <input name="to" type="email" required value="{{ mail_info.from if mail_info else '' }}" />
+    <p><button class="btn" type="submit">Send test email</button></p>
+  </form>
+  <p class="muted">Invoice chase reminders are InPmnt, not this product. This mailbox is Family Shield Pro only.</p>
 </div>
 <div class="stat-grid">
   <div class="stat"><strong>{{ counts.households }}</strong><span>Households</span></div>

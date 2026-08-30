@@ -63,7 +63,9 @@ check(str_contains($circlePhp, 'User Accesses the Circle'), 'circle status acces
 check(!str_contains($circlePhp, 'join link token'), 'circle no bare token label');
 $appPhp = file_get_contents($root . '/php/src/App.php') ?: '';
 check(str_contains($appPhp, 'inviteEmailBody'), 'invite email body helper');
+check(str_contains($appPhp, 'alertEmailBody'), 'call-me email body helper');
 check(str_contains($appPhp, 'Mailer::send'), 'app sends mail');
+check(str_contains($appPhp, '/admin/mail/test'), 'admin mail test route');
 check(str_contains($appPhp, 'Sms::send'), 'app sends sms');
 check(str_contains($appPhp, '/sms/inbound'), 'app inbound sms route');
 check(str_contains($appPhp, 'adminDispatch'), 'app admin routes');
@@ -76,6 +78,7 @@ check(is_file($root . '/php/views/admin_household.php'), 'php admin household vi
 $adminPhp = file_get_contents($root . '/php/views/admin.php') ?: '';
 check(str_contains($adminPhp, 'Add a circle'), 'admin add circle');
 check(str_contains($adminPhp, 'Last mail attempt') || str_contains($adminPhp, 'Mail is not configured'), 'admin mail status');
+check(str_contains($adminPhp, 'Send test email'), 'admin send test email');
 check(str_contains($adminPhp, 'Add a user'), 'admin add user');
 check(str_contains($adminPhp, 'Delete circle'), 'admin delete circle');
 $adminChat = SupportChat::faqReply('would a management console show how many users?');
@@ -102,6 +105,8 @@ $mailPhp = file_get_contents($root . '/php/src/Mail.php') ?: '';
 check(str_contains($mailPhp, 'smtpSocket'), 'smtp socket sender');
 check(!str_contains($mailPhp, '@mail('), 'no php mail() fallback');
 check(str_contains($mailPhp, 'SMTP_PASSWORD'), 'smtp requires password');
+check(str_contains($mailPhp, 'smtpAuth'), 'smtp login then plain');
+check(str_contains($mailPhp, 'Message-ID'), 'smtp message-id header');
 putenv('RESEND_API_KEY=');
 $_ENV['RESEND_API_KEY'] = '';
 putenv('SMTP_HOST=smtp.hostinger.com');
@@ -140,7 +145,7 @@ $inviteChat = SupportChat::faqReply('why does the invite email link not work?');
 check(str_contains(strtolower($inviteChat), 'join'), 'chat invite join');
 $resetChat = strtolower(SupportChat::faqReply('I forgot my password and the reset link did not arrive'));
 check(str_contains($resetChat, 'smtp_password') || str_contains($resetChat, 'does not pretend'), 'chat reset honest mail');
-check(Product::version() === '1.2.20', 'product version 1.2.20');
+check(Product::version() === '1.2.21', 'product version 1.2.21');
 check(Product::NAME === 'Family Shield Pro', 'product name');
 check(Product::APP === 'OurCircle', 'app name');
 

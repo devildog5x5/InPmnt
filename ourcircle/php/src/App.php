@@ -149,6 +149,15 @@ final class App
             . Analyze::GUIDANCE . "\n";
     }
 
+    public static function alertEmailBody(string $name, string $checkUrl, string $names): string
+    {
+        return "PLEASE CALL {$name} BEFORE THEY PAY.\n\n"
+            . "They asked the circle ({$names}) to stop a payment or information request.\n\n"
+            . "Open this check:\n{$checkUrl}\n\n"
+            . Analyze::CORE_RULE . "\n"
+            . Analyze::GUIDANCE . "\n";
+    }
+
     private function parsePhoneField(string $raw): string
     {
         $text = trim($raw);
@@ -369,6 +378,8 @@ final class App
             $this->adminTrustedDelete();
         } elseif ($path === '/admin/checks/delete' && $method === 'POST') {
             $this->adminCheckDelete();
+        } elseif ($path === '/admin/mail/test' && $method === 'POST') {
+            $this->adminMailTest();
         } else {
             $this->adminNotFound();
         }
@@ -402,6 +413,7 @@ final class App
             'checks' => Db::adminListChecks($this->db, null, 20),
             'q' => $q,
             'mail_last_error' => Mailer::lastStatus(),
+            'mail_info' => Mailer::publicInfo(),
         ]);
     }
 
@@ -651,6 +663,27 @@ final class App
         $gone = Db::adminDeleteCheck($this->db, (int) ($_POST['check_id'] ?? 0));
         $this->flash($gone ? 'Check deleted.' : 'That check was already gone.', $gone ? 'ok' : 'error');
         $this->adminBack();
+    }
+
+    private function adminMailTest(): void
+    {
+        $to = strtolower(trim((string) ($_POST['to'] ?? '')));
+        if (!str_contains($to, '@')) {
+            $this->flash('Enter an email address for the test.', 'error');
+            Http::redirect('/admin');
+        }
+        if (!Mailer::configured()) {
+            $this->flash(Mailer::notSetupMessage(), 'error');
+            Http::redirect('/admin');
+        }
+        try {
+            Mailer::send($to, 'Family Shield Pro test email', Mailer::testEmailBody());
+            $this->flash('Test email accepted by SMTP for ' . $to . '. Check inbox and spam. If it is not there, the mailbox password or From address is still wrong.', 'ok');
+        } catch (Throwable $e) {
+            $detail = Mailer::lastStatus() !== '' ? Mailer::lastStatus() : $e->getMessage();
+            $this->flash('Test email did not send. ' . $detail, 'error');
+        }
+        Http::redirect('/admin');
     }
 
     private function robots(): never
@@ -1215,11 +1248,32 @@ final class App
         $this->db->prepare(
             'INSERT INTO alerts (check_id, household_id, user_id, message, created_at) VALUES (?,?,?,?,?)'
         )->execute([$id, $u['household_id'], $u['id'], $msg, Db::now()]);
+        $members = Db::members($this->db, $u['household_id']);
+        $checkLink = $this->siteHome() . '/checks/' . $id;
         $texted = 0;
+        $emailed = 0;
+        $mailFail = '';
+        if (Mailer::configured()) {
+            $body = self::alertEmailBody($u['name'], $checkLink, $names);
+            foreach ($members as $member) {
+                if ((int) ($member['id'] ?? 0) === (int) $u['id']) {
+                    continue;
+                }
+                $dest = trim((string) ($member['email'] ?? ''));
+                if ($dest === '' || !str_contains($dest, '@')) {
+                    continue;
+                }
+                try {
+                    Mailer::send($dest, 'PLEASE CALL ' . $u['name'] . ' before they pay', $body);
+                    $emailed++;
+                } catch (Throwable $e) {
+                    $mailFail = Mailer::lastStatus() !== '' ? Mailer::lastStatus() : $e->getMessage();
+                }
+            }
+        }
         if (Sms::configured()) {
-            $checkLink = $this->siteHome() . '/checks/' . $id;
-            $body = Sms::alertBody($u['name'], $checkLink);
-            foreach (Db::members($this->db, $u['household_id']) as $member) {
+            $smsBody = Sms::alertBody($u['name'], $checkLink);
+            foreach ($members as $member) {
                 if ((int) ($member['id'] ?? 0) === (int) $u['id']) {
                     continue;
                 }
@@ -1228,19 +1282,26 @@ final class App
                     continue;
                 }
                 try {
-                    Sms::send($dest, $body);
+                    Sms::send($dest, $smsBody);
                     $texted++;
                 } catch (Throwable) {
                 }
             }
         }
         $note = 'Urgent alert is on the circle home. Call them by voice if you can — do not rely on a banner alone.';
+        if ($emailed > 0) {
+            $note .= ' Emailed ' . $emailed . ' circle member' . ($emailed === 1 ? '' : 's') . '.';
+        } elseif (Mailer::configured() && $mailFail !== '') {
+            $note .= ' Email did not send (' . $mailFail . ').';
+        } elseif (!Mailer::configured()) {
+            $note .= ' Mail is not set up, so nobody was emailed.';
+        }
         if ($texted > 0) {
             $note .= ' Texted ' . $texted . ' circle member' . ($texted === 1 ? '' : 's') . '.';
         } elseif (Sms::configured()) {
             $note .= ' Nobody else in the circle has a mobile number on Account yet (or they opted out).';
         }
-        $this->flash($note, 'ok');
+        $this->flash($note, ($mailFail !== '' && $emailed === 0) ? 'error' : 'ok');
         Http::redirect('/checks/' . $id);
     }
 

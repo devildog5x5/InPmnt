@@ -3,6 +3,10 @@
 Product: **Family Shield Pro** (app name in the UI: **OurCircle**).  
 Not InPmnt. Version file: `ourcircle/VERSION` (independent of repo-root InPmnt `VERSION`).
 
+## 1.2.21 — 2026-08-30
+
+- **Mail for the whole product, not just reset.** Invites, password-reset links, and **Please call me before I pay** now all email through the same Hostinger SMTP mailbox. Call-me used to be in-app (and SMS) only — that is why “reminders” never arrived. Operator console has **Send test email** plus host/from/last-error so you can prove SMTP without guessing. Live sandbox was still on an old drop (`healthz` `"version":"0.0.0"`) that claimed mail success via PHP `mail()`.
+
 ## 1.2.20 — 2026-08-30
 
 - **Password reset mail actually has to send.** `/forgot` no longer claims a link went out when SMTP is missing or fails. Hostinger PHP no longer falls back to `mail()` (that often returns true without delivering). `SMTP_PASSWORD` is required. Quoted `.env` values are stripped. If send fails, the page shows the SMTP error; the operator console shows the last mail attempt.

@@ -171,6 +171,7 @@ class AppTests(unittest.TestCase):
         self.assertIn(b"guidance, not a guarantee", res.data)
         alert = self.client.post("/checks/1/alert", follow_redirects=True)
         self.assertEqual(alert.status_code, 200)
+        self.assertIn(b"Mail is not set up", alert.data)
         home = self.client.get("/home")
         self.assertIn(b"PLEASE CALL", home.data)
         empty = self.client.post("/check", data={"text": ""}, follow_redirects=True)
@@ -219,6 +220,51 @@ class AppTests(unittest.TestCase):
         for k in ("SMTP_HOST", "SMTP_USER", "SMTP_PASSWORD", "MAIL_FROM"):
             os.environ.pop(k, None)
         self.assertFalse(mail_mod.mail_configured())
+
+    def test_please_call_me_emails_other_members(self) -> None:
+        from unittest.mock import patch
+
+        from werkzeug.security import generate_password_hash
+
+        self.client.post("/login", data={"email": "family@ourcircle.app", "password": "password123"})
+        with db.session(self.db_path) as conn:
+            hid = int(
+                conn.execute(
+                    "SELECT household_id FROM users WHERE email=?",
+                    ("family@ourcircle.app",),
+                ).fetchone()[0]
+            )
+            conn.execute(
+                "INSERT INTO users (household_id, name, email, password_hash, role, created_at) VALUES (?,?,?,?,?,?)",
+                (hid, "Kid", "kid-mail@example.com", generate_password_hash("password123"), "member", db.now()),
+            )
+        self.client.post(
+            "/check",
+            data={"text": "Send bitcoin now or your account will be suspended. Keep this secret."},
+            follow_redirects=True,
+        )
+        os.environ["SMTP_HOST"] = "smtp.example.test"
+        os.environ["SMTP_USER"] = "mail@example.test"
+        os.environ["SMTP_PASSWORD"] = "mailbox-secret"
+        os.environ["MAIL_FROM"] = "mail@example.test"
+        sent: list[dict] = []
+
+        def capture_send(**kwargs):  # type: ignore[no-untyped-def]
+            sent.append(kwargs)
+            return {"provider": "test"}
+
+        try:
+            with patch("web.send_email", side_effect=capture_send):
+                alert = self.client.post("/checks/1/alert", follow_redirects=True)
+            self.assertIn(b"Emailed 1 circle member", alert.data)
+            self.assertEqual(len(sent), 1)
+            self.assertEqual(sent[0]["to"], "kid-mail@example.com")
+            self.assertIn("PLEASE CALL", sent[0]["body"])
+            self.assertIn("/checks/1", sent[0]["body"])
+            self.assertNotIn(b"this is safe", sent[0]["body"].encode().lower())
+        finally:
+            for k in ("SMTP_HOST", "SMTP_USER", "SMTP_PASSWORD", "MAIL_FROM"):
+                os.environ.pop(k, None)
 
     def test_invite_limit_message_and_trusted(self) -> None:
         self.client.post("/login", data={"email": "family@ourcircle.app", "password": "password123"})
@@ -753,6 +799,13 @@ class AppTests(unittest.TestCase):
         self.assertIn(b"Pat Foster", opened.data)
         self.assertIn(b"family@ourcircle.app", opened.data)
         self.assertIn(b"Mail is not configured", opened.data)
+        self.assertIn(b"Send test email", opened.data)
+        skipped_mail = self.client.post(
+            "/admin/mail/test",
+            data={"to": "owner@example.com"},
+            follow_redirects=True,
+        )
+        self.assertIn(b"not set up", skipped_mail.data.lower())
         self.assertIn(b"Households", opened.data)
         self.assertIn(b">1</strong>", opened.data)
         with db.session(self.db_path) as conn:

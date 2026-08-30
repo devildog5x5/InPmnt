@@ -59,6 +59,32 @@ def last_mail_status() -> str:
         return ""
 
 
+def public_info() -> dict[str, Any]:
+    port = _env("SMTP_PORT") or "587"
+    return {
+        "configured": mail_configured(),
+        "host": _env("SMTP_HOST"),
+        "port": port,
+        "ssl": _env("SMTP_SSL").lower() in ("1", "true", "yes") or port == "465",
+        "user": _env("SMTP_USER"),
+        "from": _env("MAIL_FROM") or _env("SMTP_USER"),
+        "last": last_mail_status(),
+    }
+
+
+def test_email_body() -> str:
+    version = "0.0.0"
+    vp = ROOT / "VERSION"
+    if vp.is_file():
+        version = vp.read_text(encoding="utf-8").strip() or "0.0.0"
+    return (
+        "If you received this, Family Shield Pro SMTP is working.\n\n"
+        f"Product: Family Shield Pro OurCircle v{version}\n"
+        "Not InPmnt.\n\n"
+        "Invites, password-reset links, and “Please call me before I pay” emails all use this mailbox.\n"
+    )
+
+
 def send_email(*, to: str, subject: str, body: str, from_name: str | None = None) -> dict[str, Any]:
     try:
         result = _deliver(to=to, subject=subject, body=body, from_name=from_name)
@@ -131,6 +157,7 @@ def _send_smtp(
     msg = EmailMessage()
     msg["Subject"] = subject or "(no subject)"
     msg["From"] = from_header
+    msg["Reply-To"] = mail_from
     msg["To"] = to
     msg.set_content(body or "")
 
