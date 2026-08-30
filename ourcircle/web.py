@@ -933,7 +933,7 @@ def create_app() -> Flask:
             return render_template("forgot.html")
         if not mail_configured():
             flash(not_setup_message(), "error")
-            return redirect(url_for("forgot"))
+            return redirect(url_for("forgot"), code=303)
         email = (request.form.get("email") or "").lower().strip()
         if "@" in email:
             with db_session() as conn:
@@ -962,9 +962,9 @@ def create_app() -> Flask:
                         )
                     except Exception as exc:
                         flash(send_failed_message(last_mail_status() or str(exc)), "error")
-                        return redirect(url_for("forgot"))
+                        return redirect(url_for("forgot"), code=303)
         flash(generic, "ok")
-        return redirect(url_for("forgot"))
+        return redirect(url_for("forgot"), code=303)
 
     @app.post("/forgot/code")
     def forgot_code():

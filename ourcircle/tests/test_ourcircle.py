@@ -432,6 +432,8 @@ class AppTests(unittest.TestCase):
         self.assertIn(b"Forgot password", forgot.data)
         self.assertIn(b"not set up", forgot.data.lower())
         self.assertIn(b"recovery code", forgot.data.lower())
+        skipped = self.client.post("/forgot", data={"email": "family@ourcircle.app"}, follow_redirects=False)
+        self.assertEqual(skipped.status_code, 303)
         skipped = self.client.post("/forgot", data={"email": "family@ourcircle.app"}, follow_redirects=True)
         self.assertIn(b"not set up", skipped.data.lower())
         with db.session(self.db_path) as conn:

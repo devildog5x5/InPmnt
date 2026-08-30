@@ -874,7 +874,7 @@ final class App
         }
         if (!Mailer::configured()) {
             $this->flash(Mailer::notSetupMessage(), 'error');
-            Http::redirect('/forgot');
+            Http::redirect('/forgot', 303);
         }
         $email = strtolower(trim((string) ($_POST['email'] ?? '')));
         if (str_contains($email, '@')) {
@@ -896,12 +896,12 @@ final class App
                 } catch (Throwable $e) {
                     $detail = Mailer::lastStatus() !== '' ? Mailer::lastStatus() : $e->getMessage();
                     $this->flash(Mailer::sendFailedMessage($detail), 'error');
-                    Http::redirect('/forgot');
+                    Http::redirect('/forgot', 303);
                 }
             }
         }
         $this->flash($generic, 'ok');
-        Http::redirect('/forgot');
+        Http::redirect('/forgot', 303);
     }
 
     private function forgotCode(): void
