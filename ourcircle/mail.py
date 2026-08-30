@@ -81,7 +81,8 @@ def test_email_body() -> str:
         "If you received this, Family Shield Pro SMTP is working.\n\n"
         f"Product: Family Shield Pro OurCircle v{version}\n"
         "Not InPmnt.\n\n"
-        "Invites, password-reset links, and “Please call me before I pay” emails all use this mailbox.\n"
+        "Invites, password-reset links, and “Please call me before I pay” emails all use this mailbox.\n\n"
+        "Open the site:\nhttps://familyshieldpro.com\n"
     )
 
 
@@ -107,6 +108,11 @@ def html_from_text(text: str) -> str:
 
     escaped = html_lib.escape(text or "", quote=True)
     linked = re.sub(r"(https?://[^\s<]+)", r'<a href="\1">\1</a>', escaped)
+    linked = re.sub(
+        r'(?<!mailto:)([A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,})',
+        r'<a href="mailto:\1">\1</a>',
+        linked,
+    )
     return (
         '<!DOCTYPE html><html><body style="font-family:system-ui,sans-serif;line-height:1.5;color:#1d1e20">'
         f'<div style="white-space:pre-wrap">{linked}</div></body></html>'

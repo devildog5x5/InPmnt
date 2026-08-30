@@ -33,8 +33,8 @@ $hid = (int) ($household['id'] ?? 0);
         <?php foreach ($members as $u): ?>
         <tr>
           <td><?= Http::e((string) ($u['name'] ?? '')) ?></td>
-          <td><?= Http::e((string) ($u['email'] ?? '')) ?></td>
-          <td><?= Http::e((string) (($u['phone'] ?? '') !== '' ? $u['phone'] : '—')) ?></td>
+          <td><?= Http::mailto((string) ($u['email'] ?? '')) ?></td>
+          <td><?= Http::tel((string) ($u['phone'] ?? '')) ?></td>
           <td><?= Http::e((string) ($u['role'] ?? '')) ?></td>
           <td><span class="pill status-<?= Http::e((string) ($u['circle_status_key'] ?? '')) ?>"><?= Http::e((string) ($u['circle_status'] ?? '')) ?></span></td>
           <td>
@@ -73,10 +73,13 @@ $hid = (int) ($household['id'] ?? 0);
       <tbody>
         <?php if (!$pending): ?><tr><td colspan="4">None waiting.</td></tr><?php endif; ?>
         <?php foreach ($pending as $p): ?>
+        <?php $join = rtrim((string) ($site_home ?? ''), '/') . '/join/' . rawurlencode((string) ($p['token'] ?? '')); ?>
         <tr>
           <td><?= Http::e((string) (($p['name'] ?? '') !== '' ? $p['name'] : '—')) ?></td>
-          <td><?= Http::e((string) ($p['email'] ?? '')) ?></td>
-          <td><span class="pill status-<?= Http::e((string) ($p['circle_status_key'] ?? '')) ?>"><?= Http::e((string) ($p['circle_status'] ?? '')) ?></span></td>
+          <td><?= Http::mailto((string) ($p['email'] ?? '')) ?></td>
+          <td><span class="pill status-<?= Http::e((string) ($p['circle_status_key'] ?? '')) ?>"><?= Http::e((string) ($p['circle_status'] ?? '')) ?></span>
+            <div class="join-url"><a href="<?= Http::e($join) ?>"><?= Http::e($join) ?></a></div>
+          </td>
           <td>
             <button class="btn ghost" type="submit" form="admin-invite-resend" name="invite_id" value="<?= (int) ($p['id'] ?? 0) ?>">Resend</button>
             <button class="btn danger" type="submit" form="admin-invite-delete" name="invite_id" value="<?= (int) ($p['id'] ?? 0) ?>">Delete invite</button>
@@ -110,7 +113,7 @@ $hid = (int) ($household['id'] ?? 0);
         <tr>
           <td><?= Http::e((string) ($t['kind'] ?? '')) ?></td>
           <td><?= Http::e((string) ($t['name'] ?? '')) ?></td>
-          <td><?= Http::e((string) (($t['phone'] ?? '') !== '' ? $t['phone'] : '—')) ?></td>
+          <td><?= Http::tel((string) ($t['phone'] ?? '')) ?><?php if (!empty($t['website'])): ?><div class="muted"><?= Http::website((string) $t['website']) ?></div><?php endif; ?></td>
           <td><button class="btn danger" type="submit" form="admin-trusted-delete" name="contact_id" value="<?= (int) ($t['id'] ?? 0) ?>" onclick="return confirm('Remove this contact?')">Delete</button></td>
         </tr>
         <?php endforeach; ?>

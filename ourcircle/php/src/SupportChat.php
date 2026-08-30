@@ -28,9 +28,9 @@ final class SupportChat
             [['safe', 'scam', 'verify', 'legit', 'real or', 'too good'],
                 'I will never tell you a request is safe. ' . Analyze::CORE_RULE . ' If it sounds too good to be true, it usually is. Really! Really! Really! Pause, involve your circle, and call numbers you already trust — not the ones in the message.'],
             [['price', 'cost', 'plan', 'monthly', 'yearly', 'how much', 'subscription', '119', '14.99'],
-                'Family Shield Pro is $14.99 per month or $119.99 per year for one circle of up to five people. Yearly is the better family value. Start at familyshieldpro.com/signup. ' . Analyze::GUIDANCE . ' Billing questions: ' . self::SUPPORT_EMAIL . '.'],
+                'Family Shield Pro is $14.99 per month or $119.99 per year for one circle of up to five people. Yearly is the better family value. Start at https://familyshieldpro.com/signup. ' . Analyze::GUIDANCE . ' Billing questions: ' . self::SUPPORT_EMAIL . '.'],
             [['password', 'forgot', 'reset', '2fa', 'two-factor', 'two factor', 'authenticator', 'recovery code'],
-                'Forgot your password? Use /forgot. We email a one-hour reset link when SMTP is set in .env (Hostinger mailbox + SMTP_PASSWORD). If mail is not set, the page says so — it does not pretend a link went out. You can also use a one-time recovery code from when you turned on 2FA. Turn 2FA on or off under Account after you sign in. Stuck? ' . self::SUPPORT_EMAIL . '.'],
+                'Forgot your password? Use https://familyshieldpro.com/forgot. We email a one-hour tap-to-open reset button when SMTP is set in .env (Hostinger mailbox + SMTP_PASSWORD). If mail is not set, the page says so — it does not pretend a link went out. You can also use a one-time recovery code from when you turned on 2FA. Turn 2FA on or off under Account after you sign in. Stuck? ' . self::SUPPORT_EMAIL . '.'],
             [['sms', 'text message', 'text me', 'twilio', 'forward a text', 'text the number'],
                 'Circle SMS is optional (Twilio in .env). Save a mobile on Account. Invites and “Please call me before I pay” can go by text. Forward a sketchy message to the Family Shield Pro number to open a check. Reply STOP to opt out. We never say a request is safe. This is not a customer-service phone. ' . Analyze::CORE_RULE . ' Setup: SMS.md. Stuck? ' . self::SUPPORT_EMAIL . '.'],
             [['admin', 'console', 'management', 'operator', 'how many users', 'list users'],
@@ -46,7 +46,7 @@ final class SupportChat
             [['stripe', 'billing', 'cancel', 'refund', 'charge', 'card', 'invoice'],
                 'Plans are Family monthly $14.99 or Family yearly $119.99. If Stripe keys are in .env, Plans sends you to Stripe Checkout; you can manage or cancel in the Stripe customer portal. Until keys are live, choosing a plan only saves the flag — no charge. ' . Analyze::GUIDANCE . ' Email ' . self::SUPPORT_EMAIL . ' for billing help.'],
             [['login', 'sign in', 'signin', 'account', 'demo'],
-                'Sign in at /login. The demo circle is family@ourcircle.app / password123 (2FA off until you enable it). If you are locked out, try /forgot or email ' . self::SUPPORT_EMAIL . '.'],
+                'Sign in at https://familyshieldpro.com/login. The demo circle is family@ourcircle.app / password123 (2FA off until you enable it). If you are locked out, try https://familyshieldpro.com/forgot or email ' . self::SUPPORT_EMAIL . '.'],
             [['what is', 'what’s this', 'whats this', 'ourcircle', 'family shield', 'how it works', 'pause'],
                 'Family Shield Pro (OurCircle) is a trusted family circle for sketchy texts, calls, prizes, and urgent payment asks. It is not an AI that stamps a request as safe. You paste the message, read the warning signs, and get someone you trust on the phone — then you decide.'],
             [['hello', 'hi ', 'hey', 'help', 'thanks'],
@@ -112,7 +112,7 @@ final class SupportChat
             . 'Support email: ' . self::SUPPORT_EMAIL . '. Do not invent a customer-service phone number — phone support is not published yet. '
             . 'Circle SMS (Twilio) is optional: invites, call-me alerts, and forwarding a sketchy text. Reply STOP to opt out. Never say a request is safe. '
             . 'An operator console exists only when ADMIN_PASSWORD is set in .env; it is not a public family page. Do not invent a public admin URL. '
-            . 'Password reset is at /forgot. 2FA is on Account. '
+            . 'Password reset is at https://familyshieldpro.com/forgot. 2FA is on Account. '
             . 'Keep answers short (2–6 sentences). Do not ask for passwords, card numbers, or 2FA codes. '
             . 'If you cannot help, point to the support email.';
         $messages = [['role' => 'system', 'content' => $system]];

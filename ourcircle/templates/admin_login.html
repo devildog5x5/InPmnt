@@ -5,9 +5,7 @@
 <div class="auth-page">
   <div class="auth-card">
     {% with brand_sub="Operator console" %}{% include "_brand.html" %}{% endwith %}
-    {% for cat, msg in get_flashed_messages(with_categories=true) %}
-      <div class="flash {{ cat }}">{{ msg }}</div>
-    {% endfor %}
+    {% include "_flashes.html" %}
     <p class="muted">This is not a family login. Families use Sign in. The console is off until ADMIN_PASSWORD is set in .env.</p>
     <form method="post">
       <label>Operator password</label>

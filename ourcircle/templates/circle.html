@@ -21,8 +21,8 @@
         {% for m in members %}
         <tr>
           <td>{{ m.name }}</td>
-          <td>{{ m.email }}</td>
-          <td>{{ m.phone or "—" }}</td>
+          <td>{{ m.email|mailto_link }}</td>
+          <td>{{ m.phone|tel_link }}</td>
           <td>{{ m.role }}</td>
           <td><span class="pill status-{{ m.circle_status_key }}">{{ m.circle_status }}</span></td>
         </tr>
@@ -30,8 +30,8 @@
         {% for p in pending %}
         <tr>
           <td>{{ p.name or "—" }}</td>
-          <td>{{ p.email }}</td>
-          <td>{{ p.phone or "—" }}</td>
+          <td>{{ p.email|mailto_link }}</td>
+          <td>{{ p.phone|tel_link }}</td>
           <td>invited</td>
           <td>
             <span class="pill status-{{ p.circle_status_key }}">{{ p.circle_status }}</span>
@@ -53,7 +53,7 @@
   <label>Mobile (optional)</label>
   <input name="phone" type="tel" inputmode="tel" placeholder="(555) 010-1234" autocomplete="off" />
   <p><button class="btn wide" type="submit">Send invite</button></p>
-  <p class="disclaimer">We email a join link when mail is set up{% if sms_enabled %}, and text it when you add a mobile number{% endif %}. Also copy it from the status table and share it in a call you already trust — not inside a suspicious thread. Reply STOP on texts to opt out.</p>
+  <p class="disclaimer">We email a tap-to-open join button when mail is set up{% if sms_enabled %}, and text the join URL when you add a mobile number{% endif %}. You can also tap the join link in the status table and share it in a call you already trust — not inside a suspicious thread. Reply STOP on texts to opt out.</p>
 </form>
 {% if alerts %}
 <div class="panel" style="margin-top:16px">

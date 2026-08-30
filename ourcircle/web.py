@@ -3,9 +3,12 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import time
 from pathlib import Path
 from typing import Any
+
+from markupsafe import Markup, escape as html_escape
 
 from flask import (
     Flask,
@@ -149,22 +152,51 @@ def invite_email_body(join: str) -> str:
     )
 
 
-def invite_email_html(join: str) -> str:
+def tap_link_email_html(intro_html: str, href: str, button: str, footer_html: str) -> str:
     from html import escape
 
-    href = escape(join, quote=True)
-    guidance = escape(GUIDANCE, quote=True)
+    safe_href = escape(href, quote=True)
+    safe_btn = escape(button, quote=True)
     return (
         '<!DOCTYPE html><html><body style="margin:0;background:#f4efe6;padding:24px">'
         '<div style="max-width:560px;margin:0 auto;background:#fff8f0;padding:28px;border-radius:16px;'
         'font-family:Georgia,serif;color:#1d1e20;line-height:1.5">'
-        "<p>Someone invited you to a Family Shield Pro (OurCircle) family circle.</p>"
-        f'<p><a href="{href}" style="display:inline-block;background:#1f4f45;color:#ffffff;'
-        'padding:14px 22px;border-radius:999px;text-decoration:none;font-weight:700">Join this family circle</a></p>'
-        f'<p>Or tap this link: <a href="{href}">{href}</a></p>'
-        "<p>It is only for this email. If you did not expect this, ignore the message.</p>"
-        f'<p style="color:#5c5850;font-size:14px">{guidance}</p>'
+        f"{intro_html}"
+        f'<p><a href="{safe_href}" style="display:inline-block;background:#1f4f45;color:#ffffff;'
+        f'padding:14px 22px;border-radius:999px;text-decoration:none;font-weight:700">{safe_btn}</a></p>'
+        f'<p>Or tap this link: <a href="{safe_href}">{safe_href}</a></p>'
+        f"{footer_html}"
         "</div></body></html>"
+    )
+
+
+def invite_email_html(join: str) -> str:
+    from html import escape
+
+    guidance = escape(GUIDANCE, quote=True)
+    return tap_link_email_html(
+        "<p>Someone invited you to a Family Shield Pro (OurCircle) family circle.</p>",
+        join,
+        "Join this family circle",
+        "<p>It is only for this email. If you did not expect this, ignore the message.</p>"
+        f'<p style="color:#5c5850;font-size:14px">{guidance}</p>',
+    )
+
+
+def reset_email_body(link: str) -> str:
+    return (
+        "Someone asked to reset the Family Shield Pro password for this email.\n\n"
+        f"Tap this link within one hour (you do not need to copy and paste it):\n{link}\n\n"
+        "If you did not ask, ignore this message.\n"
+    )
+
+
+def reset_email_html(link: str) -> str:
+    return tap_link_email_html(
+        "<p>Someone asked to reset the Family Shield Pro password for this email.</p>",
+        link,
+        "Reset password",
+        "<p>This link works for one hour. If you did not ask, ignore this message.</p>",
     )
 
 
@@ -176,6 +208,61 @@ def alert_email_body(name: str, check_url: str, names: str) -> str:
         f"{CORE_RULE}\n"
         f"{GUIDANCE}\n"
     )
+
+
+def alert_email_html(name: str, check_url: str, names: str) -> str:
+    from html import escape
+
+    name_e = escape(name, quote=True)
+    names_e = escape(names, quote=True)
+    rule = escape(CORE_RULE, quote=True)
+    guidance = escape(GUIDANCE, quote=True)
+    return tap_link_email_html(
+        f"<p><strong>PLEASE CALL {name_e} BEFORE THEY PAY.</strong></p>"
+        f"<p>They asked the circle ({names_e}) to stop a payment or information request.</p>",
+        check_url,
+        "Open this check",
+        f'<p style="color:#5c5850;font-size:14px">{rule} {guidance}</p>',
+    )
+
+
+def linkify_text(text: str | None) -> Markup:
+    escaped = str(html_escape(text or ""))
+    escaped = re.sub(r"(https?://[^\s<]+)", r'<a href="\1">\1</a>', escaped)
+    escaped = re.sub(
+        r'(?<!mailto:)([A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,})',
+        r'<a href="mailto:\1">\1</a>',
+        escaped,
+    )
+    return Markup(escaped)
+
+
+def mailto_html(email: str | None) -> Markup:
+    value = (email or "").strip()
+    if not value:
+        return Markup("")
+    return Markup(f'<a href="mailto:{html_escape(value)}">{html_escape(value)}</a>')
+
+
+def tel_html(phone: str | None) -> Markup:
+    raw = (phone or "").strip()
+    if not raw:
+        return Markup("—")
+    href = normalize_phone(raw)
+    if not href:
+        digits = re.sub(r"\D+", "", raw)
+        href = f"+{digits}" if raw.startswith("+") and len(digits) >= 10 else ""
+    if not href:
+        return Markup(str(html_escape(raw)))
+    return Markup(f'<a href="tel:{html_escape(href)}">{html_escape(raw)}</a>')
+
+
+def website_html(raw: str | None) -> Markup:
+    text = (raw or "").strip()
+    if not text:
+        return Markup("")
+    href = text if re.match(r"^https?://", text, re.I) else "https://" + text.lstrip("/")
+    return Markup(f'<a href="{html_escape(href)}" rel="noopener">{html_escape(text)}</a>')
 
 
 def inbound_url() -> str:
@@ -285,6 +372,10 @@ def create_app() -> Flask:
     app.config["SECRET_KEY"] = secret
     app.config["MAX_CONTENT_LENGTH"] = 8 * 1024 * 1024
     app.config["TEMPLATES_AUTO_RELOAD"] = True
+    app.add_template_filter(linkify_text, "linkify")
+    app.add_template_filter(mailto_html, "mailto_link")
+    app.add_template_filter(tel_html, "tel_link")
+    app.add_template_filter(website_html, "website_link")
 
     @app.context_processor
     def inject():
@@ -1011,16 +1102,12 @@ def create_app() -> Flask:
                         (user["id"], token_hash, exp, now()),
                     )
                     link = site_url() + "/reset/" + raw
-                    body = (
-                        "Someone asked to reset the Family Shield Pro password for this email.\n\n"
-                        f"Tap this link within one hour (you do not need to copy and paste it):\n{link}\n\n"
-                        "If you did not ask, ignore this message.\n"
-                    )
                     try:
                         send_email(
                             to=user["email"],
                             subject="Reset your Family Shield Pro password",
-                            body=body,
+                            body=reset_email_body(link),
+                            html=reset_email_html(link),
                         )
                     except Exception as exc:
                         flash(send_failed_message(last_mail_status() or str(exc)), "error")
@@ -1398,6 +1485,7 @@ def create_app() -> Flask:
             check_link = site_url() + f"/checks/{check_id}"
             if mail_configured():
                 email_body = alert_email_body(u["name"], check_link, names)
+                email_html = alert_email_html(u["name"], check_link, names)
                 for member in members:
                     if int(member["id"]) == int(u["id"]):
                         continue
@@ -1409,6 +1497,7 @@ def create_app() -> Flask:
                             to=dest,
                             subject=f"PLEASE CALL {u['name']} before they pay",
                             body=email_body,
+                            html=email_html,
                         )
                         emailed += 1
                     except Exception as exc:

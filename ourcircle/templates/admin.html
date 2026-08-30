@@ -7,7 +7,7 @@
   <h2>Mail</h2>
   {% if mail_info and mail_info.configured %}
   <p>SMTP is set. Host {{ mail_info.host }}:{{ mail_info.port }}{% if mail_info.ssl %} (SSL){% endif %}
-    · From {{ mail_info.from }}
+    · From {{ mail_info.from|mailto_link }}
     · User {{ mail_info.user }}
   </p>
   {% else %}
@@ -94,8 +94,8 @@
         {% for u in users %}
         <tr>
           <td>{{ u.name }}</td>
-          <td>{{ u.email }}</td>
-          <td>{{ u.phone or "—" }}</td>
+          <td>{{ u.email|mailto_link }}</td>
+          <td>{{ u.phone|tel_link }}</td>
           <td>{{ u.household_name }} ({{ u.household_plan }})</td>
           <td>{{ u.role }}</td>
           <td><span class="pill status-{{ u.circle_status_key }}">{{ u.circle_status }}</span></td>
@@ -146,8 +146,8 @@
         {% for p in invites %}
         <tr>
           <td>{{ p.name or "—" }}</td>
-          <td>{{ p.email }}</td>
-          <td>{{ p.phone or "—" }}</td>
+          <td>{{ p.email|mailto_link }}</td>
+          <td>{{ p.phone|tel_link }}</td>
           <td>{{ p.household_name }}</td>
           <td>
             <span class="pill status-{{ p.circle_status_key }}">{{ p.circle_status }}</span>

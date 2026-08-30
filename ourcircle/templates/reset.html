@@ -4,9 +4,7 @@
 <div class="auth-page">
   <div class="auth-card">
     {% with brand_sub="New password" %}{% include "_brand.html" %}{% endwith %}
-    {% for cat, msg in get_flashed_messages(with_categories=true) %}
-      <div class="flash {{ cat }}">{{ msg }}</div>
-    {% endfor %}
+    {% include "_flashes.html" %}
     <form method="post">
       <label>New password (8+)</label>
       <input name="password" type="password" required minlength="8" autocomplete="new-password" />

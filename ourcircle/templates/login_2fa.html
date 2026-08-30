@@ -5,9 +5,7 @@
   <div class="auth-card">
     {% with brand_sub="Two-factor" %}{% include "_brand.html" %}{% endwith %}
     <p class="core-rule">{{ core_rule }}</p>
-    {% for cat, msg in get_flashed_messages(with_categories=true) %}
-      <div class="flash {{ cat }}">{{ msg }}</div>
-    {% endfor %}
+    {% include "_flashes.html" %}
     <p>Enter the 6-digit code from your authenticator app, or a one-time recovery code.</p>
     <form method="post">
       <label>Authenticator code</label>

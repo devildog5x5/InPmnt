@@ -26,7 +26,7 @@ SYSTEM = (
     f"Support email: {SUPPORT_EMAIL}. Do not invent a customer-service phone number — phone support is not published yet. "
     "Circle SMS (Twilio) is optional: invites, call-me alerts, and forwarding a sketchy text. Reply STOP to opt out. Never say a request is safe. "
     "An operator console exists only when ADMIN_PASSWORD is set in .env; it is not a public family page. Do not invent a public admin URL. "
-    "Password reset is at /forgot. 2FA is on Account. "
+    "Password reset is at https://familyshieldpro.com/forgot. 2FA is on Account. "
     "Keep answers short (2–6 sentences). Do not ask for passwords, card numbers, or 2FA codes. "
     "If you cannot help, point to the support email."
 )
@@ -60,12 +60,12 @@ _FAQ: list[tuple[tuple[str, ...], str]] = [
     (
         ("price", "cost", "plan", "monthly", "yearly", "how much", "subscription", "119", "14.99"),
         "Family Shield Pro is $14.99 per month or $119.99 per year for one circle of up to five people. "
-        "Yearly is the better family value. Start at familyshieldpro.com/signup. "
+        "Yearly is the better family value. Start at https://familyshieldpro.com/signup. "
         f"{GUIDANCE} Billing questions: {SUPPORT_EMAIL}.",
     ),
     (
         ("password", "forgot", "reset", "2fa", "two-factor", "two factor", "authenticator", "recovery code"),
-        "Forgot your password? Use /forgot. We email a one-hour reset link when SMTP is set in .env "
+        "Forgot your password? Use https://familyshieldpro.com/forgot. We email a one-hour tap-to-open reset button when SMTP is set in .env "
         "(Hostinger mailbox + SMTP_PASSWORD). If mail is not set, the page says so — it does not pretend a link went out. "
         "You can also use a one-time recovery code from when you turned on 2FA. "
         "Turn 2FA on or off under Account after you sign in. "
@@ -116,8 +116,8 @@ _FAQ: list[tuple[tuple[str, ...], str]] = [
     ),
     (
         ("login", "sign in", "signin", "account", "demo"),
-        "Sign in at /login. The demo circle is family@ourcircle.app / password123 (2FA off until you enable it). "
-        f"If you are locked out, try /forgot or email {SUPPORT_EMAIL}.",
+        "Sign in at https://familyshieldpro.com/login. The demo circle is family@ourcircle.app / password123 (2FA off until you enable it). "
+        f"If you are locked out, try https://familyshieldpro.com/forgot or email {SUPPORT_EMAIL}.",
     ),
     (
         ("what is", "what’s this", "whats this", "ourcircle", "family shield", "how it works", "pause"),

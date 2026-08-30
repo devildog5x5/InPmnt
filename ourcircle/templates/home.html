@@ -28,10 +28,11 @@
       <p>{{ members|length }} of 5 people · {{ pending|length }} invite{{ 's' if pending|length != 1 else '' }} waiting</p>
       <ul class="list">
         {% for m in members %}
-        <li>{{ m.name }} · {{ m.email }}</li>
+        <li>{{ m.name }} · {{ m.email|mailto_link }}</li>
         {% endfor %}
         {% for p in pending %}
-        <li>{{ p.name or p.email }} · {{ p.email }} · invited</li>
+        <li>{{ p.name or p.email }} · {{ p.email|mailto_link }} · invited
+          · <a href="{{ site_home }}/join/{{ p.token }}">Join link</a></li>
         {% endfor %}
       </ul>
       <p><a class="btn ghost" href="{{ url_for('circle') }}">Invite family</a></p>

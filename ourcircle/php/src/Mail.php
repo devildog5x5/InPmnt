@@ -56,6 +56,11 @@ final class Mailer
     {
         $escaped = htmlspecialchars($text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $linked = preg_replace('#(https?://[^\s<]+)#', '<a href="$1">$1</a>', $escaped) ?? $escaped;
+        $linked = preg_replace(
+            '#(?<!mailto:)([A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,})#',
+            '<a href="mailto:$1">$1</a>',
+            $linked
+        ) ?? $linked;
         return '<!DOCTYPE html><html><body style="font-family:system-ui,sans-serif;line-height:1.5;color:#1d1e20">'
             . '<div style="white-space:pre-wrap">' . $linked . '</div></body></html>';
     }
@@ -168,7 +173,8 @@ final class Mailer
         return "If you received this, Family Shield Pro SMTP is working.\n\n"
             . 'Product: ' . Product::label() . "\n"
             . "Not InPmnt.\n\n"
-            . "Invites, password-reset links, and “Please call me before I pay” emails all use this mailbox.\n";
+            . "Invites, password-reset links, and “Please call me before I pay” emails all use this mailbox.\n\n"
+            . "Open the site:\nhttps://familyshieldpro.com\n";
     }
 
     private static function smtpSocket(

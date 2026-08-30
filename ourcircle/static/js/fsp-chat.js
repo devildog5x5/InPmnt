@@ -11,10 +11,26 @@
   var history = [];
   var ignoreToggleUntil = 0;
 
+  function linkify(text) {
+    var div = document.createElement("div");
+    div.textContent = text == null ? "" : String(text);
+    var html = div.innerHTML;
+    html = html.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1">$1</a>');
+    html = html.replace(
+      /(^|[\s>])([A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,})/g,
+      '$1<a href="mailto:$2">$2</a>'
+    );
+    return html;
+  }
+
   function add(role, text) {
     var el = document.createElement("div");
     el.className = "fsp-chat-msg " + role;
-    el.textContent = text;
+    if (role === "assistant") {
+      el.innerHTML = linkify(text);
+    } else {
+      el.textContent = text;
+    }
     log.appendChild(el);
     log.scrollTop = log.scrollHeight;
   }

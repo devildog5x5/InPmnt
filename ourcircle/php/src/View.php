@@ -24,7 +24,7 @@ final class View
         $html = '';
         foreach ($flashes as $item) {
             $cat = Http::e((string) ($item[0] ?? 'ok'));
-            $msg = Http::e((string) ($item[1] ?? ''));
+            $msg = Http::linkify((string) ($item[1] ?? ''));
             $html .= '<div class="flash ' . $cat . '">' . $msg . '</div>';
         }
         return $html;

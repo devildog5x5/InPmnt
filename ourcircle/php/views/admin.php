@@ -16,8 +16,8 @@ View::adminOpen(get_defined_vars());
   <?php if (!empty($info['configured'])): ?>
   <p>SMTP is set. Host <?= Http::e((string) ($info['host'] ?? '')) ?>:<?= Http::e((string) ($info['port'] ?? '')) ?>
     <?= !empty($info['ssl']) ? '(SSL)' : '' ?>
-    · From <?= Http::e((string) ($info['from'] ?? '')) ?>
-    · User <?= Http::e((string) ($info['user'] ?? '')) ?>
+            · From <?= Http::mailto((string) ($info['from'] ?? '')) ?>
+            · User <?= Http::e((string) ($info['user'] ?? '')) ?>
     <?= empty($info['openssl']) ? ' · PHP openssl is OFF (enable it in hPanel)' : '' ?>
   </p>
   <?php else: ?>
@@ -108,8 +108,8 @@ View::adminOpen(get_defined_vars());
         <?php foreach ($users as $u): ?>
         <tr>
           <td><?= Http::e((string) ($u['name'] ?? '')) ?></td>
-          <td><?= Http::e((string) ($u['email'] ?? '')) ?></td>
-          <td><?= Http::e((string) (($u['phone'] ?? '') !== '' ? $u['phone'] : '—')) ?></td>
+          <td><?= Http::mailto((string) ($u['email'] ?? '')) ?></td>
+          <td><?= Http::tel((string) (($u['phone'] ?? '') !== '' ? $u['phone'] : '')) ?></td>
           <td><?= Http::e((string) ($u['household_name'] ?? '')) ?> (<?= Http::e((string) ($u['household_plan'] ?? '')) ?>)</td>
           <td><?= Http::e((string) ($u['role'] ?? '')) ?></td>
           <td><span class="pill status-<?= Http::e((string) ($u['circle_status_key'] ?? '')) ?>"><?= Http::e((string) ($u['circle_status'] ?? '')) ?></span></td>
@@ -162,8 +162,8 @@ View::adminOpen(get_defined_vars());
         <?php $join = rtrim((string) ($site_home ?? ''), '/') . '/join/' . rawurlencode((string) ($p['token'] ?? '')); ?>
         <tr>
           <td><?= Http::e((string) (($p['name'] ?? '') !== '' ? $p['name'] : '—')) ?></td>
-          <td><?= Http::e((string) ($p['email'] ?? '')) ?></td>
-          <td><?= Http::e((string) (($p['phone'] ?? '') !== '' ? $p['phone'] : '—')) ?></td>
+          <td><?= Http::mailto((string) ($p['email'] ?? '')) ?></td>
+          <td><?= Http::tel((string) ($p['phone'] ?? '')) ?></td>
           <td><?= Http::e((string) ($p['household_name'] ?? '')) ?></td>
           <td>
             <span class="pill status-<?= Http::e((string) ($p['circle_status_key'] ?? '')) ?>"><?= Http::e((string) ($p['circle_status'] ?? '')) ?></span>

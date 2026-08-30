@@ -217,8 +217,14 @@ class AppTests(unittest.TestCase):
         self.assertTrue(mail_mod.mail_configured())
         os.environ["SMTP_PASSWORD"] = '"quoted-secret"'
         self.assertEqual(mail_mod._env("SMTP_PASSWORD"), "quoted-secret")
-        linked = mail_mod.html_from_text("Open:\nhttps://example.test/join/abc")
+        linked = mail_mod.html_from_text("Open:\nhttps://example.test/join/abc\nWrite pat@example.com")
         self.assertIn('<a href="https://example.test/join/abc">', linked)
+        self.assertIn('<a href="mailto:pat@example.com">', linked)
+        import web as web_mod
+
+        self.assertIn('<a href="mailto:pat@example.com">', str(web_mod.mailto_html("pat@example.com")))
+        self.assertIn("tel:+15550101234", str(web_mod.tel_html("555-010-1234")))
+        self.assertIn('href="https://example.com"', str(web_mod.website_html("example.com")))
         for k in ("SMTP_HOST", "SMTP_USER", "SMTP_PASSWORD", "MAIL_FROM"):
             os.environ.pop(k, None)
         self.assertFalse(mail_mod.mail_configured())
@@ -263,6 +269,8 @@ class AppTests(unittest.TestCase):
             self.assertEqual(sent[0]["to"], "kid-mail@example.com")
             self.assertIn("PLEASE CALL", sent[0]["body"])
             self.assertIn("/checks/1", sent[0]["body"])
+            self.assertIn("Open this check", sent[0]["html"])
+            self.assertIn('<a href=', sent[0]["html"])
             self.assertNotIn(b"this is safe", sent[0]["body"].encode().lower())
         finally:
             for k in ("SMTP_HOST", "SMTP_USER", "SMTP_PASSWORD", "MAIL_FROM"):
@@ -511,6 +519,8 @@ class AppTests(unittest.TestCase):
             self.assertIn(b"reset instructions", mailed.data.lower())
             self.assertEqual(len(sent), 1)
             self.assertIn("/reset/", sent[0]["body"])
+            self.assertIn("Reset password", sent[0]["html"])
+            self.assertIn('<a href=', sent[0]["html"])
         finally:
             for k in ("SMTP_HOST", "SMTP_USER", "SMTP_PASSWORD", "MAIL_FROM"):
                 os.environ.pop(k, None)
@@ -670,7 +680,9 @@ class AppTests(unittest.TestCase):
         self.assertEqual(sms_mod.classify_inbound("STOP"), "stop")
         self.assertEqual(sms_mod.classify_inbound("buy gift cards now"), "check")
         self.assertIn("<Message>", sms_mod.twiml("Hello & goodbye"))
-        self.assertNotIn("this is safe", sms_mod.check_sms_body("Pause.", "https://example.test/checks/1").lower())
+        self.assertNotIn("this is safe", sms_mod.check_sms_body("Pause.", "https://example.test/c").lower())
+        self.assertIn("https://example.test/c\n", sms_mod.check_sms_body("Pause.", "https://example.test/c"))
+        self.assertIn("https://example.test/c\n", sms_mod.alert_sms_body("Pat", "https://example.test/c"))
         self.assertFalse(sms_mod.sms_configured())
 
         off = self.client.post("/sms/inbound", data={"From": "+15555550100", "Body": "HELP"})

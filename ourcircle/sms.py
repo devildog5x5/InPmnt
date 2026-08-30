@@ -49,13 +49,18 @@ def invite_sms_body(join: str, inviter: str = "") -> str:
 
 def alert_sms_body(name: str, check_url: str) -> str:
     return (
-        f"PLEASE CALL {name} before they pay. Open {check_url} "
-        f"{CORE_RULE} Reply STOP to opt out."
+        f"PLEASE CALL {name} before they pay.\n"
+        f"{check_url}\n"
+        f"Tap the link to open the check. {CORE_RULE} Reply STOP to opt out."
     )
 
 
 def check_sms_body(title: str, check_url: str) -> str:
-    return f"OurCircle: {title} Open {check_url} {GUIDANCE} {CORE_RULE}"
+    return (
+        f"OurCircle: {title}\n"
+        f"{check_url}\n"
+        f"Tap the link. {GUIDANCE} {CORE_RULE}"
+    )
 
 
 def classify_inbound(body: str) -> str:

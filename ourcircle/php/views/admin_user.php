@@ -7,7 +7,7 @@ $totp = !empty($person['totp_enabled']);
 <p><a href="/admin">← Console</a>
  · <a href="/admin/households/<?= (int) ($person['household_id'] ?? 0) ?>">Open circle</a></p>
 <h2>Edit <?= Http::e((string) ($person['name'] ?? '')) ?></h2>
-<p class="muted"><?= Http::e((string) ($person['email'] ?? '')) ?> · <?= Http::e((string) ($person['role'] ?? '')) ?>
+<p class="muted"><?= Http::mailto((string) ($person['email'] ?? '')) ?> · <?= Http::e((string) ($person['role'] ?? '')) ?>
  · <span class="pill status-<?= Http::e((string) ($person['circle_status_key'] ?? '')) ?>"><?= Http::e((string) ($person['circle_status'] ?? '')) ?></span>
 <?php if (!empty($person['last_access_at'])): ?> · last access <?= Http::e((string) $person['last_access_at']) ?><?php endif; ?>
  · <?= $totp ? '2FA on' : '2FA off' ?></p>

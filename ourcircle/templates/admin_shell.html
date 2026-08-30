@@ -14,9 +14,7 @@
     </nav>
   </header>
   <p class="core-rule">{{ core_rule }}</p>
-  {% for cat, msg in get_flashed_messages(with_categories=true) %}
-    <div class="flash {{ cat }}">{{ msg }}</div>
-  {% endfor %}
+  {% include "_flashes.html" %}
   <main class="app-main">{% block main %}{% endblock %}</main>
   <p class="disclaimer">{{ guidance }} This console cannot change .env, SMTP, Stripe, or Twilio keys.</p>
 </div>

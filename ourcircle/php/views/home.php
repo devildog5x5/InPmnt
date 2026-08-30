@@ -33,10 +33,12 @@ View::appOpen(get_defined_vars());
       <p><?= count($members) ?> of 5 people · <?= count($pending) ?> invite<?= count($pending) !== 1 ? 's' : '' ?> waiting</p>
       <ul class="list">
         <?php foreach ($members as $m): ?>
-        <li><?= Http::e((string) ($m['name'] ?? '')) ?> · <?= Http::e((string) ($m['email'] ?? '')) ?></li>
+        <li><?= Http::e((string) ($m['name'] ?? '')) ?> · <?= Http::mailto((string) ($m['email'] ?? '')) ?></li>
         <?php endforeach; ?>
         <?php foreach ($pending as $p): ?>
-        <li><?= Http::e((string) (($p['name'] ?? '') !== '' ? $p['name'] : ($p['email'] ?? ''))) ?> · <?= Http::e((string) ($p['email'] ?? '')) ?> · invited</li>
+        <?php $join = rtrim((string) ($site_home ?? ''), '/') . '/join/' . rawurlencode((string) ($p['token'] ?? '')); ?>
+        <li><?= Http::e((string) (($p['name'] ?? '') !== '' ? $p['name'] : ($p['email'] ?? ''))) ?> · <?= Http::mailto((string) ($p['email'] ?? '')) ?> · invited
+          · <a href="<?= Http::e($join) ?>">Join link</a></li>
         <?php endforeach; ?>
       </ul>
       <p><a class="btn ghost" href="/circle">Invite family</a></p>

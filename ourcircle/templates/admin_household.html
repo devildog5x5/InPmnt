@@ -28,8 +28,8 @@
         {% for u in members %}
         <tr>
           <td>{{ u.name }}</td>
-          <td>{{ u.email }}</td>
-          <td>{{ u.phone or "—" }}</td>
+          <td>{{ u.email|mailto_link }}</td>
+          <td>{{ u.phone|tel_link }}</td>
           <td>{{ u.role }}</td>
           <td><span class="pill status-{{ u.circle_status_key }}">{{ u.circle_status }}</span></td>
           <td>
@@ -77,8 +77,10 @@
         {% for p in pending %}
         <tr>
           <td>{{ p.name or "—" }}</td>
-          <td>{{ p.email }}</td>
-          <td><span class="pill status-{{ p.circle_status_key }}">{{ p.circle_status }}</span></td>
+          <td>{{ p.email|mailto_link }}</td>
+          <td><span class="pill status-{{ p.circle_status_key }}">{{ p.circle_status }}</span>
+            <div class="join-url"><a href="{{ site_home }}/join/{{ p.token }}">{{ site_home }}/join/{{ p.token }}</a></div>
+          </td>
           <td>
             <button class="btn ghost" type="submit" form="admin-invite-resend" name="invite_id" value="{{ p.id }}">Resend</button>
             <button class="btn danger" type="submit" form="admin-invite-delete" name="invite_id" value="{{ p.id }}">Delete invite</button>
@@ -116,7 +118,7 @@
         <tr>
           <td>{{ t.kind }}</td>
           <td>{{ t.name }}</td>
-          <td>{{ t.phone or "—" }}</td>
+          <td>{{ t.phone|tel_link }}{% if t.website %}<div class="muted">{{ t.website|website_link }}</div>{% endif %}</td>
           <td>
             <button class="btn danger" type="submit" form="admin-trusted-delete" name="contact_id" value="{{ t.id }}" onclick="return confirm('Remove this contact?')">Delete</button>
           </td>

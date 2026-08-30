@@ -7,9 +7,7 @@
     {% with brand_sub="Join a circle" %}{% include "_brand.html" %}{% endwith %}
     <h1>Join this family circle</h1>
     <p class="core-rule">{{ core_rule }}</p>
-    {% for cat, msg in get_flashed_messages(with_categories=true) %}
-      <div class="flash {{ cat }}">{{ msg }}</div>
-    {% endfor %}
+    {% include "_flashes.html" %}
     <p>Invite for {{ invite.email }}</p>
     <form method="post" action="{{ url_for('join', token=token) }}">
       <label>Your name</label>

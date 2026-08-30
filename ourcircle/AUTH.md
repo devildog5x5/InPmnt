@@ -54,9 +54,9 @@ Until mail is set, `/forgot` **shows that reset email is not set up** instead of
 
 **Prove it:** Operator console → **Send test email**. If that does not arrive, invites and call-me emails will not either. Check inbox and spam. Last SMTP error is on that same Mail panel.
 
-**Hostinger:** PHP `mail()` is not used. All Family Shield Pro email goes through SMTP only. `SMTP_PASSWORD` is required. Enable **openssl** in hPanel → PHP Configuration. If SMTP fails, `/forgot` and Circle invite flashes show the error. `/healthz` `"mail": true` only when SMTP (with password) or Resend is set. `"version"` should be `1.2.21` after this zip — `0.0.0` means the zip was not unzipped into `public_html`.
+**Hostinger:** PHP `mail()` is not used. All Family Shield Pro email goes through SMTP only. `SMTP_PASSWORD` is required. Enable **openssl** in hPanel → PHP Configuration. If SMTP fails, `/forgot` and Circle invite flashes show the error. `/healthz` `"mail": true` only when SMTP (with password) or Resend is set. `"version"` should be `1.2.22` after this zip — `0.0.0` means the zip was not unzipped into `public_html`.
 
-**Circle invites:** Circle → **Send invite**. If mail is set, they get a join email with a **tap-to-open link** (not a copy-paste URL). The same full link stays under **Waiting to join**. They open `/join/…` without signing in first. Always share the link in a call you already trust if the email is slow or lands in spam.
+**Circle invites:** Circle → **Send invite**. If mail is set, they get a join email with a **tap-to-open Join button** (not a copy-paste URL). Password-reset and Please-call-me emails use the same tap-to-open buttons. The same full join link stays under **Waiting to join** as a clickable URL. They open `/join/…` without signing in first. Always share the link in a call you already trust if the email is slow or lands in spam.
 
 **Please call me before I pay:** emails every other person already in the circle (same SMTP mailbox). Optional SMS if Twilio is set. This is not InPmnt invoice reminders.
 

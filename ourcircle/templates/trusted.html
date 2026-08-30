@@ -14,7 +14,7 @@
         <tr>
           <td>{{ r.kind }}</td>
           <td>{{ r.name }}<div class="muted">{{ r.notes }}</div></td>
-          <td>{{ r.phone or '—' }}<div class="muted">{{ r.website }}</div></td>
+          <td>{{ r.phone|tel_link }}<div class="muted">{{ r.website|website_link }}</div></td>
           <td>
             <button class="btn ghost" type="submit" form="trusted-delete" formaction="{{ url_for('delete_trusted', contact_id=r.id) }}" onclick="return confirm('Remove this contact?')">Remove</button>
           </td>

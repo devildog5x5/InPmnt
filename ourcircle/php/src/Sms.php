@@ -42,13 +42,16 @@ final class Sms
 
     public static function alertBody(string $name, string $checkUrl): string
     {
-        return 'PLEASE CALL ' . $name . ' before they pay. Open ' . $checkUrl
-            . ' ' . Analyze::CORE_RULE . ' Reply STOP to opt out.';
+        return 'PLEASE CALL ' . $name . " before they pay.\n"
+            . $checkUrl . "\n"
+            . 'Tap the link to open the check. ' . Analyze::CORE_RULE . ' Reply STOP to opt out.';
     }
 
     public static function checkBody(string $title, string $checkUrl): string
     {
-        return 'OurCircle: ' . $title . ' Open ' . $checkUrl . ' ' . Analyze::GUIDANCE . ' ' . Analyze::CORE_RULE;
+        return 'OurCircle: ' . $title . "\n"
+            . $checkUrl . "\n"
+            . 'Tap the link. ' . Analyze::GUIDANCE . ' ' . Analyze::CORE_RULE;
     }
 
     public static function classifyInbound(string $body): string

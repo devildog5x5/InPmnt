@@ -4,9 +4,7 @@
 <div class="auth-page">
   <div class="auth-card">
     {% with brand_sub="Password recovery" %}{% include "_brand.html" %}{% endwith %}
-    {% for cat, msg in get_flashed_messages(with_categories=true) %}
-      <div class="flash {{ cat }}">{{ msg }}</div>
-    {% endfor %}
+    {% include "_flashes.html" %}
     <h1>Reset with email</h1>
     {% if not mail_configured %}
     <p class="flash error">Reset email is not set up on this site yet. The site owner must add SMTP in .env (Hostinger: smtp.hostinger.com, port 465, SSL, mailbox address, and that mailbox password with no quotes). You can still use a recovery code below if you turned on 2FA.</p>

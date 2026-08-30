@@ -5,7 +5,8 @@ Not InPmnt. Version file: `ourcircle/VERSION` (independent of repo-root InPmnt `
 
 ## 1.2.22 — 2026-08-30
 
-- Join emails are **HTML with a tap-to-open Join button** (plain text still included). Password-reset and call-me emails auto-link `https://` URLs. Invite texts put the join URL on its own line so phones make it tappable.
+- Join, password-reset, and **Please call me** emails are **HTML with a tap-to-open button** (plain text still included). Test emails link the site. Invite, call-me, and check texts put the URL on its own line so phones make it tappable.
+- On the site, join URLs, family emails, trusted-list phones/sites, operator emails, and help-chat replies are real links — no copy-paste. Suspect websites on a check stay plain text so nobody is nudged to open a scam page.
 
 ## 1.2.21 — 2026-08-30
 

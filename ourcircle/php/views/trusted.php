@@ -16,7 +16,7 @@ View::appOpen(get_defined_vars());
           <tr>
             <td><?= Http::e($r['kind']) ?></td>
             <td><?= Http::e($r['name']) ?><div class="muted"><?= Http::e((string) $r['notes']) ?></div></td>
-            <td><?= Http::e($r['phone'] ?: '—') ?><div class="muted"><?= Http::e((string) $r['website']) ?></div></td>
+            <td><?= Http::tel((string) ($r['phone'] ?? '')) ?><div class="muted"><?= Http::website((string) ($r['website'] ?? '')) ?></div></td>
             <td>
               <button class="btn ghost" type="submit" form="trusted-delete" formaction="/trusted/<?= (int) $r['id'] ?>/delete" onclick="return confirm('Remove this contact?')">Remove</button>
             </td>

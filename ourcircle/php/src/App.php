@@ -149,18 +149,46 @@ final class App
             . Analyze::GUIDANCE . "\n";
     }
 
-    public static function inviteEmailHtml(string $join): string
+    public static function tapLinkEmailHtml(string $introHtml, string $href, string $button, string $footerHtml): string
     {
-        $href = htmlspecialchars($join, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-        $guidance = htmlspecialchars(Analyze::GUIDANCE, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $safeHref = htmlspecialchars($href, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $safeBtn = htmlspecialchars($button, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         return '<!DOCTYPE html><html><body style="margin:0;background:#f4efe6;padding:24px">'
             . '<div style="max-width:560px;margin:0 auto;background:#fff8f0;padding:28px;border-radius:16px;font-family:Georgia,serif;color:#1d1e20;line-height:1.5">'
-            . '<p>Someone invited you to a Family Shield Pro (OurCircle) family circle.</p>'
-            . '<p><a href="' . $href . '" style="display:inline-block;background:#1f4f45;color:#ffffff;padding:14px 22px;border-radius:999px;text-decoration:none;font-weight:700">Join this family circle</a></p>'
-            . '<p>Or tap this link: <a href="' . $href . '">' . $href . '</a></p>'
-            . '<p>It is only for this email. If you did not expect this, ignore the message.</p>'
-            . '<p style="color:#5c5850;font-size:14px">' . $guidance . '</p>'
+            . $introHtml
+            . '<p><a href="' . $safeHref . '" style="display:inline-block;background:#1f4f45;color:#ffffff;padding:14px 22px;border-radius:999px;text-decoration:none;font-weight:700">' . $safeBtn . '</a></p>'
+            . '<p>Or tap this link: <a href="' . $safeHref . '">' . $safeHref . '</a></p>'
+            . $footerHtml
             . '</div></body></html>';
+    }
+
+    public static function inviteEmailHtml(string $join): string
+    {
+        $guidance = htmlspecialchars(Analyze::GUIDANCE, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        return self::tapLinkEmailHtml(
+            '<p>Someone invited you to a Family Shield Pro (OurCircle) family circle.</p>',
+            $join,
+            'Join this family circle',
+            '<p>It is only for this email. If you did not expect this, ignore the message.</p>'
+            . '<p style="color:#5c5850;font-size:14px">' . $guidance . '</p>'
+        );
+    }
+
+    public static function resetEmailBody(string $link): string
+    {
+        return "Someone asked to reset the Family Shield Pro password for this email.\n\n"
+            . "Tap this link within one hour (you do not need to copy and paste it):\n{$link}\n\n"
+            . "If you did not ask, ignore this message.\n";
+    }
+
+    public static function resetEmailHtml(string $link): string
+    {
+        return self::tapLinkEmailHtml(
+            '<p>Someone asked to reset the Family Shield Pro password for this email.</p>',
+            $link,
+            'Reset password',
+            '<p>This link works for one hour. If you did not ask, ignore this message.</p>'
+        );
     }
 
     public static function alertEmailBody(string $name, string $checkUrl, string $names): string
@@ -170,6 +198,21 @@ final class App
             . "Open this check:\n{$checkUrl}\n\n"
             . Analyze::CORE_RULE . "\n"
             . Analyze::GUIDANCE . "\n";
+    }
+
+    public static function alertEmailHtml(string $name, string $checkUrl, string $names): string
+    {
+        $nameE = htmlspecialchars($name, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $namesE = htmlspecialchars($names, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $rule = htmlspecialchars(Analyze::CORE_RULE, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $guidance = htmlspecialchars(Analyze::GUIDANCE, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        return self::tapLinkEmailHtml(
+            '<p><strong>PLEASE CALL ' . $nameE . ' BEFORE THEY PAY.</strong></p>'
+            . '<p>They asked the circle (' . $namesE . ') to stop a payment or information request.</p>',
+            $checkUrl,
+            'Open this check',
+            '<p style="color:#5c5850;font-size:14px">' . $rule . ' ' . $guidance . '</p>'
+        );
     }
 
     private function parsePhoneField(string $raw): string
@@ -937,11 +980,14 @@ final class App
                     'INSERT INTO password_resets (user_id, token_hash, expires_at, created_at) VALUES (?,?,?,?)'
                 )->execute([$user['id'], $tok['hash'], gmdate('Y-m-d\TH:i:s\Z', time() + 3600), Db::now()]);
                 $link = $this->siteHome() . '/reset/' . rawurlencode($tok['token']);
-                $body = "Someone asked to reset the Family Shield Pro password for this email.\n\n"
-                    . "Tap this link within one hour (you do not need to copy and paste it):\n{$link}\n\n"
-                    . "If you did not ask, ignore this message.\n";
                 try {
-                    Mailer::send((string) $user['email'], 'Reset your Family Shield Pro password', $body);
+                    Mailer::send(
+                        (string) $user['email'],
+                        'Reset your Family Shield Pro password',
+                        self::resetEmailBody($link),
+                        null,
+                        self::resetEmailHtml($link)
+                    );
                 } catch (Throwable $e) {
                     $detail = Mailer::lastStatus() !== '' ? Mailer::lastStatus() : $e->getMessage();
                     $this->flash(Mailer::sendFailedMessage($detail), 'error');
@@ -1271,6 +1317,7 @@ final class App
         $mailFail = '';
         if (Mailer::configured()) {
             $body = self::alertEmailBody($u['name'], $checkLink, $names);
+            $html = self::alertEmailHtml($u['name'], $checkLink, $names);
             foreach ($members as $member) {
                 if ((int) ($member['id'] ?? 0) === (int) $u['id']) {
                     continue;
@@ -1280,7 +1327,7 @@ final class App
                     continue;
                 }
                 try {
-                    Mailer::send($dest, 'PLEASE CALL ' . $u['name'] . ' before they pay', $body);
+                    Mailer::send($dest, 'PLEASE CALL ' . $u['name'] . ' before they pay', $body, null, $html);
                     $emailed++;
                 } catch (Throwable $e) {
                     $mailFail = Mailer::lastStatus() !== '' ? Mailer::lastStatus() : $e->getMessage();

@@ -31,6 +31,62 @@ final class Http
         return htmlspecialchars((string) $s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     }
 
+    /** Escape text, then turn http(s) URLs and email addresses into tap-to-open links. */
+    public static function linkify(?string $raw): string
+    {
+        $escaped = self::e($raw);
+        $escaped = preg_replace('#(https?://[^\s<]+)#', '<a href="$1">$1</a>', $escaped) ?? $escaped;
+        $escaped = preg_replace(
+            '#(?<!mailto:)([A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,})#',
+            '<a href="mailto:$1">$1</a>',
+            $escaped
+        ) ?? $escaped;
+        return $escaped;
+    }
+
+    public static function mailto(?string $email): string
+    {
+        $email = trim((string) $email);
+        if ($email === '') {
+            return '';
+        }
+        return '<a href="mailto:' . self::e($email) . '">' . self::e($email) . '</a>';
+    }
+
+    public static function tel(?string $phone): string
+    {
+        $raw = trim((string) $phone);
+        if ($raw === '') {
+            return '—';
+        }
+        $digits = preg_replace('/\D+/', '', $raw) ?? '';
+        $href = '';
+        if (str_starts_with($raw, '+') && strlen($digits) >= 10) {
+            $href = '+' . $digits;
+        } elseif (strlen($digits) === 10) {
+            $href = '+1' . $digits;
+        } elseif (strlen($digits) === 11 && str_starts_with($digits, '1')) {
+            $href = '+' . $digits;
+        }
+        if ($href === '') {
+            return self::e($raw);
+        }
+        return '<a href="tel:' . self::e($href) . '">' . self::e($raw) . '</a>';
+    }
+
+    public static function website(?string $raw): string
+    {
+        $text = trim((string) $raw);
+        if ($text === '') {
+            return '';
+        }
+        $href = $text;
+        if (!preg_match('#^https?://#i', $href)) {
+            $href = 'https://' . ltrim($href, '/');
+        }
+        return '<a href="' . self::e($href) . '" rel="noopener">' . self::e($text) . '</a>';
+    }
+
     public static function safeNext(?string $raw): ?string
     {
         if ($raw === null) {
