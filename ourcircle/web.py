@@ -82,7 +82,7 @@ from database import (
     touch_last_access,
     trusted_list,
 )
-from mail import mail_configured, send_email
+from mail import last_mail_status, mail_configured, not_setup_message, send_email, send_failed_message
 from sms import (
     alert_sms_body,
     check_sms_body,
@@ -161,6 +161,7 @@ def notify_invite(inv: dict[str, Any], inviter: str) -> tuple[str, str]:
     emailed = False
     texted = False
     mail_error = False
+    mail_fail_detail = ""
     sms_error = False
     if mail_configured():
         try:
@@ -170,8 +171,9 @@ def notify_invite(inv: dict[str, Any], inviter: str) -> tuple[str, str]:
                 body=invite_email_body(join),
             )
             emailed = True
-        except Exception:
+        except Exception as exc:
             mail_error = True
+            mail_fail_detail = last_mail_status() or str(exc)
     phone = (inv.get("phone") or "").strip()
     if phone and sms_configured():
         try:
@@ -193,12 +195,13 @@ def notify_invite(inv: dict[str, Any], inviter: str) -> tuple[str, str]:
         msg = "Invite " + " and ".join(bits) + f". If they do not see it, {share[0].lower() + share[1:]}"
         cat = "error" if mail_error or sms_error else "ok"
         if mail_error:
-            msg += " Email did not send."
+            msg += f" Email did not send ({mail_fail_detail})." if mail_fail_detail else " Email did not send."
         if sms_error:
             msg += " Text did not send."
         return msg, cat
     if mail_error or sms_error:
-        return f"Could not send the invite. {share}", "error"
+        why = f" Email: {mail_fail_detail}." if mail_fail_detail else ""
+        return f"Could not send the invite.{why} {share}", "error"
     extra = []
     if not mail_configured():
         extra.append("Mail is not set up yet")
@@ -258,6 +261,7 @@ def create_app() -> Flask:
             "sms_enabled": sms_configured(),
             "admin_ok": bool(session.get("admin_ok")) and admin_configured(),
             "admin_configured": admin_configured(),
+            "mail_configured": mail_configured(),
         }
 
     @app.get("/robots.txt")
@@ -403,6 +407,7 @@ def create_app() -> Flask:
             households=households,
             checks=checks,
             q=q,
+            mail_last_error=last_mail_status(),
         )
 
     def _admin_back():
@@ -926,6 +931,9 @@ def create_app() -> Flask:
         generic = "If that email is on a circle, we sent reset instructions. Check spam. You can also use a recovery code on this page."
         if request.method == "GET":
             return render_template("forgot.html")
+        if not mail_configured():
+            flash(not_setup_message(), "error")
+            return redirect(url_for("forgot"))
         email = (request.form.get("email") or "").lower().strip()
         if "@" in email:
             with db_session() as conn:
@@ -952,8 +960,9 @@ def create_app() -> Flask:
                             subject="Reset your Family Shield Pro password",
                             body=body,
                         )
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        flash(send_failed_message(last_mail_status() or str(exc)), "error")
+                        return redirect(url_for("forgot"))
         flash(generic, "ok")
         return redirect(url_for("forgot"))
 

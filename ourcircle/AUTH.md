@@ -19,7 +19,7 @@ Demo login `family@ourcircle.app` has 2FA **off** until you turn it on.
 
 hPanel → `public_html/.env` — **add lines, do not replace the file**.
 
-`MAIL_FROM` and `SMTP_USER` must match the Hostinger mailbox **exactly** (underscores count).
+`MAIL_FROM` and `SMTP_USER` must match the Hostinger mailbox **exactly** (underscores count). Do not wrap `SMTP_PASSWORD` in quotes.
 
 Set **both** site URLs to the host families actually open, including a sandbox host:
 
@@ -28,7 +28,7 @@ BASE_URL=https://sandbox.familyshieldpro.com
 OURCIRCLE_SITE_URL=https://sandbox.familyshieldpro.com
 ```
 
-Join links in invite email are `{OURCIRCLE_SITE_URL}/join/{token}`. If that host is wrong, the link will 404 or open the live site’s empty database.
+Join and reset links use that host (`{OURCIRCLE_SITE_URL}/join/{token}` and `/reset/{token}`). If the host is wrong, the link 404s or opens a different database.
 
 Hostinger mailbox (typical):
 
@@ -50,7 +50,9 @@ MAIL_FROM_NAME=Family Shield Pro
 RESEND_API_KEY=re_...
 ```
 
-Until mail is set, `/forgot` still accepts the form (same “if that email is on a circle…” message) but **no email is sent**. Use a recovery code, or change the password while signed in.
+Until mail is set, `/forgot` **shows that reset email is not set up** instead of pretending a link went out. Use a recovery code, or change the password while signed in.
+
+**Hostinger:** PHP `mail()` is not used. Reset and invite email go through SMTP only. `SMTP_PASSWORD` is required. If SMTP fails, `/forgot` shows the error instead of a fake success. The operator console shows the last mail attempt. `/healthz` `"mail": true` only when SMTP (with password) or Resend is set.
 
 **Circle invites:** Circle → **Send invite**. If mail is set, they get a join link by email. The same full link stays under **Waiting to join**. They open `/join/…` without signing in first. Always share the link in a call you already trust if the email is slow or lands in spam.
 

@@ -10,6 +10,17 @@ View::adminOpen(get_defined_vars());
 ?>
 <h2>Operator console</h2>
 <p class="muted">Add, edit, and delete circles, logins, invites, trusted contacts, and checks. This is not shown to families. It cannot change .env, SMTP, Stripe, or Twilio keys. The last owner of a circle cannot be deleted — delete the circle, or add another owner first.</p>
+<div class="panel" style="margin-bottom:16px">
+  <h2>Mail</h2>
+  <?php if (!empty($mail_configured)): ?>
+  <p>SMTP or Resend is configured. Reset links and invite emails use that mailbox.</p>
+  <?php else: ?>
+  <p class="flash error" style="margin:0">Mail is not configured. Reset links will not send until SMTP_HOST, SMTP_USER, SMTP_PASSWORD, and MAIL_FROM are in .env (Hostinger: smtp.hostinger.com, port 465, SSL). See AUTH.md.</p>
+  <?php endif; ?>
+  <?php if (!empty($mail_last_error)): ?>
+  <p class="muted">Last mail attempt: <?= Http::e((string) $mail_last_error) ?></p>
+  <?php endif; ?>
+</div>
 <div class="stat-grid">
   <div class="stat"><strong><?= (int) ($counts['households'] ?? 0) ?></strong><span>Households</span></div>
   <div class="stat"><strong><?= (int) ($counts['users'] ?? 0) ?></strong><span>Users</span></div>

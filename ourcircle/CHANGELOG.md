@@ -3,6 +3,10 @@
 Product: **Family Shield Pro** (app name in the UI: **OurCircle**).  
 Not InPmnt. Version file: `ourcircle/VERSION` (independent of repo-root InPmnt `VERSION`).
 
+## 1.2.20 — 2026-08-30
+
+- **Password reset mail actually has to send.** `/forgot` no longer claims a link went out when SMTP is missing or fails. Hostinger PHP no longer falls back to `mail()` (that often returns true without delivering). `SMTP_PASSWORD` is required. Quoted `.env` values are stripped. If send fails, the page shows the SMTP error; the operator console shows the last mail attempt.
+
 ## 1.2.19 — 2026-08-30
 
 - Operator console can **add, edit, and delete** circles, logins, invites, trusted contacts, and checks. Last owner of a circle cannot be removed except by deleting the circle. Optional **turn off 2FA**. Still cannot change `.env`, SMTP, Stripe, or Twilio keys.

@@ -6,7 +6,7 @@ Until `ADMIN_PASSWORD` is in `.env`, **`/admin` is not found** (404). It is not 
 
 **Site:** https://familyshieldpro.com
 
-This cannot change `.env`, SMTP, Stripe, or Twilio keys.
+This cannot change `.env`, SMTP, Stripe, or Twilio keys. It does show whether mail is configured and the last mail attempt (no passwords).
 
 ## What you can do
 

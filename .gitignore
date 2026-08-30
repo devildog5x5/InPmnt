@@ -19,10 +19,12 @@ certs/*.key
 php/.env
 php/data/*.db
 ourcircle/data/*.db
+ourcircle/data/mail_last_error.txt
 ourcircle/data/uploads/*
 !ourcircle/data/uploads/.gitkeep
 ourcircle/php/.env
 ourcircle/php/data/*.db
+ourcircle/php/data/mail_last_error.txt
 ourcircle/php/data/uploads/*
 !ourcircle/php/data/uploads/.gitkeep
 !ourcircle/php/data/uploads/.htaccess

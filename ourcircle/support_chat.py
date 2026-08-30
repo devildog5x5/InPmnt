@@ -65,8 +65,9 @@ _FAQ: list[tuple[tuple[str, ...], str]] = [
     ),
     (
         ("password", "forgot", "reset", "2fa", "two-factor", "two factor", "authenticator", "recovery code"),
-        "Forgot your password? Use /forgot. We can email a one-hour reset link if mail is set up, "
-        "or you can use a one-time recovery code from when you turned on 2FA. "
+        "Forgot your password? Use /forgot. We email a one-hour reset link when SMTP is set in .env "
+        "(Hostinger mailbox + SMTP_PASSWORD). If mail is not set, the page says so — it does not pretend a link went out. "
+        "You can also use a one-time recovery code from when you turned on 2FA. "
         "Turn 2FA on or off under Account after you sign in. "
         f"Stuck? {SUPPORT_EMAIL}.",
     ),

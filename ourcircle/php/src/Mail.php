@@ -6,15 +6,53 @@ final class Mailer
 {
     public static function configured(): bool
     {
-        if (trim(Env::get('RESEND_API_KEY')) !== '' && !str_contains(Env::get('RESEND_API_KEY'), '...')) {
+        $resend = trim(Env::get('RESEND_API_KEY'));
+        if ($resend !== '' && !str_contains($resend, '...')) {
             return true;
         }
         return trim(Env::get('SMTP_HOST')) !== ''
             && trim(Env::get('SMTP_USER')) !== ''
+            && trim(Env::get('SMTP_PASSWORD')) !== ''
             && (trim(Env::get('MAIL_FROM')) !== '' || trim(Env::get('SMTP_USER')) !== '');
     }
 
+    public static function notSetupMessage(): string
+    {
+        return 'Reset email is not set up on this site yet. In .env set SMTP_HOST=smtp.hostinger.com, '
+            . 'SMTP_PORT=465, SMTP_SSL=1, SMTP_USER and MAIL_FROM to the Hostinger mailbox, and SMTP_PASSWORD '
+            . 'to that mailbox password (no quotes). Recovery codes on this page still work if you turned on 2FA.';
+    }
+
+    public static function sendFailedMessage(string $detail = ''): string
+    {
+        $base = 'We could not send the reset email. Check SMTP in .env: Hostinger smtp.hostinger.com, port 465, SSL, '
+            . 'and the mailbox password. Recovery codes on this page still work.';
+        $detail = self::safeDetail($detail);
+        return $detail !== '' ? $base . ' Last error: ' . $detail : $base;
+    }
+
+    public static function lastStatus(): string
+    {
+        $path = self::statusPath();
+        if (!is_file($path)) {
+            return '';
+        }
+        $raw = trim((string) file_get_contents($path));
+        return self::safeDetail($raw);
+    }
+
     public static function send(string $to, string $subject, string $body, ?string $fromName = null): void
+    {
+        try {
+            self::deliver($to, $subject, $body, $fromName);
+            self::rememberStatus('ok');
+        } catch (Throwable $e) {
+            self::rememberStatus($e->getMessage());
+            throw $e;
+        }
+    }
+
+    private static function deliver(string $to, string $subject, string $body, ?string $fromName): void
     {
         $to = trim($to);
         if ($to === '' || !str_contains($to, '@')) {
@@ -35,7 +73,7 @@ final class Mailer
         $host = trim(Env::get('SMTP_HOST'));
         if ($host === '') {
             throw new RuntimeException(
-                'Email is not configured. Set RESEND_API_KEY or SMTP_HOST/SMTP_USER/MAIL_FROM in .env'
+                'Email is not configured. Set SMTP_HOST, SMTP_USER, SMTP_PASSWORD, and MAIL_FROM in .env (or RESEND_API_KEY).'
             );
         }
         self::smtp($host, $fromHeader, $mailFrom, $to, $subject, $body);
@@ -84,21 +122,13 @@ final class Mailer
         $user = trim(Env::get('SMTP_USER'));
         $password = Env::get('SMTP_PASSWORD');
         $useSsl = Env::truthy('SMTP_SSL') || $port === 465;
-        // Hostinger's mail() often returns true without delivering. Use SMTP first.
-        try {
-            self::smtpSocket($host, $port, $user, $password, $fromHeader, $mailFrom, $to, $subject, $body, $useSsl);
-            return;
-        } catch (Throwable $smtpErr) {
-            $headers = [
-                'From: ' . $fromHeader,
-                'Reply-To: ' . $mailFrom,
-                'Content-Type: text/plain; charset=UTF-8',
-            ];
-            $ok = @mail($to, $subject !== '' ? $subject : '(no subject)', $body, implode("\r\n", $headers), '-f' . $mailFrom);
-            if (!$ok) {
-                throw $smtpErr;
-            }
+        if ($user !== '' && $password === '') {
+            throw new RuntimeException(
+                'SMTP_PASSWORD is not set. Use the Hostinger mailbox password in .env (no quotes).'
+            );
         }
+        // Do not fall back to PHP mail() — Hostinger often returns true without delivering.
+        self::smtpSocket($host, $port, $user, $password, $fromHeader, $mailFrom, $to, $subject, $body, $useSsl);
     }
 
     private static function smtpSocket(
@@ -113,55 +143,166 @@ final class Mailer
         string $body,
         bool $ssl
     ): void {
-        $remote = ($ssl ? 'ssl://' : '') . $host . ':' . $port;
-        $fp = @stream_socket_client($remote, $errno, $errstr, 30);
+        $ctx = stream_context_create([
+            'ssl' => [
+                'verify_peer' => false,
+                'verify_peer_name' => false,
+                'allow_self_signed' => true,
+                'SNI_enabled' => true,
+                'peer_name' => $host,
+            ],
+        ]);
+        $remote = ($ssl ? 'ssl://' : 'tcp://') . $host . ':' . $port;
+        $fp = @stream_socket_client($remote, $errno, $errstr, 25, STREAM_CLIENT_CONNECT, $ctx);
         if (!$fp) {
-            throw new RuntimeException("SMTP connect failed: {$errstr}");
+            throw new RuntimeException("SMTP connect failed ({$host}:{$port}): {$errstr}");
         }
-        $read = static function () use ($fp): string {
-            $line = '';
-            while (!feof($fp)) {
-                $chunk = fgets($fp, 515);
-                if ($chunk === false) {
-                    break;
+        stream_set_timeout($fp, 25);
+        try {
+            $ehlo = self::ehloName();
+            self::smtpExpect($fp, [220]);
+            self::smtpExpect($fp, [250], 'EHLO ' . $ehlo);
+            if (!$ssl && Env::get('SMTP_STARTTLS', '1') !== '0') {
+                self::smtpExpect($fp, [220], 'STARTTLS');
+                $ok = @stream_socket_enable_crypto($fp, true, STREAM_CRYPTO_METHOD_TLS_CLIENT);
+                if ($ok !== true) {
+                    throw new RuntimeException('SMTP STARTTLS failed');
                 }
-                $line .= $chunk;
-                if (isset($chunk[3]) && $chunk[3] === ' ') {
-                    break;
+                self::smtpExpect($fp, [250], 'EHLO ' . $ehlo);
+            }
+            if ($user !== '') {
+                self::smtpExpect($fp, [334], 'AUTH LOGIN');
+                self::smtpExpect($fp, [334], base64_encode($user));
+                $auth = self::smtpTry($fp, base64_encode($password));
+                if (!str_starts_with($auth, '235')) {
+                    throw new RuntimeException(
+                        'SMTP login failed. SMTP_USER and SMTP_PASSWORD must match the Hostinger mailbox exactly.'
+                    );
                 }
             }
-            return $line;
-        };
-        $cmd = static function (string $c) use ($fp, $read): string {
-            fwrite($fp, $c . "\r\n");
-            return $read();
-        };
-        $read();
-        $cmd('EHLO familyshieldpro');
-        if (!$ssl && Env::get('SMTP_STARTTLS', '1') !== '0') {
-            $cmd('STARTTLS');
-            stream_socket_enable_crypto($fp, true, STREAM_CRYPTO_METHOD_TLS_CLIENT);
-            $cmd('EHLO familyshieldpro');
+            self::smtpExpect($fp, [250], 'MAIL FROM:<' . $mailFrom . '>');
+            self::smtpExpect($fp, [250, 251], 'RCPT TO:<' . $to . '>');
+            self::smtpExpect($fp, [354], 'DATA');
+            $msg = 'Subject: ' . self::headerSafe($subject !== '' ? $subject : '(no subject)') . "\r\n"
+                . 'From: ' . $fromHeader . "\r\n"
+                . 'To: ' . $to . "\r\n"
+                . "Content-Type: text/plain; charset=UTF-8\r\n"
+                . "MIME-Version: 1.0\r\n\r\n"
+                . self::dotStuff($body);
+            fwrite($fp, $msg . "\r\n.\r\n");
+            self::smtpExpect($fp, [250]);
+            try {
+                self::smtpExpect($fp, [221], 'QUIT');
+            } catch (Throwable) {
+                // Some servers close after 250 without a 221.
+            }
+        } finally {
+            fclose($fp);
         }
-        if ($user !== '') {
-            $cmd('AUTH LOGIN');
-            $cmd(base64_encode($user));
-            $resp = $cmd(base64_encode($password));
-            if (!str_starts_with($resp, '235')) {
-                fclose($fp);
-                throw new RuntimeException('SMTP login failed');
+    }
+
+    private static function ehloName(): string
+    {
+        $site = Env::get('OURCIRCLE_SITE_URL', Env::get('BASE_URL', 'https://familyshieldpro.com'));
+        $host = parse_url($site, PHP_URL_HOST);
+        if (is_string($host) && $host !== '') {
+            return $host;
+        }
+        return 'familyshieldpro.com';
+    }
+
+    private static function headerSafe(string $value): string
+    {
+        return str_replace(["\r", "\n"], ' ', $value);
+    }
+
+    private static function dotStuff(string $body): string
+    {
+        $body = str_replace(["\r\n", "\r"], "\n", $body);
+        $lines = explode("\n", $body);
+        foreach ($lines as $i => $line) {
+            if (str_starts_with($line, '.')) {
+                $lines[$i] = '.' . $line;
             }
         }
-        $cmd('MAIL FROM:<' . $mailFrom . '>');
-        $cmd('RCPT TO:<' . $to . '>');
-        $cmd('DATA');
-        $msg = 'Subject: ' . ($subject !== '' ? $subject : '(no subject)') . "\r\n"
-            . 'From: ' . $fromHeader . "\r\n"
-            . 'To: ' . $to . "\r\n"
-            . "Content-Type: text/plain; charset=UTF-8\r\n\r\n"
-            . $body . "\r\n.";
-        $cmd($msg);
-        $cmd('QUIT');
-        fclose($fp);
+        return implode("\r\n", $lines);
+    }
+
+    /** @param resource $fp */
+    private static function smtpRead($fp): string
+    {
+        $line = '';
+        while (!feof($fp)) {
+            $chunk = fgets($fp, 515);
+            if ($chunk === false) {
+                break;
+            }
+            $line .= $chunk;
+            if (strlen($chunk) >= 4 && $chunk[3] === ' ') {
+                break;
+            }
+        }
+        return $line;
+    }
+
+    /**
+     * @param resource $fp
+     * @param list<int> $ok
+     */
+    private static function smtpExpect($fp, array $ok, string $cmd = ''): string
+    {
+        $line = self::smtpTry($fp, $cmd);
+        $code = (int) substr($line, 0, 3);
+        if (!in_array($code, $ok, true)) {
+            $verb = 'SMTP';
+            if ($cmd === '') {
+                $verb = 'banner';
+            } else {
+                $first = strtoupper((string) (preg_split('/\s+/', $cmd)[0] ?? ''));
+                if (str_starts_with($first, 'AUTH')) {
+                    $verb = 'AUTH';
+                } elseif (preg_match('/^[A-Z]{3,12}$/', $first)) {
+                    $verb = $first;
+                }
+            }
+            throw new RuntimeException('SMTP ' . ($code > 0 ? (string) $code : 'no-reply') . ' on ' . $verb . ': ' . trim($line));
+        }
+        return $line;
+    }
+
+    /** @param resource $fp */
+    private static function smtpTry($fp, string $cmd = ''): string
+    {
+        if ($cmd !== '') {
+            fwrite($fp, $cmd . "\r\n");
+        }
+        return self::smtpRead($fp);
+    }
+
+    private static function rememberStatus(string $message): void
+    {
+        $dir = dirname(self::statusPath());
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0775, true);
+        }
+        $stamp = gmdate('Y-m-d\TH:i:s\Z');
+        $line = $stamp . ' ' . self::safeDetail($message) . "\n";
+        @file_put_contents(self::statusPath(), $line);
+    }
+
+    private static function statusPath(): string
+    {
+        return dirname(__DIR__) . '/data/mail_last_error.txt';
+    }
+
+    private static function safeDetail(string $message): string
+    {
+        $message = preg_replace('/[\x00-\x08\x0b\x0c\x0e-\x1f]/', '', $message) ?? $message;
+        $message = preg_replace('/SMTP_PASSWORD\s*=\s*\S+/i', 'SMTP_PASSWORD=***', $message) ?? $message;
+        $message = trim($message);
+        if (strlen($message) > 500) {
+            $message = substr($message, 0, 500) . '…';
+        }
+        return $message;
     }
 }

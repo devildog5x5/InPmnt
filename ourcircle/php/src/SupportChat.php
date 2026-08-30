@@ -30,7 +30,7 @@ final class SupportChat
             [['price', 'cost', 'plan', 'monthly', 'yearly', 'how much', 'subscription', '119', '14.99'],
                 'Family Shield Pro is $14.99 per month or $119.99 per year for one circle of up to five people. Yearly is the better family value. Start at familyshieldpro.com/signup. ' . Analyze::GUIDANCE . ' Billing questions: ' . self::SUPPORT_EMAIL . '.'],
             [['password', 'forgot', 'reset', '2fa', 'two-factor', 'two factor', 'authenticator', 'recovery code'],
-                'Forgot your password? Use /forgot. We can email a one-hour reset link if mail is set up, or you can use a one-time recovery code from when you turned on 2FA. Turn 2FA on or off under Account after you sign in. Stuck? ' . self::SUPPORT_EMAIL . '.'],
+                'Forgot your password? Use /forgot. We email a one-hour reset link when SMTP is set in .env (Hostinger mailbox + SMTP_PASSWORD). If mail is not set, the page says so — it does not pretend a link went out. You can also use a one-time recovery code from when you turned on 2FA. Turn 2FA on or off under Account after you sign in. Stuck? ' . self::SUPPORT_EMAIL . '.'],
             [['sms', 'text message', 'text me', 'twilio', 'forward a text', 'text the number'],
                 'Circle SMS is optional (Twilio in .env). Save a mobile on Account. Invites and “Please call me before I pay” can go by text. Forward a sketchy message to the Family Shield Pro number to open a check. Reply STOP to opt out. We never say a request is safe. This is not a customer-service phone. ' . Analyze::CORE_RULE . ' Setup: SMS.md. Stuck? ' . self::SUPPORT_EMAIL . '.'],
             [['admin', 'console', 'management', 'operator', 'how many users', 'list users'],

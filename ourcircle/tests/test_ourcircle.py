@@ -45,7 +45,18 @@ class AppTests(unittest.TestCase):
         os.close(fd)
         os.environ["OURCIRCLE_DB"] = self.db_path
         db.init_db(self.db_path)
-        for key in ("TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_FROM", "ADMIN_PASSWORD", "ADMIN_EMAIL"):
+        for key in (
+            "TWILIO_ACCOUNT_SID",
+            "TWILIO_AUTH_TOKEN",
+            "TWILIO_FROM",
+            "ADMIN_PASSWORD",
+            "ADMIN_EMAIL",
+            "SMTP_HOST",
+            "SMTP_USER",
+            "SMTP_PASSWORD",
+            "MAIL_FROM",
+            "RESEND_API_KEY",
+        ):
             os.environ.pop(key, None)
         app = create_app()
         app.config["TESTING"] = True
@@ -57,7 +68,18 @@ class AppTests(unittest.TestCase):
         except OSError:
             pass
         os.environ.pop("OURCIRCLE_DB", None)
-        for key in ("TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_FROM", "ADMIN_PASSWORD", "ADMIN_EMAIL"):
+        for key in (
+            "TWILIO_ACCOUNT_SID",
+            "TWILIO_AUTH_TOKEN",
+            "TWILIO_FROM",
+            "ADMIN_PASSWORD",
+            "ADMIN_EMAIL",
+            "SMTP_HOST",
+            "SMTP_USER",
+            "SMTP_PASSWORD",
+            "MAIL_FROM",
+            "RESEND_API_KEY",
+        ):
             os.environ.pop(key, None)
 
     def test_landing_and_login_demo(self) -> None:
@@ -172,6 +194,7 @@ class AppTests(unittest.TestCase):
         forgot = self.client.get("/forgot")
         self.assertEqual(forgot.status_code, 200)
         self.assertIn(b"Forgot password", forgot.data)
+        self.assertIn(b"not set up", forgot.data.lower())
         signup = self.client.post(
             "/signup",
             data={"name": "", "email": "not-an-email", "password": "short"},
@@ -179,6 +202,23 @@ class AppTests(unittest.TestCase):
         )
         self.assertEqual(signup.status_code, 200)
         self.assertIn(b"required", signup.data.lower())
+
+    def test_mail_configured_requires_smtp_password(self) -> None:
+        import mail as mail_mod
+
+        os.environ["SMTP_HOST"] = "smtp.hostinger.com"
+        os.environ["SMTP_USER"] = "a@b.c"
+        os.environ["MAIL_FROM"] = "a@b.c"
+        os.environ.pop("SMTP_PASSWORD", None)
+        os.environ.pop("RESEND_API_KEY", None)
+        self.assertFalse(mail_mod.mail_configured())
+        os.environ["SMTP_PASSWORD"] = "mailbox-secret"
+        self.assertTrue(mail_mod.mail_configured())
+        os.environ["SMTP_PASSWORD"] = '"quoted-secret"'
+        self.assertEqual(mail_mod._env("SMTP_PASSWORD"), "quoted-secret")
+        for k in ("SMTP_HOST", "SMTP_USER", "SMTP_PASSWORD", "MAIL_FROM"):
+            os.environ.pop(k, None)
+        self.assertFalse(mail_mod.mail_configured())
 
     def test_invite_limit_message_and_trusted(self) -> None:
         self.client.post("/login", data={"email": "family@ourcircle.app", "password": "password123"})
@@ -225,6 +265,7 @@ class AppTests(unittest.TestCase):
 
         os.environ["SMTP_HOST"] = "smtp.example.test"
         os.environ["SMTP_USER"] = "mail@example.test"
+        os.environ["SMTP_PASSWORD"] = "mailbox-secret"
         os.environ["MAIL_FROM"] = "mail@example.test"
         os.environ["OURCIRCLE_SITE_URL"] = "https://sandbox.familyshieldpro.com"
         try:
@@ -246,7 +287,7 @@ class AppTests(unittest.TestCase):
             cousin_chunk = mailed.data[cousin_at : cousin_at + 500]
             self.assertIn(b"Invite sent", cousin_chunk)
         finally:
-            for k in ("SMTP_HOST", "SMTP_USER", "MAIL_FROM", "OURCIRCLE_SITE_URL"):
+            for k in ("SMTP_HOST", "SMTP_USER", "SMTP_PASSWORD", "MAIL_FROM", "OURCIRCLE_SITE_URL"):
                 os.environ.pop(k, None)
 
         joined = other.post(
@@ -389,8 +430,38 @@ class AppTests(unittest.TestCase):
         forgot = self.client.get("/forgot")
         self.assertEqual(forgot.status_code, 200)
         self.assertIn(b"Forgot password", forgot.data)
+        self.assertIn(b"not set up", forgot.data.lower())
         self.assertIn(b"recovery code", forgot.data.lower())
-        self.client.post("/forgot", data={"email": "family@ourcircle.app"}, follow_redirects=True)
+        skipped = self.client.post("/forgot", data={"email": "family@ourcircle.app"}, follow_redirects=True)
+        self.assertIn(b"not set up", skipped.data.lower())
+        with db.session(self.db_path) as conn:
+            n = conn.execute("SELECT COUNT(*) AS c FROM password_resets").fetchone()["c"]
+        self.assertEqual(n, 0)
+        sent: list[dict] = []
+
+        def capture_send(**kwargs):  # type: ignore[no-untyped-def]
+            sent.append(kwargs)
+            return {"provider": "test"}
+
+        os.environ["SMTP_HOST"] = "smtp.example.test"
+        os.environ["SMTP_USER"] = "mail@example.test"
+        os.environ["SMTP_PASSWORD"] = "mailbox-secret"
+        os.environ["MAIL_FROM"] = "mail@example.test"
+        try:
+            from unittest.mock import patch
+
+            with patch("web.send_email", side_effect=capture_send):
+                mailed = self.client.post(
+                    "/forgot",
+                    data={"email": "family@ourcircle.app"},
+                    follow_redirects=True,
+                )
+            self.assertIn(b"reset instructions", mailed.data.lower())
+            self.assertEqual(len(sent), 1)
+            self.assertIn("/reset/", sent[0]["body"])
+        finally:
+            for k in ("SMTP_HOST", "SMTP_USER", "SMTP_PASSWORD", "MAIL_FROM"):
+                os.environ.pop(k, None)
         with db.session(self.db_path) as conn:
             n = conn.execute("SELECT COUNT(*) AS c FROM password_resets").fetchone()["c"]
         self.assertEqual(n, 1)
@@ -679,6 +750,7 @@ class AppTests(unittest.TestCase):
         self.assertIn(b"Operator console", opened.data)
         self.assertIn(b"Pat Foster", opened.data)
         self.assertIn(b"family@ourcircle.app", opened.data)
+        self.assertIn(b"Mail is not configured", opened.data)
         self.assertIn(b"Households", opened.data)
         self.assertIn(b">1</strong>", opened.data)
         with db.session(self.db_path) as conn:

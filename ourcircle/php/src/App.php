@@ -170,6 +170,7 @@ final class App
         $emailed = false;
         $texted = false;
         $mailError = false;
+        $mailFailDetail = '';
         $smsError = false;
         if (Mailer::configured()) {
             try {
@@ -179,8 +180,9 @@ final class App
                     self::inviteEmailBody($join)
                 );
                 $emailed = true;
-            } catch (Throwable) {
+            } catch (Throwable $e) {
                 $mailError = true;
+                $mailFailDetail = Mailer::lastStatus() !== '' ? Mailer::lastStatus() : $e->getMessage();
             }
         }
         $phone = trim((string) ($inv['phone'] ?? ''));
@@ -209,7 +211,7 @@ final class App
             $msg = 'Invite ' . implode(' and ', $bits) . '. If they do not see it, ' . lcfirst($share);
             $cat = ($mailError || $smsError) ? 'error' : 'ok';
             if ($mailError) {
-                $msg .= ' Email did not send.';
+                $msg .= ' Email did not send' . ($mailFailDetail !== '' ? ' (' . $mailFailDetail . ').' : '.');
             }
             if ($smsError) {
                 $msg .= ' Text did not send.';
@@ -217,7 +219,8 @@ final class App
             return [$msg, $cat];
         }
         if ($mailError || $smsError) {
-            return ['Could not send the invite. ' . $share, 'error'];
+            $why = $mailFailDetail !== '' ? ' Email: ' . $mailFailDetail . '.' : '';
+            return ['Could not send the invite.' . $why . ' ' . $share, 'error'];
         }
         $extra = [];
         if (!Mailer::configured()) {
@@ -291,6 +294,7 @@ final class App
         $vars['robots'] = $vars['robots'] ?? 'noindex,nofollow';
         $vars['admin_ok'] = !empty($_SESSION['admin_ok']) && Admin::configured();
         $vars['admin_configured'] = Admin::configured();
+        $vars['mail_configured'] = Mailer::configured();
         View::render($view, $vars);
     }
 
@@ -397,6 +401,7 @@ final class App
             'households' => Db::adminListHouseholds($this->db, $q),
             'checks' => Db::adminListChecks($this->db, null, 20),
             'q' => $q,
+            'mail_last_error' => Mailer::lastStatus(),
         ]);
     }
 
@@ -867,6 +872,10 @@ final class App
         if (Http::method() === 'GET') {
             $this->page('forgot', ['title' => 'Forgot password · OurCircle', 'robots' => 'index,follow', 'flashes' => $this->takeFlashes()]);
         }
+        if (!Mailer::configured()) {
+            $this->flash(Mailer::notSetupMessage(), 'error');
+            Http::redirect('/forgot');
+        }
         $email = strtolower(trim((string) ($_POST['email'] ?? '')));
         if (str_contains($email, '@')) {
             $st = $this->db->prepare('SELECT * FROM users WHERE lower(email)=?');
@@ -884,8 +893,10 @@ final class App
                     . "If you did not ask, ignore this message.\n";
                 try {
                     Mailer::send((string) $user['email'], 'Reset your Family Shield Pro password', $body);
-                } catch (Throwable) {
-                    // Same public message either way.
+                } catch (Throwable $e) {
+                    $detail = Mailer::lastStatus() !== '' ? Mailer::lastStatus() : $e->getMessage();
+                    $this->flash(Mailer::sendFailedMessage($detail), 'error');
+                    Http::redirect('/forgot');
                 }
             }
         }

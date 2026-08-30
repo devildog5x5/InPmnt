@@ -19,7 +19,7 @@ final class Env
             }
             [$k, $v] = explode('=', $trim, 2);
             $k = trim($k);
-            $v = trim($v);
+            $v = self::unquote(trim($v));
             if ($k === '') {
                 continue;
             }
@@ -37,7 +37,19 @@ final class Env
         if ($v === false || $v === '') {
             $v = $_ENV[$key] ?? $default;
         }
-        return is_string($v) ? $v : $default;
+        return self::unquote(is_string($v) ? $v : $default);
+    }
+
+    private static function unquote(string $v): string
+    {
+        $v = trim($v);
+        if (strlen($v) >= 2) {
+            $q = $v[0];
+            if (($q === '"' || $q === "'") && str_ends_with($v, $q)) {
+                return substr($v, 1, -1);
+            }
+        }
+        return $v;
     }
 
     public static function truthy(string $key): bool
