@@ -99,7 +99,6 @@ final class Mailer
             'from' => $from,
             'to' => [$to],
             'subject' => $subject !== '' ? $subject : '(no subject)',
-            'text' => $body,
             'html' => $html,
         ], JSON_UNESCAPED_SLASHES);
         $ch = curl_init('https://api.resend.com/emails');
@@ -224,7 +223,8 @@ final class Mailer
             self::smtpExpect($fp, [250, 251], 'RCPT TO:<' . $to . '>');
             self::smtpExpect($fp, [354], 'DATA');
             $msgid = bin2hex(random_bytes(12)) . '@' . $ehlo;
-            $boundary = '=_fsp_' . bin2hex(random_bytes(8));
+            // HTML only — a text/plain alternative is what inboxes were showing as
+            // unlinked copy-paste. The join URL lives in <a href> in this part.
             $msg = 'Date: ' . gmdate('D, d M Y H:i:s') . " +0000\r\n"
                 . 'Message-ID: <' . $msgid . ">\r\n"
                 . 'Subject: ' . self::headerSafe($subject !== '' ? $subject : '(no subject)') . "\r\n"
@@ -232,16 +232,9 @@ final class Mailer
                 . 'Reply-To: ' . $mailFrom . "\r\n"
                 . 'To: ' . $to . "\r\n"
                 . "MIME-Version: 1.0\r\n"
-                . 'Content-Type: multipart/alternative; boundary="' . $boundary . "\"\r\n\r\n"
-                . '--' . $boundary . "\r\n"
-                . "Content-Type: text/plain; charset=UTF-8\r\n"
-                . "Content-Transfer-Encoding: quoted-printable\r\n\r\n"
-                . self::quotedPrintablePart($body) . "\r\n"
-                . '--' . $boundary . "\r\n"
                 . "Content-Type: text/html; charset=UTF-8\r\n"
                 . "Content-Transfer-Encoding: quoted-printable\r\n\r\n"
-                . self::quotedPrintablePart($html) . "\r\n"
-                . '--' . $boundary . "--";
+                . self::quotedPrintablePart($html);
             fwrite($fp, $msg . "\r\n.\r\n");
             self::smtpExpect($fp, [250]);
             try {

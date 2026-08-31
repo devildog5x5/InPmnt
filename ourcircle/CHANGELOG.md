@@ -3,6 +3,10 @@
 Product: **Family Shield Pro** (app name in the UI: **OurCircle**).  
 Not InPmnt. Version file: `ourcircle/VERSION` (independent of repo-root InPmnt `VERSION`).
 
+## 1.2.25 — 2026-08-31
+
+- Invite mail is **HTML only** (no text/plain alternative). Inboxes that preferred the plain part were showing the join URL as copy-paste text. The https://…/join/… URL is an `<a href>` plus a Join button. Unzip this zip and tap **Resend invite** — old messages in the inbox stay as they were.
+
 ## 1.2.24 — 2026-08-31
 
 - Invite (and reset / call-me) emails put the **https://… URL itself inside `<a href>`** so inboxes open join with a tap, not copy-paste. Plain text wraps the same URL in `<https://…>` so text-only clients still auto-link. SMTP uses quoted-printable (not 8bit) so Hostinger does not drop the HTML part. Expired join links stay on a public join page instead of bouncing to login.

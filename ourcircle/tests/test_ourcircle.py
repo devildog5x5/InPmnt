@@ -235,7 +235,10 @@ class AppTests(unittest.TestCase):
         self.assertIn(">https://sandbox.familyshieldpro.com/join/abc</a>", join_html)
         self.assertIn("<https://sandbox.familyshieldpro.com/join/abc>", web_mod.invite_email_body("https://sandbox.familyshieldpro.com/join/abc"))
         mail_src = Path(__file__).resolve().parents[1] / "mail.py"
-        self.assertIn("quoted-printable", mail_src.read_text(encoding="utf-8"))
+        mail_text = mail_src.read_text(encoding="utf-8")
+        self.assertIn("quoted-printable", mail_text)
+        self.assertIn('subtype="html"', mail_text)
+        self.assertNotIn("add_alternative", mail_text)
 
         self.assertIn('<a href="mailto:pat@example.com">', str(web_mod.mailto_html("pat@example.com")))
         self.assertIn("tel:+15550101234", str(web_mod.tel_html("555-010-1234")))

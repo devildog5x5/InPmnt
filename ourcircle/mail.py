@@ -163,7 +163,6 @@ def _send_resend(
             "from": from_header,
             "to": [to],
             "subject": subject or "(no subject)",
-            "text": body or "",
             "html": html or "",
         }
     ).encode("utf-8")
@@ -205,8 +204,8 @@ def _send_smtp(
     msg["From"] = from_header
     msg["Reply-To"] = mail_from
     msg["To"] = to
-    msg.set_content(body or "", charset="utf-8", cte="quoted-printable")
-    msg.add_alternative(
+    # HTML only — a text/plain alternative is what inboxes were showing as unlinked copy-paste.
+    msg.set_content(
         html or html_from_text(body or ""),
         subtype="html",
         charset="utf-8",
