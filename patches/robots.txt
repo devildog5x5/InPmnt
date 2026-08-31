@@ -1,0 +1,21 @@
+User-agent: *
+Allow: /
+Allow: /signup
+Allow: /login
+Allow: /forgot
+Disallow: /home
+Disallow: /circle
+Disallow: /trusted
+Disallow: /checks
+Disallow: /uploads
+Disallow: /join
+Disallow: /billing
+Disallow: /report
+Disallow: /account
+Disallow: /logout
+Disallow: /support
+Disallow: /sms
+Disallow: /admin
+
+Host: familyshieldpro.com
+Sitemap: https://familyshieldpro.com/sitemap.xml

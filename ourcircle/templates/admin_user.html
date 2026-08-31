@@ -1,0 +1,45 @@
+{% extends "admin_shell.html" %}
+{% block heading %}Edit {{ person.name }}{% endblock %}
+{% block main %}
+<p><a href="{{ url_for('admin_home') }}">← Console</a>
+ · <a href="{{ url_for('admin_household', hid=person.household_id) }}">Open circle</a></p>
+<h2>Edit {{ person.name }}</h2>
+<p class="muted">{{ person.email|mailto_link }} · {{ person.role }} · <span class="pill status-{{ person.circle_status_key }}">{{ person.circle_status }}</span>
+{% if person.last_access_at %} · last access {{ person.last_access_at }}{% endif %}
+{% if person.totp_enabled %} · 2FA on{% else %} · 2FA off{% endif %}</p>
+<form class="panel" method="post">
+  <label>Name</label>
+  <input name="name" value="{{ person.name }}" required autocomplete="name" />
+  <label>Email</label>
+  <input name="email" type="email" value="{{ person.email }}" required autocomplete="off" />
+  <label>Mobile (optional)</label>
+  <input name="phone" type="tel" inputmode="tel" value="{{ person.phone or '' }}" placeholder="(555) 010-1234" autocomplete="off" />
+  <label class="check-row"><input type="checkbox" name="sms_opt_out" value="1"{% if person.sms_opt_out %} checked{% endif %} /> Opt out of Family Shield Pro texts</label>
+  <label>Role</label>
+  <select name="role">
+    <option value="owner"{% if person.role == 'owner' %} selected{% endif %}>owner</option>
+    <option value="member"{% if person.role == 'member' %} selected{% endif %}>member</option>
+  </select>
+  <label>Circle</label>
+  <select name="household_id">
+    {% for h in households %}
+    <option value="{{ h.id }}"{% if h.id == person.household_id %} selected{% endif %}>{{ h.name }}</option>
+    {% endfor %}
+  </select>
+  <label>New password (optional, 8+)</label>
+  <input name="password" type="password" minlength="8" autocomplete="new-password" />
+  <p class="muted">Leave password blank to keep the current one. The last owner cannot be demoted or moved until another owner exists.</p>
+  <p><button class="btn" type="submit">Save login</button></p>
+</form>
+{% if person.totp_enabled %}
+<form class="panel" method="post" action="{{ url_for('admin_user_disable_2fa') }}" style="margin-top:16px">
+  <input type="hidden" name="user_id" value="{{ person.id }}" />
+  <p>Turn off 2FA if they are locked out of their authenticator.</p>
+  <p><button class="btn ghost" type="submit">Turn off 2FA</button></p>
+</form>
+{% endif %}
+<form class="panel" method="post" action="{{ url_for('admin_user_delete') }}" style="margin-top:16px" onsubmit="return confirm('Delete this login?')">
+  <input type="hidden" name="user_id" value="{{ person.id }}" />
+  <p><button class="btn danger" type="submit">Delete this login</button></p>
+</form>
+{% endblock %}

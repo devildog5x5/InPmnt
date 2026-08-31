@@ -1,0 +1,1962 @@
+"""OurCircle — pause, ask family, then pay. Flask app."""
+from __future__ import annotations
+
+import json
+import os
+import re
+import time
+from pathlib import Path
+from typing import Any
+
+from markupsafe import Markup, escape as html_escape
+
+from flask import (
+    Flask,
+    abort,
+    flash,
+    redirect,
+    render_template,
+    request,
+    send_from_directory,
+    session,
+    url_for,
+)
+from werkzeug.utils import secure_filename
+
+from admin import admin_configured, admin_password_ok, email_is_admin
+from analyze import CORE_RULE, DISCLAIMER, GUIDANCE, analyze, extract_phones, extract_urls
+from auth import (
+    consume_recovery,
+    group_secret,
+    hash_list,
+    new_recovery_codes,
+    new_reset_token,
+    new_secret,
+    otpauth_uri,
+    totp_on,
+    verify_totp,
+)
+from billing import (
+    PLAN_LABELS,
+    construct_event,
+    create_checkout_session,
+    create_portal_session,
+    load_stripe_config,
+    plan_from_price_id,
+    retrieve_checkout,
+)
+from database import (
+    DATA,
+    accept_invite,
+    admin_add_trusted,
+    admin_counts,
+    admin_create_household,
+    admin_create_invite,
+    admin_create_user,
+    admin_delete_check,
+    admin_delete_household,
+    admin_delete_trusted,
+    admin_delete_user,
+    admin_disable_2fa,
+    admin_get_user,
+    admin_household_detail,
+    admin_list_checks,
+    admin_list_households,
+    admin_list_invites,
+    admin_list_users,
+    admin_update_household,
+    admin_update_user,
+    authenticate,
+    cancel_pending_invite,
+    create_household,
+    find_pending_invite_by_phone,
+    find_user_by_phone,
+    household_members,
+    init_db,
+    invite_member,
+    mark_invite_sent,
+    mark_invite_sms_sent,
+    now,
+    pending_invite,
+    pending_invite_by_id,
+    session as db_session,
+    set_sms_opt_out,
+    set_user_phone,
+    touch_last_access,
+    trusted_list,
+)
+from mail import (
+    last_mail_status,
+    mail_configured,
+    not_setup_message,
+    public_info,
+    send_email,
+    send_failed_message,
+    test_email_body,
+)
+from sms import (
+    alert_sms_body,
+    check_sms_body,
+    classify_inbound,
+    inbound_auto_reply,
+    invite_sms_body,
+    look_sms_body,
+    normalize_phone,
+    send_sms,
+    sms_configured,
+    twiml,
+    valid_signature,
+)
+from support_chat import handle_chat, openai_configured
+from werkzeug.security import check_password_hash, generate_password_hash
+
+ROOT = Path(__file__).resolve().parent
+UPLOADS = DATA / "uploads"
+ALLOWED_SHOT = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
+DEFAULT_SITE_URL = "https://familyshieldpro.com"
+PUBLIC_PATHS = ("/", "/signup", "/login", "/forgot")
+PRIVATE_PREFIXES = (
+    "/home",
+    "/circle",
+    "/trusted",
+    "/checks",
+    "/uploads",
+    "/join",
+    "/billing",
+    "/report",
+    "/account",
+    "/logout",
+    "/support",
+    "/sms",
+    "/admin",
+)
+
+
+def site_url() -> str:
+    return (
+        (os.environ.get("OURCIRCLE_SITE_URL") or os.environ.get("BASE_URL") or DEFAULT_SITE_URL)
+        .strip()
+        .rstrip("/")
+    )
+
+
+def join_url(token: str) -> str:
+    return site_url() + "/join/" + token
+
+
+def invite_email_body(join: str) -> str:
+    return (
+        "Someone invited you to a Family Shield Pro (OurCircle) family circle.\n\n"
+        "Open this link to join. It is only for this email — tap it, you do not need to copy and paste:\n"
+        f"<{join}>\n\n"
+        "If you did not expect this, ignore the message.\n\n"
+        f"{GUIDANCE}\n"
+    )
+
+
+def tap_link_email_html(intro_html: str, href: str, button: str, footer_html: str) -> str:
+    from html import escape
+
+    safe_href = escape(href, quote=True)
+    safe_btn = escape(button, quote=True)
+    return (
+        '<!DOCTYPE html><html><body style="margin:0;background:#f4efe6;padding:24px">'
+        '<div style="max-width:560px;margin:0 auto;background:#fff8f0;padding:28px;border-radius:16px;'
+        'font-family:Georgia,serif;color:#1d1e20;line-height:1.5">'
+        f"{intro_html}"
+        "<p>Open this link:</p>"
+        f'<p style="word-break:break-all;font-size:16px;line-height:1.4">'
+        f'<a href="{safe_href}" style="color:#1f4f45;text-decoration:underline">{safe_href}</a></p>'
+        f'<p><a href="{safe_href}" style="display:inline-block;background:#1f4f45;color:#ffffff;'
+        f'padding:14px 22px;border-radius:999px;text-decoration:underline;font-weight:700">{safe_btn}</a></p>'
+        f"{footer_html}"
+        "</div></body></html>"
+    )
+
+
+def invite_email_html(join: str) -> str:
+    from html import escape
+
+    guidance = escape(GUIDANCE, quote=True)
+    return tap_link_email_html(
+        "<p>Someone invited you to a Family Shield Pro (OurCircle) family circle.</p>"
+        "<p>Open this link to join. It is only for this email.</p>",
+        join,
+        "Join this family circle",
+        "<p>If you did not expect this, ignore the message.</p>"
+        f'<p style="color:#5c5850;font-size:14px">{guidance}</p>',
+    )
+
+
+def reset_email_body(link: str) -> str:
+    return (
+        "Someone asked to reset the Family Shield Pro password for this email.\n\n"
+        "Open this link within one hour — tap it, you do not need to copy and paste:\n"
+        f"<{link}>\n\n"
+        "If you did not ask, ignore this message.\n"
+    )
+
+
+def reset_email_html(link: str) -> str:
+    return tap_link_email_html(
+        "<p>Someone asked to reset the Family Shield Pro password for this email.</p>",
+        link,
+        "Reset password",
+        "<p>This link works for one hour. If you did not ask, ignore this message.</p>",
+    )
+
+
+def alert_email_body(name: str, check_url: str, names: str) -> str:
+    return (
+        f"PLEASE CALL {name} BEFORE THEY PAY.\n\n"
+        f"They asked the circle ({names}) to stop a payment or information request.\n\n"
+        "Open this check — tap the link, you do not need to copy and paste:\n"
+        f"<{check_url}>\n\n"
+        f"{CORE_RULE}\n"
+        f"{GUIDANCE}\n"
+    )
+
+
+def alert_email_html(name: str, check_url: str, names: str) -> str:
+    from html import escape
+
+    name_e = escape(name, quote=True)
+    names_e = escape(names, quote=True)
+    rule = escape(CORE_RULE, quote=True)
+    guidance = escape(GUIDANCE, quote=True)
+    return tap_link_email_html(
+        f"<p><strong>PLEASE CALL {name_e} BEFORE THEY PAY.</strong></p>"
+        f"<p>They asked the circle ({names_e}) to stop a payment or information request.</p>",
+        check_url,
+        "Open this check",
+        f'<p style="color:#5c5850;font-size:14px">{rule} {guidance}</p>',
+    )
+
+
+def look_email_body(name: str, check_url: str) -> str:
+    return (
+        f"{name} asked the family circle to look at a request before they pay.\n\n"
+        "Open this check — tap the link, you do not need to copy and paste:\n"
+        f"<{check_url}>\n\n"
+        f"{CORE_RULE}\n"
+        f"{GUIDANCE}\n"
+    )
+
+
+def look_email_html(name: str, check_url: str) -> str:
+    from html import escape
+
+    name_e = escape(name, quote=True)
+    rule = escape(CORE_RULE, quote=True)
+    guidance = escape(GUIDANCE, quote=True)
+    return tap_link_email_html(
+        f"<p><strong>{name_e} asked the circle to look before they pay.</strong></p>",
+        check_url,
+        "Open this check",
+        f'<p style="color:#5c5850;font-size:14px">{rule} {guidance}</p>',
+    )
+
+
+def notify_circle_members(
+    members: list,
+    skip_id: int,
+    *,
+    subject: str,
+    body: str,
+    html: str,
+    sms_body: str,
+) -> tuple[int, int, str]:
+    emailed = 0
+    texted = 0
+    mail_fail = ""
+    if mail_configured():
+        for member in members:
+            if int(member["id"]) == int(skip_id):
+                continue
+            dest = (member.get("email") or "").strip()
+            if not dest or "@" not in dest:
+                continue
+            try:
+                send_email(to=dest, subject=subject, body=body, html=html)
+                emailed += 1
+            except Exception as exc:
+                mail_fail = last_mail_status() or str(exc)
+    if sms_configured():
+        for member in members:
+            if int(member["id"]) == int(skip_id):
+                continue
+            dest = (member.get("phone") or "").strip()
+            if not dest or member.get("sms_opt_out"):
+                continue
+            try:
+                send_sms(to=dest, body=sms_body)
+                texted += 1
+            except Exception:
+                pass
+    return emailed, texted, mail_fail
+
+
+def linkify_text(text: str | None) -> Markup:
+    escaped = str(html_escape(text or ""))
+    escaped = re.sub(r"(https?://[^\s<]+)", r'<a href="\1">\1</a>', escaped)
+    escaped = re.sub(
+        r'(?<!mailto:)([A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,})',
+        r'<a href="mailto:\1">\1</a>',
+        escaped,
+    )
+    return Markup(escaped)
+
+
+def mailto_html(email: str | None) -> Markup:
+    value = (email or "").strip()
+    if not value:
+        return Markup("")
+    return Markup(f'<a href="mailto:{html_escape(value)}">{html_escape(value)}</a>')
+
+
+def tel_html(phone: str | None) -> Markup:
+    raw = (phone or "").strip()
+    if not raw:
+        return Markup("—")
+    href = normalize_phone(raw)
+    if not href:
+        digits = re.sub(r"\D+", "", raw)
+        href = f"+{digits}" if raw.startswith("+") and len(digits) >= 10 else ""
+    if not href:
+        return Markup(str(html_escape(raw)))
+    return Markup(f'<a href="tel:{html_escape(href)}">{html_escape(raw)}</a>')
+
+
+def website_html(raw: str | None) -> Markup:
+    text = (raw or "").strip()
+    if not text:
+        return Markup("")
+    href = text if re.match(r"^https?://", text, re.I) else "https://" + text.lstrip("/")
+    return Markup(f'<a href="{html_escape(href)}" rel="noopener">{html_escape(text)}</a>')
+
+
+def inbound_url() -> str:
+    return site_url() + "/sms/inbound"
+
+
+def parse_phone_field(raw: str) -> str:
+    text = (raw or "").strip()
+    if not text:
+        return ""
+    phone = normalize_phone(text)
+    if not phone:
+        raise ValueError("That mobile number does not look like a US or international number.")
+    return phone
+
+
+def notify_invite(inv: dict[str, Any], inviter: str) -> tuple[str, str]:
+    join = join_url(inv["token"])
+    share = f"Share this join link: {join}"
+    emailed = False
+    texted = False
+    mail_error = False
+    mail_fail_detail = ""
+    sms_error = False
+    if mail_configured():
+        try:
+            send_email(
+                to=inv["email"],
+                subject="Join your family circle on Family Shield Pro",
+                body=invite_email_body(join),
+                html=invite_email_html(join),
+            )
+            emailed = True
+        except Exception as exc:
+            mail_error = True
+            mail_fail_detail = last_mail_status() or str(exc)
+    phone = (inv.get("phone") or "").strip()
+    if phone and sms_configured():
+        try:
+            send_sms(to=phone, body=invite_sms_body(join, inviter))
+            texted = True
+        except Exception:
+            sms_error = True
+    with db_session() as conn:
+        if emailed:
+            mark_invite_sent(conn, int(inv["id"]))
+        if texted:
+            mark_invite_sms_sent(conn, int(inv["id"]))
+    bits = []
+    if emailed:
+        bits.append(f"emailed to {inv['email']}")
+    if texted:
+        bits.append(f"texted to {phone}")
+    if bits:
+        msg = "Invite " + " and ".join(bits) + f". If they do not see it, {share[0].lower() + share[1:]}"
+        cat = "error" if mail_error or sms_error else "ok"
+        if mail_error:
+            msg += f" Email did not send ({mail_fail_detail})." if mail_fail_detail else " Email did not send."
+        if sms_error:
+            msg += " Text did not send."
+        return msg, cat
+    if mail_error or sms_error:
+        why = f" Email: {mail_fail_detail}." if mail_fail_detail else ""
+        return f"Could not send the invite.{why} {share}", "error"
+    extra = []
+    if not mail_configured():
+        extra.append("Mail is not set up yet")
+    if phone and not sms_configured():
+        extra.append("SMS is not set up yet")
+    if extra:
+        return f"Invite created for {inv['email']}. {' and '.join(extra)}, so {share[0].lower() + share[1:]}", "ok"
+    return f"Invite created for {inv['email']}. {share}", "ok"
+
+
+def product_version() -> str:
+    vp = ROOT / "VERSION"
+    if vp.is_file():
+        return vp.read_text(encoding="utf-8").strip() or "0.0.0"
+    return "0.0.0"
+
+PLANS = [
+    {
+        "id": "monthly",
+        "name": "Family monthly",
+        "price": "$14.99/month",
+        "detail": "Up to five people in one circle. Pause, trusted list, and call-me-before-I-pay.",
+        "featured": False,
+    },
+    {
+        "id": "yearly",
+        "name": "Family yearly",
+        "price": "$119.99/year",
+        "detail": "Same circle. Pay once a year — about $10 a month. Best for families.",
+        "featured": True,
+    },
+]
+
+
+def create_app() -> Flask:
+    init_db()
+    app = Flask(
+        __name__,
+        template_folder=str(ROOT / "templates"),
+        static_folder=str(ROOT / "static"),
+    )
+    secret = (os.environ.get("OURCIRCLE_SECRET") or os.environ.get("FLASK_SECRET_KEY") or "ourcircle-dev").strip()
+    app.config["SECRET_KEY"] = secret
+    app.config["MAX_CONTENT_LENGTH"] = 8 * 1024 * 1024
+    app.config["TEMPLATES_AUTO_RELOAD"] = True
+    app.add_template_filter(linkify_text, "linkify")
+    app.add_template_filter(mailto_html, "mailto_link")
+    app.add_template_filter(tel_html, "tel_link")
+    app.add_template_filter(website_html, "website_link")
+
+    @app.context_processor
+    def inject():
+        return {
+            "core_rule": CORE_RULE,
+            "disclaimer": DISCLAIMER,
+            "guidance": GUIDANCE,
+            "user_name": session.get("name"),
+            "site_home": site_url(),
+            "app_version": product_version(),
+            "stripe_enabled": load_stripe_config().enabled,
+            "sms_enabled": sms_configured(),
+            "admin_ok": bool(session.get("admin_ok")) and admin_configured(),
+            "admin_configured": admin_configured(),
+            "mail_configured": mail_configured(),
+        }
+
+    @app.get("/robots.txt")
+    def robots_txt():
+        lines = [
+            "User-agent: *",
+            "Allow: /",
+            "Allow: /signup",
+            "Allow: /login",
+            "Allow: /forgot",
+        ]
+        for path in PRIVATE_PREFIXES:
+            lines.append(f"Disallow: {path}")
+        lines.extend(
+            [
+                "",
+                f"Host: {site_url().replace('https://', '').replace('http://', '')}",
+                f"Sitemap: {site_url()}/sitemap.xml",
+                "",
+            ]
+        )
+        return app.response_class("\n".join(lines), mimetype="text/plain; charset=utf-8")
+
+    @app.get("/sitemap.xml")
+    def sitemap_xml():
+        lastmod = now()[:10]
+        urls = []
+        for path in PUBLIC_PATHS:
+            loc = f"{site_url()}/" if path == "/" else f"{site_url()}{path}"
+            priority = "1.0" if path == "/" else ("0.9" if path == "/signup" else "0.8")
+            changefreq = "weekly" if path != "/login" else "monthly"
+            if path == "/login":
+                priority = "0.6"
+            urls.append(
+                "  <url>\n"
+                f"    <loc>{loc}</loc>\n"
+                f"    <lastmod>{lastmod}</lastmod>\n"
+                f"    <changefreq>{changefreq}</changefreq>\n"
+                f"    <priority>{priority}</priority>\n"
+                "  </url>"
+            )
+        body = (
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+            + "\n".join(urls)
+            + "\n</urlset>\n"
+        )
+        return app.response_class(body, mimetype="application/xml; charset=utf-8")
+
+    @app.get("/healthz")
+    def healthz():
+        return {
+            "ok": True,
+            "service": "familyshieldpro",
+            "product": "Family Shield Pro",
+            "app": "OurCircle",
+            "version": product_version(),
+            "not": "InPmnt",
+            "stripe": load_stripe_config().enabled,
+            "mail": mail_configured(),
+            "sms": sms_configured(),
+            "openai": openai_configured(),
+            "admin": admin_configured(),
+        }
+
+    def current_user():
+        uid = session.get("user_id")
+        hid = session.get("household_id")
+        if not uid or not hid:
+            return None
+        return {"id": uid, "household_id": hid, "name": session.get("name"), "email": session.get("email")}
+
+    def maybe_elevate_admin() -> None:
+        if session.get("admin_ok"):
+            return
+        if not admin_configured():
+            return
+        email = (session.get("email") or "").strip()
+        if email_is_admin(email):
+            session["admin_ok"] = True
+
+    def require_admin():
+        if not admin_configured():
+            abort(404)
+        maybe_elevate_admin()
+        if not session.get("admin_ok"):
+            return redirect(url_for("admin_login"))
+        return None
+
+    @app.before_request
+    def elevate_admin_session():
+        maybe_elevate_admin()
+
+    def login_required():
+        if not current_user():
+            return redirect(url_for("login", next=request.path))
+        if session.pop("just_joined", None):
+            return None
+        uid = session.get("user_id")
+        if uid:
+            with db_session() as conn:
+                touch_last_access(conn, int(uid))
+        return None
+
+    @app.route("/admin/login", methods=["GET", "POST"])
+    def admin_login():
+        if not admin_configured():
+            abort(404)
+        maybe_elevate_admin()
+        if session.get("admin_ok"):
+            return redirect(url_for("admin_home"))
+        if request.method == "POST":
+            if admin_password_ok(request.form.get("password") or ""):
+                session["admin_ok"] = True
+                return redirect(url_for("admin_home"))
+            flash("Operator password did not match.", "error")
+        return render_template("admin_login.html")
+
+    @app.get("/admin/logout")
+    def admin_logout():
+        if not admin_configured():
+            abort(404)
+        session.pop("admin_ok", None)
+        return redirect(url_for("admin_login"))
+
+    @app.get("/admin")
+    def admin_home():
+        gate = require_admin()
+        if gate:
+            return gate
+        q = (request.args.get("q") or "").strip()
+        with db_session() as conn:
+            counts = admin_counts(conn)
+            users = admin_list_users(conn, q)
+            invites = admin_list_invites(conn, q)
+            households = admin_list_households(conn, q)
+            checks = admin_list_checks(conn, limit=20)
+        return render_template(
+            "admin.html",
+            counts=counts,
+            users=users,
+            invites=invites,
+            households=households,
+            checks=checks,
+            q=q,
+            mail_last_error=last_mail_status(),
+            mail_info=public_info(),
+        )
+
+    def _admin_back():
+        hid = int(request.form.get("return_household") or 0)
+        if hid:
+            return redirect(url_for("admin_household", hid=hid))
+        uid = int(request.form.get("return_user") or 0)
+        if uid:
+            return redirect(url_for("admin_user", user_id=uid))
+        return redirect(url_for("admin_home"))
+
+    def _admin_phone():
+        return parse_phone_field(request.form.get("phone") or "")
+
+    @app.route("/admin/users/<int:user_id>", methods=["GET", "POST"])
+    def admin_user(user_id: int):
+        gate = require_admin()
+        if gate:
+            return gate
+        if request.method == "POST":
+            try:
+                phone = _admin_phone()
+            except ValueError as exc:
+                flash(str(exc), "error")
+                return redirect(url_for("admin_user", user_id=user_id))
+            hid_raw = request.form.get("household_id")
+            try:
+                with db_session() as conn:
+                    person = admin_update_user(
+                        conn,
+                        user_id,
+                        name=request.form.get("name") or "",
+                        email=request.form.get("email") or "",
+                        phone=phone,
+                        sms_opt_out=(request.form.get("sms_opt_out") or "") == "1",
+                        password=request.form.get("password") or "",
+                        role=request.form.get("role") or None,
+                        household_id=int(hid_raw) if hid_raw else None,
+                    )
+            except ValueError as exc:
+                flash(str(exc), "error")
+                return redirect(url_for("admin_user", user_id=user_id))
+            if session.get("user_id") == person["id"]:
+                session["name"] = person["name"]
+                session["email"] = person["email"]
+                session["household_id"] = person["household_id"]
+            flash("Login saved.", "ok")
+            return redirect(url_for("admin_user", user_id=user_id))
+        with db_session() as conn:
+            person = admin_get_user(conn, user_id)
+            households = admin_list_households(conn)
+        if not person:
+            flash("That login is not in Family Shield Pro.", "error")
+            return redirect(url_for("admin_home"))
+        return render_template("admin_user.html", person=person, households=households)
+
+    @app.post("/admin/users/create")
+    def admin_user_create():
+        gate = require_admin()
+        if gate:
+            return gate
+        try:
+            phone = _admin_phone()
+        except ValueError as exc:
+            flash(str(exc), "error")
+            return _admin_back()
+        try:
+            with db_session() as conn:
+                person = admin_create_user(
+                    conn,
+                    int(request.form.get("household_id") or 0),
+                    name=request.form.get("name") or "",
+                    email=request.form.get("email") or "",
+                    password=request.form.get("password") or "",
+                    role=request.form.get("role") or "member",
+                    phone=phone,
+                )
+        except ValueError as exc:
+            flash(str(exc), "error")
+            return _admin_back()
+        flash(f"Login added: {person['email']}.", "ok")
+        return _admin_back()
+
+    @app.post("/admin/users/delete")
+    def admin_user_delete():
+        gate = require_admin()
+        if gate:
+            return gate
+        uid = int(request.form.get("user_id") or 0)
+        try:
+            with db_session() as conn:
+                admin_delete_user(conn, uid)
+        except ValueError as exc:
+            flash(str(exc), "error")
+            return _admin_back()
+        if session.get("user_id") == uid:
+            session.pop("user_id", None)
+            session.pop("household_id", None)
+            session.pop("name", None)
+            session.pop("email", None)
+        flash("Login deleted.", "ok")
+        return _admin_back()
+
+    @app.post("/admin/users/disable-2fa")
+    def admin_user_disable_2fa():
+        gate = require_admin()
+        if gate:
+            return gate
+        uid = int(request.form.get("user_id") or 0)
+        try:
+            with db_session() as conn:
+                admin_disable_2fa(conn, uid)
+        except ValueError as exc:
+            flash(str(exc), "error")
+            return redirect(url_for("admin_user", user_id=uid) if uid else url_for("admin_home"))
+        flash("2FA turned off for that login.", "ok")
+        return redirect(url_for("admin_user", user_id=uid) if uid else url_for("admin_home"))
+
+    @app.route("/admin/households/<int:hid>", methods=["GET", "POST"])
+    def admin_household(hid: int):
+        gate = require_admin()
+        if gate:
+            return gate
+        if request.method == "POST":
+            try:
+                with db_session() as conn:
+                    admin_update_household(
+                        conn,
+                        hid,
+                        name=request.form.get("name") or "",
+                        plan=request.form.get("plan") or "",
+                    )
+            except ValueError as exc:
+                flash(str(exc), "error")
+            else:
+                flash("Circle saved. Plan flag only — no Stripe charge.", "ok")
+            return_user = int(request.form.get("return_user") or 0)
+            if return_user:
+                return redirect(url_for("admin_user", user_id=return_user))
+            return redirect(url_for("admin_household", hid=hid))
+        with db_session() as conn:
+            household = admin_household_detail(conn, hid)
+            if not household:
+                flash("That circle is not in Family Shield Pro.", "error")
+                return redirect(url_for("admin_home"))
+            members, pending = household_members(conn, hid)
+            trusted = trusted_list(conn, hid)
+            checks = admin_list_checks(conn, hid)
+        return render_template(
+            "admin_household.html",
+            household=household,
+            members=members,
+            pending=pending,
+            trusted=trusted,
+            checks=checks,
+        )
+
+    @app.post("/admin/households/create")
+    def admin_household_create():
+        gate = require_admin()
+        if gate:
+            return gate
+        try:
+            phone = _admin_phone()
+        except ValueError as exc:
+            flash(str(exc), "error")
+            return redirect(url_for("admin_home"))
+        try:
+            with db_session() as conn:
+                house = admin_create_household(
+                    conn,
+                    name=request.form.get("name") or "",
+                    plan=request.form.get("plan") or "yearly",
+                    owner_name=request.form.get("owner_name") or "",
+                    owner_email=request.form.get("owner_email") or "",
+                    owner_password=request.form.get("owner_password") or "",
+                    phone=phone,
+                )
+        except ValueError as exc:
+            flash(str(exc), "error")
+            return redirect(url_for("admin_home"))
+        flash("Circle added.", "ok")
+        return redirect(url_for("admin_household", hid=int(house["id"])))
+
+    @app.post("/admin/households/delete")
+    def admin_household_delete():
+        gate = require_admin()
+        if gate:
+            return gate
+        hid = int(request.form.get("household_id") or 0)
+        try:
+            with db_session() as conn:
+                if session.get("household_id") == hid:
+                    session.pop("user_id", None)
+                    session.pop("household_id", None)
+                    session.pop("name", None)
+                    session.pop("email", None)
+                admin_delete_household(conn, hid)
+        except ValueError as exc:
+            flash(str(exc), "error")
+            return redirect(url_for("admin_home"))
+        flash("Circle deleted.", "ok")
+        return redirect(url_for("admin_home"))
+
+    @app.post("/admin/invites/create")
+    def admin_invite_create():
+        gate = require_admin()
+        if gate:
+            return gate
+        try:
+            phone = _admin_phone()
+        except ValueError as exc:
+            flash(str(exc), "error")
+            return _admin_back()
+        try:
+            with db_session() as conn:
+                inv = admin_create_invite(
+                    conn,
+                    int(request.form.get("household_id") or 0),
+                    request.form.get("email") or "",
+                    request.form.get("name") or "",
+                    phone,
+                )
+        except ValueError as exc:
+            flash(str(exc), "error")
+            return _admin_back()
+        msg, cat = notify_invite(inv, "Family Shield Pro")
+        flash(msg, cat)
+        return _admin_back()
+
+    @app.post("/admin/invites/resend")
+    def admin_invite_resend():
+        gate = require_admin()
+        if gate:
+            return gate
+        invite_id = int(request.form.get("invite_id") or 0)
+        with db_session() as conn:
+            inv = pending_invite_by_id(conn, invite_id)
+        if not inv:
+            flash("That invite is not waiting anymore.", "error")
+            return _admin_back()
+        msg, cat = notify_invite(inv, "Family Shield Pro")
+        flash(msg, cat)
+        return _admin_back()
+
+    @app.post("/admin/invites/delete")
+    def admin_invite_delete():
+        gate = require_admin()
+        if gate:
+            return gate
+        invite_id = int(request.form.get("invite_id") or 0)
+        with db_session() as conn:
+            gone = cancel_pending_invite(conn, invite_id)
+        if gone:
+            flash("Pending invite deleted.", "ok")
+        else:
+            flash("That invite is not waiting anymore.", "error")
+        return _admin_back()
+
+    @app.post("/admin/trusted/create")
+    def admin_trusted_create():
+        gate = require_admin()
+        if gate:
+            return gate
+        try:
+            with db_session() as conn:
+                admin_add_trusted(
+                    conn,
+                    int(request.form.get("household_id") or 0),
+                    kind=request.form.get("kind") or "other",
+                    name=request.form.get("name") or "",
+                    phone=request.form.get("phone") or "",
+                    website=request.form.get("website") or "",
+                    notes=request.form.get("notes") or "",
+                )
+        except ValueError as exc:
+            flash(str(exc), "error")
+            return _admin_back()
+        flash("Trusted contact saved.", "ok")
+        return _admin_back()
+
+    @app.post("/admin/trusted/delete")
+    def admin_trusted_delete():
+        gate = require_admin()
+        if gate:
+            return gate
+        with db_session() as conn:
+            gone = admin_delete_trusted(conn, int(request.form.get("contact_id") or 0))
+        flash("Trusted contact removed." if gone else "That contact was already gone.", "ok" if gone else "error")
+        return _admin_back()
+
+    @app.post("/admin/checks/delete")
+    def admin_check_delete():
+        gate = require_admin()
+        if gate:
+            return gate
+        with db_session() as conn:
+            gone = admin_delete_check(conn, int(request.form.get("check_id") or 0))
+        flash("Check deleted." if gone else "That check was already gone.", "ok" if gone else "error")
+        return _admin_back()
+
+    @app.post("/admin/mail/test")
+    def admin_mail_test():
+        gate = require_admin()
+        if gate:
+            return gate
+        to = (request.form.get("to") or "").strip().lower()
+        if "@" not in to:
+            flash("Enter an email address for the test.", "error")
+            return redirect(url_for("admin_home"))
+        if not mail_configured():
+            flash(not_setup_message(), "error")
+            return redirect(url_for("admin_home"))
+        try:
+            send_email(to=to, subject="Family Shield Pro test email", body=test_email_body())
+            flash(
+                f"Test email accepted by SMTP for {to}. Check inbox and spam. "
+                "If it is not there, the mailbox password or From address is still wrong.",
+                "ok",
+            )
+        except Exception as exc:
+            flash("Test email did not send. " + (last_mail_status() or str(exc)), "error")
+        return redirect(url_for("admin_home"))
+
+    @app.get("/")
+    def landing():
+        if current_user():
+            return redirect(url_for("home"))
+        return render_template("landing.html", plans=PLANS)
+
+    @app.post("/support/chat")
+    def support_chat():
+        data = request.get_json(silent=True) or {}
+        message = (data.get("message") or request.form.get("message") or "").strip()
+        history = data.get("history") if isinstance(data.get("history"), list) else []
+        n = int(session.get("support_chat_n") or 0)
+        started = int(session.get("support_chat_t") or 0)
+        now_ts = int(time.time())
+        if started and now_ts - started > 3600:
+            n = 0
+            started = now_ts
+        if not started:
+            started = now_ts
+        if n >= 30:
+            return {
+                "reply": "Please email CustomerService@FamilyShieldPro.com — this chat has a short hourly limit.",
+                "source": "limit",
+            }, 429
+        session["support_chat_n"] = n + 1
+        session["support_chat_t"] = started
+        reply, source = handle_chat(message, history)
+        return {"reply": reply, "source": source}
+
+    @app.post("/sms/inbound")
+    def sms_inbound():
+        if not sms_configured():
+            return app.response_class(twiml("SMS is not configured."), status=503, mimetype="text/xml; charset=utf-8")
+        params = {key: request.form.get(key) or "" for key in request.form}
+        header = request.headers.get("X-Twilio-Signature") or ""
+        if not valid_signature(inbound_url(), params, header):
+            return app.response_class(twiml("Forbidden"), status=403, mimetype="text/xml; charset=utf-8")
+        frm = normalize_phone(request.form.get("From") or "")
+        body = (request.form.get("Body") or "").strip()
+        action = classify_inbound(body)
+        auto = inbound_auto_reply(action)
+        with db_session() as conn:
+            user = find_user_by_phone(conn, frm) if frm else None
+            pending = None if user else find_pending_invite_by_phone(conn, frm)
+            if action == "stop":
+                if user:
+                    set_sms_opt_out(conn, int(user["id"]), True)
+                return app.response_class(twiml(auto), mimetype="text/xml; charset=utf-8")
+            if action == "start":
+                if user:
+                    set_sms_opt_out(conn, int(user["id"]), False)
+                elif not pending:
+                    auto = (
+                        "Family Shield Pro: this number is not in a circle yet. "
+                        "Ask a family member to invite you from Circle (email plus this phone). "
+                        f"{CORE_RULE} Reply STOP to opt out."
+                    )
+                return app.response_class(twiml(auto), mimetype="text/xml; charset=utf-8")
+            if action == "help":
+                return app.response_class(twiml(auto), mimetype="text/xml; charset=utf-8")
+            if not user:
+                if pending:
+                    join = join_url(pending["token"])
+                    reply = (
+                        f"Family Shield Pro: join your circle first: {join} "
+                        f"Then you can forward a sketchy text here. {CORE_RULE} Reply STOP to opt out."
+                    )
+                else:
+                    reply = (
+                        "Family Shield Pro: this number is not in a circle yet. "
+                        "Ask a family member to invite you from Circle (email plus this phone). "
+                        f"{CORE_RULE} Reply STOP to opt out."
+                    )
+                return app.response_class(twiml(reply), mimetype="text/xml; charset=utf-8")
+            if user.get("sms_opt_out"):
+                return app.response_class(twiml(inbound_auto_reply("stop")), mimetype="text/xml; charset=utf-8")
+            trusted = trusted_list(conn, int(user["household_id"]))
+            report = analyze(text=body, phone="", url="", trusted=trusted)
+            kind = "sms"
+            cur = conn.execute(
+                """
+                INSERT INTO checks (household_id, user_id, kind, raw_text, phone, url, screenshot, risk, report_json, created_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?)
+                """,
+                (
+                    user["household_id"],
+                    user["id"],
+                    kind,
+                    body,
+                    frm,
+                    "",
+                    "",
+                    report["level"],
+                    json.dumps(report),
+                    now(),
+                ),
+            )
+            cid = int(cur.lastrowid or 0)
+        check_link = site_url() + f"/checks/{cid}"
+        title = report.get("title") or "Pause with your circle."
+        reply = check_sms_body(title, check_link)
+        return app.response_class(twiml(reply), mimetype="text/xml; charset=utf-8")
+
+    @app.route("/signup", methods=["GET", "POST"])
+    def signup():
+        if request.method == "GET":
+            return render_template("signup.html")
+        name = (request.form.get("name") or "").strip()
+        household = (request.form.get("household") or "").strip()
+        email = (request.form.get("email") or "").strip().lower()
+        password = request.form.get("password") or ""
+        if not name or "@" not in email or len(password) < 8:
+            flash("Name, email, and an 8+ character password are required.", "error")
+            return render_template("signup.html")
+        try:
+            phone = parse_phone_field(request.form.get("phone") or "")
+        except ValueError as exc:
+            flash(str(exc), "error")
+            return render_template("signup.html")
+        with db_session() as conn:
+            taken = conn.execute("SELECT id FROM users WHERE lower(email)=?", (email,)).fetchone()
+            if taken:
+                flash("That email already has a login. Sign in instead.", "error")
+                return redirect(url_for("login"))
+            hid = create_household(
+                conn,
+                name=household or f"{name}'s circle",
+                owner_name=name,
+                email=email,
+                password=password,
+                phone=phone,
+            )
+            user = conn.execute("SELECT * FROM users WHERE lower(email)=?", (email,)).fetchone()
+        session["user_id"] = user["id"]
+        session["household_id"] = hid
+        session["name"] = user["name"]
+        session["email"] = user["email"]
+        flash("Welcome. Paste anything odd below, or invite family from the right.", "ok")
+        return redirect(url_for("home"))
+
+    @app.route("/login", methods=["GET", "POST"])
+    def login():
+        if request.method == "GET":
+            return render_template("login.html")
+        email = request.form.get("email") or ""
+        password = request.form.get("password") or ""
+        with db_session() as conn:
+            user = authenticate(conn, email, password)
+        if not user:
+            flash("Email or password did not match.", "error")
+            return render_template("login.html")
+        if totp_on(user):
+            session.clear()
+            session["pending_2fa"] = user["id"]
+            session["pending_2fa_tries"] = 0
+            session["pending_next"] = request.args.get("next") or url_for("home")
+            return redirect(url_for("login_2fa"))
+        session["user_id"] = user["id"]
+        session["household_id"] = user["household_id"]
+        session["name"] = user["name"]
+        session["email"] = user["email"]
+        return redirect(request.args.get("next") or url_for("home"))
+
+    @app.get("/logout")
+    def logout():
+        session.clear()
+        return redirect(url_for("landing"))
+
+    def _user_by_id(uid: int) -> dict[str, Any] | None:
+        with db_session() as conn:
+            row = conn.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
+        return dict(row) if row else None
+
+    def _verify_second(user: dict[str, Any], code: str, recovery: str) -> bool:
+        secret = (user.get("totp_secret") or "").strip()
+        if code and secret and verify_totp(secret, code):
+            return True
+        if not recovery:
+            return False
+        nxt = consume_recovery(user.get("recovery_codes") or "", recovery)
+        if nxt is None:
+            return False
+        with db_session() as conn:
+            conn.execute("UPDATE users SET recovery_codes=? WHERE id=?", (nxt, user["id"]))
+        user["recovery_codes"] = nxt
+        return True
+
+    @app.route("/login/2fa", methods=["GET", "POST"])
+    def login_2fa():
+        uid = int(session.get("pending_2fa") or 0)
+        if uid < 1:
+            return redirect(url_for("login"))
+        if request.method == "GET":
+            return render_template("login_2fa.html")
+        user = _user_by_id(uid)
+        if not user:
+            session.clear()
+            return redirect(url_for("login"))
+        tries = int(session.get("pending_2fa_tries") or 0)
+        if tries >= 8:
+            session.clear()
+            flash("Too many codes. Sign in again.", "error")
+            return redirect(url_for("login"))
+        code = (request.form.get("code") or "").strip()
+        recovery = (request.form.get("recovery_code") or "").strip()
+        if not _verify_second(user, code, recovery):
+            session["pending_2fa_tries"] = tries + 1
+            flash("That code did not match.", "error")
+            return redirect(url_for("login_2fa"))
+        nxt = session.get("pending_next") or url_for("home")
+        session.clear()
+        session["user_id"] = user["id"]
+        session["household_id"] = user["household_id"]
+        session["name"] = user["name"]
+        session["email"] = user["email"]
+        return redirect(nxt if isinstance(nxt, str) and nxt.startswith("/") else url_for("home"))
+
+    @app.route("/forgot", methods=["GET", "POST"])
+    def forgot():
+        generic = "If that email is on a circle, we sent reset instructions. Check spam. You can also use a recovery code on this page."
+        if request.method == "GET":
+            return render_template("forgot.html")
+        if not mail_configured():
+            flash(not_setup_message(), "error")
+            return redirect(url_for("forgot"), code=303)
+        email = (request.form.get("email") or "").lower().strip()
+        if "@" in email:
+            with db_session() as conn:
+                user = conn.execute("SELECT * FROM users WHERE lower(email)=?", (email,)).fetchone()
+                if user:
+                    raw, token_hash = new_reset_token()
+                    conn.execute("DELETE FROM password_resets WHERE user_id=?", (user["id"],))
+                    from datetime import datetime, timedelta, timezone
+
+                    exp = (datetime.now(timezone.utc) + timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
+                    conn.execute(
+                        "INSERT INTO password_resets (user_id, token_hash, expires_at, created_at) VALUES (?,?,?,?)",
+                        (user["id"], token_hash, exp, now()),
+                    )
+                    link = site_url() + "/reset/" + raw
+                    try:
+                        send_email(
+                            to=user["email"],
+                            subject="Reset your Family Shield Pro password",
+                            body=reset_email_body(link),
+                            html=reset_email_html(link),
+                        )
+                    except Exception as exc:
+                        flash(send_failed_message(last_mail_status() or str(exc)), "error")
+                        return redirect(url_for("forgot"), code=303)
+        flash(generic, "ok")
+        return redirect(url_for("forgot"), code=303)
+
+    @app.post("/forgot/code")
+    def forgot_code():
+        email = (request.form.get("email") or "").lower().strip()
+        recovery = (request.form.get("recovery_code") or "").strip()
+        password = request.form.get("password") or ""
+        generic = "If that email and recovery code matched, the password is updated. Sign in."
+        if "@" in email and recovery and len(password) >= 8:
+            with db_session() as conn:
+                user = conn.execute("SELECT * FROM users WHERE lower(email)=?", (email,)).fetchone()
+                if user:
+                    nxt = consume_recovery(user["recovery_codes"] or "", recovery)
+                    if nxt is not None:
+                        conn.execute(
+                            "UPDATE users SET password_hash=?, recovery_codes=? WHERE id=?",
+                            (generate_password_hash(password), nxt, user["id"]),
+                        )
+                        conn.execute("DELETE FROM password_resets WHERE user_id=?", (user["id"],))
+        flash(generic, "ok")
+        return redirect(url_for("login"))
+
+    @app.route("/reset/<token>", methods=["GET", "POST"])
+    def reset_password(token: str):
+        import hashlib
+
+        token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+        with db_session() as conn:
+            row = conn.execute(
+                "SELECT * FROM password_resets WHERE token_hash=? AND expires_at >= ?",
+                (token_hash, now()),
+            ).fetchone()
+        if not row:
+            flash("That reset link is invalid or expired. Request a new one.", "error")
+            return redirect(url_for("forgot"))
+        if request.method == "GET":
+            return render_template("reset.html")
+        password = request.form.get("password") or ""
+        if len(password) < 8:
+            flash("Use at least 8 characters.", "error")
+            return redirect(url_for("reset_password", token=token))
+        with db_session() as conn:
+            conn.execute(
+                "UPDATE users SET password_hash=? WHERE id=?",
+                (generate_password_hash(password), row["user_id"]),
+            )
+            conn.execute("DELETE FROM password_resets WHERE user_id=?", (row["user_id"],))
+        flash("Password saved. Sign in. If 2FA is on, you still need the authenticator.", "ok")
+        return redirect(url_for("login"))
+
+    @app.get("/account")
+    def account():
+        gate = login_required()
+        if gate:
+            return gate
+        u = current_user()
+        user = _user_by_id(int(u["id"]))
+        codes = session.pop("show_recovery", [])
+        return render_template(
+            "account.html",
+            totp_on=totp_on(user),
+            recovery_codes=codes if isinstance(codes, list) else [],
+            phone=user.get("phone") or "" if user else "",
+            sms_opt_out=bool(user.get("sms_opt_out")) if user else False,
+        )
+
+    @app.post("/account/phone")
+    def account_phone():
+        gate = login_required()
+        if gate:
+            return gate
+        u = current_user()
+        try:
+            phone = parse_phone_field(request.form.get("phone") or "")
+        except ValueError as exc:
+            flash(str(exc), "error")
+            return redirect(url_for("account"))
+        opt_out = (request.form.get("sms_opt_out") or "") == "1"
+        try:
+            with db_session() as conn:
+                set_user_phone(conn, int(u["id"]), phone, opt_out)
+        except ValueError as exc:
+            flash(str(exc), "error")
+            return redirect(url_for("account"))
+        if phone:
+            flash("Mobile number saved. We can text invites and call-me alerts to this number.", "ok")
+        else:
+            flash("Mobile number cleared.", "ok")
+        return redirect(url_for("account"))
+
+    @app.post("/account/password")
+    def account_password():
+        gate = login_required()
+        if gate:
+            return gate
+        u = current_user()
+        user = _user_by_id(int(u["id"]))
+        current = request.form.get("current_password") or ""
+        password = request.form.get("password") or ""
+        if not user or not check_password_hash(user["password_hash"], current):
+            flash("Current password did not match.", "error")
+            return redirect(url_for("account"))
+        if len(password) < 8:
+            flash("Use at least 8 characters.", "error")
+            return redirect(url_for("account"))
+        with db_session() as conn:
+            conn.execute(
+                "UPDATE users SET password_hash=? WHERE id=?",
+                (generate_password_hash(password), user["id"]),
+            )
+        flash("Password updated.", "ok")
+        return redirect(url_for("account"))
+
+    @app.route("/account/2fa/setup", methods=["GET", "POST"])
+    def account_2fa_setup():
+        gate = login_required()
+        if gate:
+            return gate
+        u = current_user()
+        user = _user_by_id(int(u["id"]))
+        if totp_on(user):
+            return redirect(url_for("account"))
+        if request.method == "POST" and (request.form.get("new_key") or "") == "1":
+            session.pop("totp_pending_secret", None)
+        if not session.get("totp_pending_secret"):
+            session["totp_pending_secret"] = new_secret()
+        secret = session["totp_pending_secret"]
+        return render_template(
+            "account_2fa_setup.html",
+            secret_grouped=group_secret(secret),
+            otpauth=otpauth_uri(u["email"], secret),
+        )
+
+    @app.post("/account/2fa/enable")
+    def account_2fa_enable():
+        gate = login_required()
+        if gate:
+            return gate
+        u = current_user()
+        secret = session.get("totp_pending_secret") or ""
+        code = (request.form.get("code") or "").strip()
+        if not secret or not verify_totp(secret, code):
+            flash("That code did not match. Scan the key again and retry.", "error")
+            return redirect(url_for("account_2fa_setup"))
+        codes = new_recovery_codes()
+        with db_session() as conn:
+            conn.execute(
+                "UPDATE users SET totp_secret=?, totp_enabled=1, recovery_codes=? WHERE id=?",
+                (secret, hash_list(codes), u["id"]),
+            )
+        session.pop("totp_pending_secret", None)
+        session["show_recovery"] = codes
+        flash("Two-factor authentication is on. Save the recovery codes.", "ok")
+        return redirect(url_for("account"))
+
+    @app.post("/account/2fa/disable")
+    def account_2fa_disable():
+        gate = login_required()
+        if gate:
+            return gate
+        u = current_user()
+        user = _user_by_id(int(u["id"]))
+        code = (request.form.get("code") or "").strip()
+        if not user or not _verify_second(user, code, code):
+            flash("That code did not match.", "error")
+            return redirect(url_for("account"))
+        with db_session() as conn:
+            conn.execute(
+                "UPDATE users SET totp_secret=NULL, totp_enabled=0, recovery_codes=NULL WHERE id=?",
+                (u["id"],),
+            )
+        flash("Two-factor authentication is off.", "ok")
+        return redirect(url_for("account"))
+
+    @app.post("/account/2fa/recovery")
+    def account_2fa_recovery():
+        gate = login_required()
+        if gate:
+            return gate
+        u = current_user()
+        user = _user_by_id(int(u["id"]))
+        code = (request.form.get("code") or "").strip()
+        secret = (user.get("totp_secret") or "") if user else ""
+        if not user or not secret or not verify_totp(secret, code):
+            flash("That authenticator code did not match.", "error")
+            return redirect(url_for("account"))
+        codes = new_recovery_codes()
+        with db_session() as conn:
+            conn.execute("UPDATE users SET recovery_codes=? WHERE id=?", (hash_list(codes), u["id"]))
+        session["show_recovery"] = codes
+        flash("New recovery codes — save them now.", "ok")
+        return redirect(url_for("account"))
+
+    @app.get("/home")
+    def home():
+        gate = login_required()
+        if gate:
+            return gate
+        u = current_user()
+        with db_session() as conn:
+            members, pending = household_members(conn, u["household_id"])
+            trusted = trusted_list(conn, u["household_id"])
+            checks = [dict(r) for r in conn.execute(
+                "SELECT id, kind, risk, created_at, raw_text, phone, url FROM checks WHERE household_id=? ORDER BY id DESC LIMIT 8",
+                (u["household_id"],),
+            ).fetchall()]
+            alerts = [dict(r) for r in conn.execute(
+                "SELECT * FROM alerts WHERE household_id=? ORDER BY id DESC LIMIT 5",
+                (u["household_id"],),
+            ).fetchall()]
+        return render_template(
+            "home.html",
+            members=members,
+            pending=pending,
+            trusted=trusted,
+            checks=checks,
+            alerts=alerts,
+        )
+
+    @app.post("/check")
+    def create_check():
+        gate = login_required()
+        if gate:
+            return gate
+        u = current_user()
+        text = (request.form.get("text") or "").strip()
+        phone = (request.form.get("phone") or "").strip()
+        url = (request.form.get("url") or "").strip()
+        shot_name = ""
+        file = request.files.get("screenshot")
+        if file and file.filename:
+            ext = Path(file.filename).suffix.lower()
+            if ext not in ALLOWED_SHOT:
+                flash("Please upload a PNG, JPG, WEBP, or GIF screenshot.", "error")
+                return redirect(url_for("home"))
+            shot_name = f"{u['household_id']}-{u['id']}-{now().replace(':','')}-{secure_filename(file.filename)}"
+            file.save(UPLOADS / shot_name)
+            if not text:
+                text = "(Screenshot uploaded — describe what it says if you can.)"
+        if not text and not phone and not url:
+            flash("Paste the message, a phone number, a website, or upload a screenshot.", "error")
+            return redirect(url_for("home"))
+        if not phone:
+            found = extract_phones(text)
+            if found:
+                phone = found[0]
+        if not url:
+            found = extract_urls(text)
+            if found:
+                url = found[0]
+        with db_session() as conn:
+            trusted = trusted_list(conn, u["household_id"])
+            report = analyze(text=text, phone=phone, url=url, trusted=trusted)
+            kind = "screenshot" if shot_name else ("phone" if phone and not text else "message")
+            cur = conn.execute(
+                """
+                INSERT INTO checks (household_id, user_id, kind, raw_text, phone, url, screenshot, risk, report_json, created_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?)
+                """,
+                (
+                    u["household_id"],
+                    u["id"],
+                    kind,
+                    text,
+                    phone,
+                    url,
+                    shot_name,
+                    report["level"],
+                    json.dumps(report),
+                    now(),
+                ),
+            )
+            cid = cur.lastrowid
+        return redirect(url_for("show_check", check_id=cid))
+
+    @app.get("/checks/<int:check_id>")
+    def show_check(check_id: int):
+        gate = login_required()
+        if gate:
+            return gate
+        u = current_user()
+        with db_session() as conn:
+            row = conn.execute(
+                "SELECT * FROM checks WHERE id=? AND household_id=?",
+                (check_id, u["household_id"]),
+            ).fetchone()
+            if not row:
+                abort(404)
+            members, _pending = household_members(conn, u["household_id"])
+            reviews = [dict(r) for r in conn.execute(
+                "SELECT * FROM reviews WHERE check_id=? ORDER BY id DESC",
+                (check_id,),
+            ).fetchall()]
+        report = json.loads(row["report_json"])
+        return render_template("check.html", item=dict(row), report=report, members=members, reviews=reviews)
+
+    @app.post("/checks/<int:check_id>/review")
+    def ask_review(check_id: int):
+        gate = login_required()
+        if gate:
+            return gate
+        u = current_user()
+        comment = (request.form.get("comment") or "").strip() or "Please look at this with me before I do anything."
+        emailed = 0
+        texted = 0
+        mail_fail = ""
+        with db_session() as conn:
+            row = conn.execute(
+                "SELECT id FROM checks WHERE id=? AND household_id=?",
+                (check_id, u["household_id"]),
+            ).fetchone()
+            if not row:
+                abort(404)
+            conn.execute(
+                """
+                INSERT INTO reviews (check_id, household_id, requester_id, comment, status, created_at)
+                VALUES (?,?,?,?, 'asked', ?)
+                """,
+                (check_id, u["household_id"], u["id"], comment, now()),
+            )
+            members, _p = household_members(conn, u["household_id"])
+        check_link = site_url() + f"/checks/{check_id}"
+        emailed, texted, mail_fail = notify_circle_members(
+            members,
+            int(u["id"]),
+            subject=f"Look before {u['name']} pays — Family Shield Pro",
+            body=look_email_body(u["name"], check_link),
+            html=look_email_html(u["name"], check_link),
+            sms_body=look_sms_body(u["name"], check_link),
+        )
+        note = "Asked the circle to look."
+        if emailed:
+            note += f" Emailed {emailed} circle member{'s' if emailed != 1 else ''}."
+        elif mail_configured() and mail_fail:
+            note += f" Email did not send ({mail_fail})."
+        elif not mail_configured():
+            note += " Mail is not set up, so nobody was emailed — call them."
+        if texted:
+            note += f" Texted {texted}."
+        flash(note, "error" if mail_fail and not emailed else "ok")
+        return redirect(url_for("show_check", check_id=check_id))
+
+    @app.post("/checks/<int:check_id>/review/reply")
+    def reply_review(check_id: int):
+        gate = login_required()
+        if gate:
+            return gate
+        u = current_user()
+        comment = (request.form.get("reply") or "").strip()
+        status = request.form.get("status") or "looked"
+        if status not in ("looked", "scam_likely", "wait", "call_me"):
+            status = "looked"
+        if not comment:
+            comment = "I looked — keep pausing."
+        with db_session() as conn:
+            row = conn.execute(
+                "SELECT id FROM checks WHERE id=? AND household_id=?",
+                (check_id, u["household_id"]),
+            ).fetchone()
+            if not row:
+                abort(404)
+            conn.execute(
+                """
+                INSERT INTO reviews (check_id, household_id, requester_id, comment, status, created_at)
+                VALUES (?,?,?,?,?,?)
+                """,
+                (check_id, u["household_id"], u["id"], comment, status, now()),
+            )
+        flash("Your note is on this check for the whole circle.", "ok")
+        return redirect(url_for("show_check", check_id=check_id))
+
+    @app.post("/checks/<int:check_id>/alert")
+    def send_alert(check_id: int):
+        gate = login_required()
+        if gate:
+            return gate
+        u = current_user()
+        emailed = 0
+        texted = 0
+        mail_fail = ""
+        with db_session() as conn:
+            row = conn.execute(
+                "SELECT * FROM checks WHERE id=? AND household_id=?",
+                (check_id, u["household_id"]),
+            ).fetchone()
+            if not row:
+                abort(404)
+            members, _p = household_members(conn, u["household_id"])
+            names = ", ".join(m["name"] for m in members)
+            msg = (
+                f"PLEASE CALL {u['name']} BEFORE THEY PAY. "
+                f"They asked the circle ({names}) to stop a payment or information request. "
+                f"Open OurCircle and look at check #{check_id}."
+            )
+            conn.execute(
+                "INSERT INTO alerts (check_id, household_id, user_id, message, created_at) VALUES (?,?,?,?,?)",
+                (check_id, u["household_id"], u["id"], msg, now()),
+            )
+        check_link = site_url() + f"/checks/{check_id}"
+        emailed, texted, mail_fail = notify_circle_members(
+            members,
+            int(u["id"]),
+            subject=f"PLEASE CALL {u['name']} before they pay",
+            body=alert_email_body(u["name"], check_link, names),
+            html=alert_email_html(u["name"], check_link, names),
+            sms_body=alert_sms_body(u["name"], check_link),
+        )
+        note = "Urgent alert is on the circle home. Call them by voice if you can — do not rely on a banner alone."
+        if emailed:
+            note += f" Emailed {emailed} circle member{'s' if emailed != 1 else ''}."
+        elif mail_configured() and mail_fail:
+            note += f" Email did not send ({mail_fail})."
+        elif not mail_configured():
+            note += " Mail is not set up, so nobody was emailed."
+        if texted:
+            note += f" Texted {texted} circle member{'s' if texted != 1 else ''}."
+        elif sms_configured():
+            note += " Nobody else in the circle has a mobile number on Account yet (or they opted out)."
+        flash(note, "error" if mail_fail and not emailed else "ok")
+        return redirect(url_for("show_check", check_id=check_id))
+
+    @app.get("/uploads/<path:name>")
+    def uploaded(name: str):
+        gate = login_required()
+        if gate:
+            return gate
+        return send_from_directory(UPLOADS, name)
+
+    @app.route("/circle", methods=["GET", "POST"])
+    def circle():
+        gate = login_required()
+        if gate:
+            return gate
+        u = current_user()
+        if request.method == "POST":
+            email = (request.form.get("email") or "").strip()
+            name = (request.form.get("name") or "").strip()
+            try:
+                requested = parse_phone_field(request.form.get("phone") or "")
+                with db_session() as conn:
+                    inv = invite_member(conn, u["household_id"], email, name, requested)
+                msg, cat = notify_invite(inv, u["name"])
+                if requested and not (inv.get("phone") or ""):
+                    msg += " We did not attach that mobile — it is already on a Family Shield Pro login. They can add theirs on Account after they join."
+                flash(msg, cat)
+            except ValueError as exc:
+                flash(str(exc), "error")
+            dest = "home" if request.form.get("return") == "home" else "circle"
+            return redirect(url_for(dest))
+        with db_session() as conn:
+            members, pending = household_members(conn, u["household_id"])
+            alerts = [dict(r) for r in conn.execute(
+                "SELECT * FROM alerts WHERE household_id=? ORDER BY id DESC LIMIT 12",
+                (u["household_id"],),
+            ).fetchall()]
+        return render_template("circle.html", members=members, pending=pending, alerts=alerts)
+
+    @app.post("/circle/resend")
+    def circle_resend():
+        gate = login_required()
+        if gate:
+            return gate
+        u = current_user()
+        try:
+            invite_id = int(request.form.get("invite_id") or 0)
+        except ValueError:
+            invite_id = 0
+        with db_session() as conn:
+            inv = pending_invite(conn, u["household_id"], invite_id)
+        if not inv:
+            flash("That invite is not waiting anymore.", "error")
+            dest = "home" if request.form.get("return") == "home" else "circle"
+            return redirect(url_for(dest))
+        msg, cat = notify_invite(inv, u["name"])
+        flash(msg, cat)
+        dest = "home" if request.form.get("return") == "home" else "circle"
+        return redirect(url_for(dest))
+
+    @app.route("/join/<token>", methods=["GET", "HEAD", "POST"])
+    def join(token: str):
+        if request.method in ("GET", "HEAD"):
+            with db_session() as conn:
+                inv = conn.execute("SELECT * FROM invitations WHERE token=? AND status='pending'", (token,)).fetchone()
+            if not inv:
+                return render_template("join_invalid.html", token=token), 404
+            return render_template("join.html", invite=dict(inv), token=token)
+        name = (request.form.get("name") or "").strip()
+        password = request.form.get("password") or ""
+        if not name or len(password) < 8:
+            flash("Name and an 8+ character password are required.", "error")
+            return render_template("join.html", invite={"email": ""}, token=token)
+        try:
+            phone = parse_phone_field(request.form.get("phone") or "")
+        except ValueError as exc:
+            flash(str(exc), "error")
+            return render_template("join.html", invite={"email": ""}, token=token)
+        try:
+            with db_session() as conn:
+                user = accept_invite(conn, token, name, password, phone)
+        except ValueError as exc:
+            flash(str(exc), "error")
+            return redirect(url_for("login"))
+        session["user_id"] = user["id"]
+        session["household_id"] = user["household_id"]
+        session["name"] = user["name"]
+        session["email"] = user["email"]
+        session["just_joined"] = True
+        flash("You are in the circle. If someone asks you to look, pause with them — do not rush.", "ok")
+        return redirect(url_for("home"))
+
+    @app.route("/trusted", methods=["GET", "POST"])
+    def trusted():
+        gate = login_required()
+        if gate:
+            return gate
+        u = current_user()
+        if request.method == "POST":
+            kind = (request.form.get("kind") or "other").strip()
+            if kind not in ("bank", "doctor", "insurer", "utility", "family", "other"):
+                kind = "other"
+            name = (request.form.get("name") or "").strip()
+            if not name:
+                flash("Give this contact a name you will recognize.", "error")
+                return redirect(url_for("trusted"))
+            with db_session() as conn:
+                conn.execute(
+                    """
+                    INSERT INTO trusted_contacts (household_id, kind, name, phone, website, notes, created_at)
+                    VALUES (?,?,?,?,?,?,?)
+                    """,
+                    (
+                        u["household_id"],
+                        kind,
+                        name,
+                        (request.form.get("phone") or "").strip(),
+                        (request.form.get("website") or "").strip(),
+                        (request.form.get("notes") or "").strip(),
+                        now(),
+                    ),
+                )
+            flash("Saved on your protected list. Prefer numbers from statements and cards, not from unexpected texts.", "ok")
+            return redirect(url_for("trusted"))
+        with db_session() as conn:
+            rows = trusted_list(conn, u["household_id"])
+        return render_template("trusted.html", rows=rows)
+
+    @app.post("/trusted/<int:contact_id>/delete")
+    def delete_trusted(contact_id: int):
+        gate = login_required()
+        if gate:
+            return gate
+        u = current_user()
+        with db_session() as conn:
+            conn.execute(
+                "DELETE FROM trusted_contacts WHERE id=? AND household_id=?",
+                (contact_id, u["household_id"]),
+            )
+        flash("Removed from the trusted list.", "ok")
+        return redirect(url_for("trusted"))
+
+    @app.get("/report")
+    def report():
+        gate = login_required()
+        if gate:
+            return gate
+        return render_template("report.html")
+
+    @app.get("/billing")
+    def billing():
+        gate = login_required()
+        if gate:
+            return gate
+        u = current_user()
+        with db_session() as conn:
+            hh = conn.execute("SELECT * FROM households WHERE id=?", (u["household_id"],)).fetchone()
+        cfg = load_stripe_config()
+        return render_template(
+            "billing.html",
+            plans=PLANS,
+            household=dict(hh) if hh else {},
+            stripe_enabled=cfg.enabled,
+        )
+
+    @app.post("/billing/choose")
+    def choose_plan():
+        gate = login_required()
+        if gate:
+            return gate
+        u = current_user()
+        plan = (request.form.get("plan") or "").strip()
+        if plan not in ("monthly", "yearly"):
+            flash("Choose Family monthly or Family yearly.", "error")
+            return redirect(url_for("billing"))
+        cfg = load_stripe_config()
+        if cfg.enabled:
+            with db_session() as conn:
+                hh = conn.execute("SELECT * FROM households WHERE id=?", (u["household_id"],)).fetchone()
+            try:
+                sess = create_checkout_session(
+                    plan=plan,
+                    customer_email=u["email"],
+                    household_id=u["household_id"],
+                    user_id=u["id"],
+                    customer_id=(dict(hh).get("stripe_customer_id") if hh else None) or None,
+                )
+            except Exception as exc:
+                flash(f"Stripe could not start checkout: {exc}", "error")
+                return redirect(url_for("billing"))
+            url = sess.get("url") or ""
+            if not url:
+                flash("Stripe did not return a checkout URL.", "error")
+                return redirect(url_for("billing"))
+            return redirect(url)
+        with db_session() as conn:
+            conn.execute(
+                "UPDATE households SET plan=?, founding=0 WHERE id=?",
+                (plan, u["household_id"]),
+            )
+        label = PLAN_LABELS[plan]
+        flash(f"This circle is on Family {plan} ({label}). Add Stripe keys to .env to charge a card.", "ok")
+        return redirect(url_for("billing"))
+
+    @app.post("/billing/portal")
+    def billing_portal():
+        gate = login_required()
+        if gate:
+            return gate
+        u = current_user()
+        cfg = load_stripe_config()
+        if not cfg.enabled:
+            flash("Stripe is not configured yet. Add keys to .env (see STRIPE.md).", "error")
+            return redirect(url_for("billing"))
+        with db_session() as conn:
+            hh = conn.execute("SELECT * FROM households WHERE id=?", (u["household_id"],)).fetchone()
+        cid = (dict(hh).get("stripe_customer_id") if hh else None) or ""
+        if not cid:
+            flash("No Stripe customer yet — choose a plan and pay first.", "error")
+            return redirect(url_for("billing"))
+        try:
+            sess = create_portal_session(cid)
+        except Exception as exc:
+            flash(f"Stripe portal: {exc}", "error")
+            return redirect(url_for("billing"))
+        url = sess.get("url") or ""
+        if not url:
+            flash("Stripe did not return a portal URL. Enable Customer portal in the Stripe Dashboard.", "error")
+            return redirect(url_for("billing"))
+        return redirect(url)
+
+    @app.get("/billing/success")
+    def billing_success():
+        gate = login_required()
+        if gate:
+            return gate
+        session_id = (request.args.get("session_id") or "").strip()
+        cfg = load_stripe_config()
+        if session_id and cfg.enabled:
+            try:
+                checkout = retrieve_checkout(session_id)
+                _apply_checkout_session(checkout)
+                flash("Payment received. This circle is on a paid Family plan.", "ok")
+            except Exception:
+                flash("Paid, but we could not read the Stripe session yet. The webhook will finish this.", "error")
+        return redirect(url_for("billing"))
+
+    @app.post("/billing/webhook")
+    def stripe_webhook():
+        cfg = load_stripe_config()
+        payload = request.get_data(as_text=True) or ""
+        sig = request.headers.get("Stripe-Signature") or ""
+        if not cfg.secret_key or len(cfg.secret_key) < 20 or "..." in cfg.secret_key:
+            return {"error": "Stripe not configured"}, 503
+        wh = cfg.webhook_secret
+        if not wh or "..." in wh or not wh.startswith("whsec_") or len(wh) < 20:
+            return {"error": "STRIPE_WEBHOOK_SECRET is required"}, 503
+        try:
+            event = construct_event(payload, sig, wh)
+        except Exception as exc:
+            return {"error": str(exc)}, 400
+        etype = event.get("type") or ""
+        obj = (event.get("data") or {}).get("object") or {}
+        if not isinstance(obj, dict):
+            obj = {}
+        if etype == "checkout.session.completed":
+            _apply_checkout_session(obj)
+        elif etype in ("customer.subscription.updated", "customer.subscription.created"):
+            _apply_subscription(obj)
+        elif etype == "customer.subscription.deleted":
+            with db_session() as conn:
+                conn.execute(
+                    "UPDATE households SET stripe_subscription_id=NULL, stripe_status='canceled' WHERE stripe_customer_id=?",
+                    (obj.get("customer"),),
+                )
+        return {"received": True}
+
+    def _household_id_from(meta: dict, reference: Any, customer: Any) -> int | None:
+        hid = meta.get("household_id") if isinstance(meta, dict) else None
+        if hid not in (None, ""):
+            return int(hid)
+        if reference not in (None, ""):
+            return int(reference)
+        if customer:
+            with db_session() as conn:
+                row = conn.execute(
+                    "SELECT id FROM households WHERE stripe_customer_id=?",
+                    (str(customer),),
+                ).fetchone()
+            if row:
+                return int(row["id"])
+        return None
+
+    def _plan_from_subscription(sub: dict) -> str | None:
+        data = ((sub.get("items") or {}).get("data")) or None
+        if data:
+            price = data[0].get("price")
+            price_id = price if isinstance(price, str) else (price or {}).get("id")
+            found = plan_from_price_id(price_id)
+            if found:
+                return found
+        meta = sub.get("metadata") if isinstance(sub.get("metadata"), dict) else {}
+        plan = meta.get("plan")
+        return plan if isinstance(plan, str) else None
+
+    def _apply_checkout_session(checkout: dict) -> None:
+        customer = checkout.get("customer")
+        if isinstance(customer, dict):
+            customer = customer.get("id")
+        subscription = checkout.get("subscription")
+        sub_id = subscription if isinstance(subscription, str) else (subscription or {}).get("id") if isinstance(subscription, dict) else None
+        meta = checkout.get("metadata") if isinstance(checkout.get("metadata"), dict) else {}
+        plan = meta.get("plan")
+        if not plan and isinstance(subscription, dict):
+            plan = _plan_from_subscription(subscription)
+        if plan not in ("monthly", "yearly"):
+            plan = "yearly"
+        hid = _household_id_from(meta, checkout.get("client_reference_id"), customer)
+        if hid is None:
+            return
+        with db_session() as conn:
+            conn.execute(
+                """
+                UPDATE households SET plan=?, founding=0,
+                    stripe_customer_id=COALESCE(?, stripe_customer_id),
+                    stripe_subscription_id=COALESCE(?, stripe_subscription_id),
+                    stripe_status=?
+                WHERE id=?
+                """,
+                (plan, customer, sub_id, "active", hid),
+            )
+
+    def _apply_subscription(sub: dict) -> None:
+        customer = sub.get("customer")
+        if isinstance(customer, dict):
+            customer = customer.get("id")
+        sub_id = sub.get("id")
+        plan = _plan_from_subscription(sub)
+        if plan not in ("monthly", "yearly"):
+            plan = "yearly"
+        status = str(sub.get("status") or "")
+        meta = sub.get("metadata") if isinstance(sub.get("metadata"), dict) else {}
+        if status in ("canceled", "unpaid", "incomplete_expired"):
+            with db_session() as conn:
+                conn.execute(
+                    "UPDATE households SET stripe_subscription_id=NULL, stripe_status=? WHERE stripe_customer_id=?",
+                    (status, customer),
+                )
+            return
+        hid = _household_id_from(meta, meta.get("household_id"), customer)
+        if hid is None:
+            return
+        with db_session() as conn:
+            conn.execute(
+                "UPDATE households SET plan=?, stripe_customer_id=?, stripe_subscription_id=?, stripe_status=? WHERE id=?",
+                (plan, customer, sub_id, status or "active", hid),
+            )
+
+    return app

@@ -1,0 +1,141 @@
+# Family Shield Pro changelog
+
+Product: **Family Shield Pro** (app name in the UI: **OurCircle**).  
+Not InPmnt. Version file: `ourcircle/VERSION` (independent of repo-root InPmnt `VERSION`).
+
+## 1.2.26 — 2026-08-31
+
+- **Less clicking, same protection.** Check is paste + screenshot (numbers/links are pulled from the paste). Invite from home with just an email. Signup is name, email, password. Join is mostly a password. Call-me and **Send to family circle** sit at the top of a check — and Send now actually emails/texts the circle. Trusted add is name + phone; extra fields stay folded.
+
+## 1.2.25 — 2026-08-31
+
+- Invite mail is **HTML only** (no text/plain alternative). Inboxes that preferred the plain part were showing the join URL as copy-paste text. The https://…/join/… URL is an `<a href>` plus a Join button. Unzip this zip and tap **Resend invite** — old messages in the inbox stay as they were.
+
+## 1.2.24 — 2026-08-31
+
+- Invite (and reset / call-me) emails put the **https://… URL itself inside `<a href>`** so inboxes open join with a tap, not copy-paste. Plain text wraps the same URL in `<https://…>` so text-only clients still auto-link. SMTP uses quoted-printable (not 8bit) so Hostinger does not drop the HTML part. Expired join links stay on a public join page instead of bouncing to login.
+
+## 1.2.23 — 2026-08-30
+
+- Remaining tap-to-open surfaces: home trusted-list phones, join-page invite email, call-me banners (**Open this check**), Account forgot-password, and official Report links (SSA, IRS, Equifax, Experian, TransUnion). Suspect check numbers/sites stay plain text.
+
+## 1.2.22 — 2026-08-30
+
+- Join, password-reset, and **Please call me** emails are **HTML with a tap-to-open button** (plain text still included). Test emails link the site. Invite, call-me, and check texts put the URL on its own line so phones make it tappable.
+- On the site, join URLs, family emails, trusted-list phones/sites, operator emails, and help-chat replies are real links — no copy-paste. Suspect websites on a check stay plain text so nobody is nudged to open a scam page.
+
+## 1.2.21 — 2026-08-30
+
+- **Mail for the whole product, not just reset.** Invites, password-reset links, and **Please call me before I pay** now all email through the same Hostinger SMTP mailbox. Call-me used to be in-app (and SMS) only — that is why “reminders” never arrived. Operator console has **Send test email** plus host/from/last-error so you can prove SMTP without guessing. Live sandbox was still on an old drop (`healthz` `"version":"0.0.0"`) that claimed mail success via PHP `mail()`.
+
+## 1.2.20 — 2026-08-30
+
+- **Password reset mail actually has to send.** `/forgot` no longer claims a link went out when SMTP is missing or fails. Hostinger PHP no longer falls back to `mail()` (that often returns true without delivering). `SMTP_PASSWORD` is required. Quoted `.env` values are stripped. If send fails, the page shows the SMTP error; the operator console shows the last mail attempt.
+
+## 1.2.19 — 2026-08-30
+
+- Operator console can **add, edit, and delete** circles, logins, invites, trusted contacts, and checks. Last owner of a circle cannot be removed except by deleting the circle. Optional **turn off 2FA**. Still cannot change `.env`, SMTP, Stripe, or Twilio keys.
+
+## 1.2.18 — 2026-08-29
+
+- **Operator console** for the product owner: user counts, names, emails, phones, circle status, and safe edits (login fields, circle name, monthly/yearly flag, resend/delete pending invites). Locked until `ADMIN_PASSWORD` is in `.env` (12+ characters; stubs with `...` stay off). `/admin` is 404 until then — not in family nav, sitemap, or robots Allow. See **ADMIN.md**. Cannot change `.env`, SMTP, Stripe, or Twilio keys.
+
+## 1.2.17 — 2026-08-29
+
+- Circle and Trusted list show **every** person/contact (full-width table). Invites no longer fail when a mobile number is already on a login (browser autofill of *your* number used to block people 2 and 3). Check page lists each circle member and each trusted contact by name.
+
+## 1.2.16 — 2026-08-29
+
+- Optional **Twilio SMS**: circle invite texts, “Please call me before I pay” texts, and inbound forward-a-text to open a check. STOP / START / HELP. Mobile number on Account, signup, join, and invite. **Resend invite**. Status **Invite sent** if email or SMS went out. See **SMS.md**.
+
+## 1.2.15 — 2026-08-29
+
+- Circle shows status for each person: **Invited** → **Invite sent** → **Invite Accepted** → **User Accesses the Circle**.
+
+## 1.2.14 — 2026-08-29
+
+- Circle invites now **email a join link** when SMTP or Resend is in `.env`. Waiting to join shows the full `https://…/join/…` URL (not a bare token). Hostinger SMTP is used first — PHP `mail()` often claims success without delivering.
+
+## 1.2.13 — 2026-08-29
+
+- Homepage uses the exact line: **We offer Strategy and Tactics to help you and your family prevent being scammed. Not a guarantee. Your circle and us help prevent you from being taken advantage of.**
+
+## 1.2.12 — 2026-08-29
+
+- Homepage: **We offer strategy and tactics to help you and your family prevent being scammed. Not a guarantee.** Your circle and we help prevent you from being taken advantage of.
+
+## 1.2.11 — 2026-08-29
+
+- Guidance line sits under each **Pay / Choose** plan button and next to **Please call me before I pay** on a check. Paying still does not make a request safe.
+
+## 1.2.10 — 2026-08-29
+
+- **This application offers guidance, not a guarantee.** now sits next to pay buttons (Plans, Start a circle, homepage family plans) and on sign-in, join, the check form, report, and billing chat answers. Paying for a plan does not make a request safe.
+
+## 1.2.9 — 2026-08-29
+
+- Circle name example on Start a circle is **The Smith circle** (was The Patel circle).
+
+## 1.2.8 — 2026-08-29
+
+- **Hide** actually closes the help box. The panel used `display: flex`, which kept it on screen after Hide (the `hidden` attribute lost). Hide now sets the box to `display: none` and ignores a follow-up tap on the Help tab.
+
+## 1.2.7 — 2026-08-29
+
+- Hostinger PHP login on `http://127.0.0.1` keeps the session cookie (Secure flag no longer follows the public HTTPS site URL on localhost). Live HTTPS is unchanged.
+
+## 1.2.6 — 2026-08-29
+
+- Help box parks to a right-edge **Help** tab. **Hide** puts it away; tap **Help** to bring it back.
+
+## 1.2.5 — 2026-08-29
+
+- Chat: if someone asks you to send money, the answer is **NO!!!** unless a family member helps you vet it and you are sure it is the person you think it is.
+
+## 1.2.4 — 2026-08-29
+
+- 2FA setup shows a QR code you can scan. “Open authenticator app” is for phones; a refresh no longer mints a new key.
+
+## 1.2.3 — 2026-08-29
+
+- Short disclaimer on the homepage, signed-in screens, checks, and chat: **This application offers guidance, not a guarantee.**
+
+## 1.2.2 — 2026-08-29
+
+- Removed the public **Offers** page (`/offers`), nav link, and sitemap/robots entries.
+
+## 1.2.1 — 2026-08-29
+
+- Homepage footer no longer shows version, Hostinger, robots.txt, or sitemap.xml.
+
+## 1.2.0 — 2026-08-29
+
+- Customer-service email on the homepage: **CustomerService@FamilyShieldPro.com**.
+- Site-wide **Chat with us** widget (FAQ; optional OpenAI key — see **SUPPORT.md**). Never says a request is “safe.”
+- Phone number slot is in the homepage code, commented out, until a number is assigned.
+
+## 1.1.1 — 2026-08-29
+
+- Homepage explains the service, why we built it (we have been scammed; they keep getting more believable), the core pause rule, and “if it sounds too good to be true, it usually is.”
+
+## 1.1.0 — 2026-08-29
+
+- Password recovery: email reset link (SMTP/Resend) and one-time **recovery codes**.
+- Two-factor authentication (authenticator app TOTP) on **Account**. Recovery codes also complete sign-in.
+
+## 1.0.2 — 2026-08-29
+
+- Stripe Checkout, Customer Portal, and webhook are wired for Family monthly **$14.99** and Family yearly **$119.99**.
+- Add keys to `.env` (see **STRIPE.md**). Until then, choosing a plan only saves the flag — no charge.
+
+## 1.0.1 — 2026-08-29
+
+- Public pricing is two Family plans only: **$14.99/month** or **$119.99/year** (yearly highlighted).
+- Removed Individual, founding $49 SKU, and group tile from the public menu.
+
+## 1.0.0 — 2026-08-28
+
+- First Hostinger PHP drop (`FamilyShieldPro-1.0.0.zip`) — unzip into `public_html`, no VPS.
+- `robots.txt` and `sitemap.xml` ship **inside that zip** (zip root, next to `index.php`). Do not fetch them as GitHub raw text.
+- Family circle, pause-and-verify checks, trusted list, “Please call me before I pay,” founding $49 reservation.
+- Logo always links to https://familyshieldpro.com.

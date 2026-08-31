@@ -1,0 +1,27 @@
+---
+description: Always give public HTTPS download URLs. Never /opt/cursor/artifacts or other local paths in the chat.
+alwaysApply: true
+---
+
+# Web-accessible downloads only
+
+If the user should receive a file, the **chat reply must use a public HTTPS URL** they can open in a browser. A turn is not done until that URL is pushed and verified (`curl -sSI` → 200).
+
+## Required
+
+1. Commit the file under repo-root `patches/<filename>` (same pattern as InPmnt-PHP.zip) and `git push`.
+2. In the reply, the download is **only**:
+   `https://raw.githubusercontent.com/devildog5x5/InPmnt/<branch>/patches/<filename>`
+3. Verify with `curl -sSI` that the URL returns HTTP 200 (zip → `Content-Type: application/zip`).
+4. Put `robots.txt`, `sitemap.xml`, and other text **inside the product zip**. Do not send those as standalone raw links (the browser shows text, not a save).
+5. Prefer a versioned zip (`FamilyShieldPro-1.0.0.zip`).
+
+## Forbidden in user-facing replies
+
+- `/opt/cursor/artifacts/...`
+- `/workspace/...`
+- `file://...`
+- HTML `<a href="/opt/cursor/artifacts/...">`
+- “it’s on the VM” / “download tray” as the only pointer
+
+Copying to `/opt/cursor/artifacts/` for the agent tray is fine internally. **Never** paste that path as the link they should click.

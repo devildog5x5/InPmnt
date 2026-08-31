@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Start a circle · OurCircle{% endblock %}
+{% block body %}
+<div class="auth-page">
+  <div class="auth-card">
+    {% with brand_sub="Family circle" %}{% include "_brand.html" %}{% endwith %}
+    <p class="core-rule">{{ core_rule }}</p>
+    {% include "_flashes.html" %}
+    <form method="post">
+      <label>Your name</label>
+      <input name="name" required />
+      <label>Email</label>
+      <input name="email" type="email" required />
+      <label>Password (8+ characters)</label>
+      <input name="password" type="password" required minlength="8" />
+      <details class="more">
+        <summary>Mobile number (so we can text call-me)</summary>
+        <input name="phone" type="tel" inputmode="tel" placeholder="(555) 010-1234" autocomplete="tel" />
+      </details>
+      <p><button class="btn gold wide" type="submit">Start the family circle</button></p>
+    </form>
+    <p class="disclaimer">{% if stripe_enabled %}You’ll pay $119.99/year on Stripe after you create the circle, or switch to $14.99/month on Plans.{% else %}No card is charged until Stripe keys are in .env. Default is Family yearly. Switch to $14.99/month anytime on Plans.{% endif %} Circle name defaults to your name’s circle (like The Smith circle). {{ guidance }}</p>
+    <p><a href="{{ url_for('login') }}">Already have a login</a></p>
+  </div>
+</div>
+{% endblock %}

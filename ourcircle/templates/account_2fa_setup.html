@@ -1,0 +1,47 @@
+{% extends "shell.html" %}
+{% block heading %}Turn on 2FA{% endblock %}
+{% block main %}
+<p>Scan the square with Google Authenticator, Authy, 1Password, or iCloud Keychain. Then enter the 6-digit code to confirm.</p>
+<div class="otp-qr" id="otp-qr" data-otpauth="{{ otpauth }}"></div>
+<p>
+  <a class="btn" id="otp-open" href="{{ otpauth }}">Open authenticator app</a>
+  <button type="button" class="btn ghost" id="otp-copy">Copy setup key</button>
+</p>
+<p class="muted" id="otp-hint">On a phone, “Open authenticator app” should hand the key to the app. If nothing happens (usual on a computer), scan the square or paste the key.</p>
+<p><strong>Setup key</strong></p>
+<p class="otp-secret" id="otp-secret">{{ secret_grouped }}</p>
+<form method="post">
+  <input type="hidden" name="new_key" value="1" />
+  <p><button class="btn ghost" type="submit">Use a different key</button></p>
+</form>
+<form method="post" action="{{ url_for('account_2fa_enable') }}">
+  <label>6-digit code</label>
+  <input class="otp" name="code" required inputmode="numeric" autocomplete="one-time-code" maxlength="8" />
+  <p><button class="btn gold wide" type="submit">Confirm and turn on 2FA</button></p>
+</form>
+<p><a href="{{ url_for('account') }}">Cancel</a></p>
+<script src="{{ url_for('static', filename='js/qrcode.min.js') }}"></script>
+<script>
+(function () {
+  var box = document.getElementById("otp-qr");
+  var uri = box && box.getAttribute("data-otpauth");
+  if (box && uri && window.QRCode) {
+    box.innerHTML = "";
+    new QRCode(box, { text: uri, width: 196, height: 196, correctLevel: QRCode.CorrectLevel.M });
+  }
+  var copyBtn = document.getElementById("otp-copy");
+  var secretEl = document.getElementById("otp-secret");
+  if (copyBtn && secretEl) {
+    copyBtn.addEventListener("click", function () {
+      var key = (secretEl.textContent || "").replace(/\s+/g, "");
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(key).then(function () {
+          copyBtn.textContent = "Copied";
+          setTimeout(function () { copyBtn.textContent = "Copy setup key"; }, 1600);
+        });
+      }
+    });
+  }
+})();
+</script>
+{% endblock %}

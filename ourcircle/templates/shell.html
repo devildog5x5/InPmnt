@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block robots %}noindex,nofollow{% endblock %}
+{% block title %}{% block heading %}OurCircle{% endblock %}{% endblock %}
+{% block body %}
+<div class="wrap">
+  <header class="app-header">
+    {% with brand_sub=user_name %}{% include "_brand.html" %}{% endwith %}
+    <nav class="nav">
+      <a href="{{ url_for('home') }}">Check</a>
+      <a href="{{ url_for('circle') }}">Circle</a>
+      <a href="{{ url_for('trusted') }}">Trusted list</a>
+      <a href="{{ url_for('report') }}">Report</a>
+      <a href="{{ url_for('billing') }}">Plans</a>
+      <a href="{{ url_for('account') }}">Account</a>
+      {% if admin_ok %}<a href="{{ url_for('admin_home') }}">Console</a>{% endif %}
+      <a class="btn ghost" href="{{ url_for('logout') }}">Sign out</a>
+    </nav>
+  </header>
+  <p class="core-rule">{{ core_rule }}</p>
+  {% include "_flashes.html" %}
+  <main class="app-main">{% block main %}{% endblock %}</main>
+  <p class="disclaimer">{{ guidance }}</p>
+</div>
+{% endblock %}

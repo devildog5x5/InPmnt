@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block robots %}noindex,nofollow{% endblock %}
+{% block title %}{% block heading %}Console{% endblock %} · Family Shield Pro{% endblock %}
+{% block body %}
+<div class="wrap">
+  <header class="app-header">
+    {% with brand_sub="Operator console" %}{% include "_brand.html" %}{% endwith %}
+    <nav class="nav">
+      <a href="{{ url_for('admin_home') }}">Console</a>
+      {% if user_name %}
+      <a href="{{ url_for('home') }}">Your circle</a>
+      {% endif %}
+      <a class="btn ghost" href="{{ url_for('admin_logout') }}">Sign out of console</a>
+    </nav>
+  </header>
+  <p class="core-rule">{{ core_rule }}</p>
+  {% include "_flashes.html" %}
+  <main class="app-main">{% block main %}{% endblock %}</main>
+  <p class="disclaimer">{{ guidance }} This console cannot change .env, SMTP, Stripe, or Twilio keys.</p>
+</div>
+{% endblock %}

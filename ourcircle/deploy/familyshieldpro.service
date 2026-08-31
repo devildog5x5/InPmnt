@@ -1,0 +1,19 @@
+[Unit]
+Description=Family Shield Pro (OurCircle)
+After=network.target
+
+[Service]
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/familyshieldpro
+EnvironmentFile=/var/www/familyshieldpro/.env
+Environment=OURCIRCLE_HOST=127.0.0.1
+Environment=OURCIRCLE_PORT=5065
+ExecStart=/var/www/familyshieldpro/.venv/bin/gunicorn -b 127.0.0.1:5065 -w 2 --timeout 120 wsgi:app
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,43 @@
+---
+description: Always commit/push, version, and keep each product separate and identifiable like a build manager would.
+alwaysApply: true
+---
+
+# Check-in, identity, and product separation
+
+A turn that changes software is not done until a **dev + build manager** would sign it off: committed, pushed, versioned, named so nobody can mix it up with another product, and downloadable.
+
+## Separate products (never mix)
+
+| Product | Site | Tree | Zip prefix | Version file |
+|---|---|---|---|---|
+| **InPmnt** | invoice app | repo root / `php/` | `InPmnt-*` | `/VERSION` |
+| **Family Shield Pro (OurCircle)** | https://familyshieldpro.com | `ourcircle/` | `FamilyShieldPro-*` | `ourcircle/VERSION` |
+
+- Do not merge OurCircle into InPmnt `main`.
+- Do not drop Family Shield Pro into an InPmnt `public_html` or overwrite an InPmnt `.env`.
+- Do not name OurCircle zips `InPmnt-*` or reuse InPmnt version numbers.
+- Ports stay apart locally: InPmnt **5055**, OurCircle **5065**.
+
+## Git (every shippable change)
+
+1. `git status` — never commit `.env`, `*.db`, `.venv/`.
+2. Commit source + VERSION + CHANGELOG + pack scripts + README with a message that names the **product** and the **change**.
+3. `git push -u origin <branch>`. Do not leave commits unpushed. Do not ask “want me to commit?”
+
+## Identifiable builds
+
+1. Bump `ourcircle/VERSION` (semver) when the runnable app or the install zip changes.
+2. Append `ourcircle/CHANGELOG.md` (date, version, what changed).
+3. Pack zips as **both**:
+   - `FamilyShieldPro-<version>.zip` (immutable identity)
+   - `FamilyShieldPro.zip` (latest alias)
+4. Put `VERSION` and `BUILD.txt` **inside** the zip (`Product`, `Version`, `Channel`, `Git`, `Date`, `Not: InPmnt`).
+5. Copy versioned + alias zips to `/opt/cursor/artifacts/` **and** repo-root `patches/`, then push.
+6. Chat handoff lists the **versioned** HTTPS URL first (`https://raw.githubusercontent.com/devildog5x5/InPmnt/<branch>/patches/FamilyShieldPro-<version>.zip`). Never a local artifacts path.
+
+## Do not
+
+- Ship an unlabeled “latest.zip” as the only artifact.
+- Mix InPmnt release SOP (four InPmnt zips / GitHub Release on `main`) into an OurCircle Hostinger drop.
+- End a product change with uncommitted files.

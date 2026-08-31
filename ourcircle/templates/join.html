@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block robots %}noindex,nofollow{% endblock %}
+{% block title %}Join a circle · OurCircle{% endblock %}
+{% block body %}
+<div class="auth-page">
+  <div class="auth-card">
+    {% with brand_sub="Join a circle" %}{% include "_brand.html" %}{% endwith %}
+    <h1>Join this family circle</h1>
+    <p class="core-rule">{{ core_rule }}</p>
+    {% include "_flashes.html" %}
+    <p>Invite for {{ invite.email|mailto_link }}</p>
+    <form method="post" action="{{ url_for('join', token=token) }}">
+      {% if invite.name %}
+        <input type="hidden" name="name" value="{{ invite.name }}" />
+        <p>Joining as <strong>{{ invite.name }}</strong></p>
+      {% else %}
+        <label>Your name</label>
+        <input name="name" required />
+      {% endif %}
+      <label>Choose a password (8+)</label>
+      <input name="password" type="password" required minlength="8" />
+      {% if invite.phone %}
+        <input type="hidden" name="phone" value="{{ invite.phone }}" />
+      {% else %}
+        <details class="more">
+          <summary>Mobile (optional — for call-me texts)</summary>
+          <input name="phone" type="tel" inputmode="tel" placeholder="(555) 010-1234" autocomplete="tel" />
+        </details>
+      {% endif %}
+      <p><button class="btn wide" type="submit">Join the circle</button></p>
+    </form>
+    <p class="disclaimer">{{ guidance }}</p>
+  </div>
+</div>
+{% endblock %}

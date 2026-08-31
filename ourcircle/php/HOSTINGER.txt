@@ -1,0 +1,27 @@
+Family Shield Pro — unzip into public_html (Hostinger, no VPS)
+==============================================================
+Site: https://familyshieldpro.com
+
+1. In hPanel → Files → File Manager, open public_html.
+2. Upload FamilyShieldPro.zip and Unzip here (files sit next to each other, not in a subfolder).
+3. hPanel → Advanced → PHP Configuration: PHP 8.2+, enable pdo_sqlite and curl.
+4. Open https://familyshieldpro.com and sign up (or demo family@ourcircle.app / password123).
+5. Stripe: add keys to public_html/.env (see STRIPE.md in this zip). Do not overwrite a live .env.
+6. Password reset / invites / Please-call-me email: see AUTH.md. SMTP must include SMTP_PASSWORD (mailbox password, no quotes). After unzip, `/healthz` `"version"` should be `1.2.21`. Operator console → Send test email.
+7. Operator console: see ADMIN.md. Off until ADMIN_PASSWORD is in .env.
+
+Permissions are already set in the zip:
+  folders 755   (data/ and data/uploads/ 775 so the site can save the database)
+  files   644
+  .env    created on first visit as 640 — do not chmod 777 anything
+
+If the site cannot save a check or signup, in File Manager select the data folder → Permissions → 775.
+Never use 777.
+
+Copy .env.example to .env only if first visit did not create .env.
+Do not overwrite a live .env on later updates.
+Do not drop this into an InPmnt public_html.
+
+This zip already includes **robots.txt** and **sitemap.xml** at the top level (next to index.php).
+After unzip they become https://familyshieldpro.com/robots.txt and /sitemap.xml.
+Do not download those as separate GitHub links — they display as text, not a file.
