@@ -230,6 +230,13 @@ class AppTests(unittest.TestCase):
         self.assertIn('<a href="mailto:pat@example.com">', linked)
         import web as web_mod
 
+        join_html = web_mod.invite_email_html("https://sandbox.familyshieldpro.com/join/abc")
+        self.assertIn('<a href="https://sandbox.familyshieldpro.com/join/abc"', join_html)
+        self.assertIn(">https://sandbox.familyshieldpro.com/join/abc</a>", join_html)
+        self.assertIn("<https://sandbox.familyshieldpro.com/join/abc>", web_mod.invite_email_body("https://sandbox.familyshieldpro.com/join/abc"))
+        mail_src = Path(__file__).resolve().parents[1] / "mail.py"
+        self.assertIn("quoted-printable", mail_src.read_text(encoding="utf-8"))
+
         self.assertIn('<a href="mailto:pat@example.com">', str(web_mod.mailto_html("pat@example.com")))
         self.assertIn("tel:+15550101234", str(web_mod.tel_html("555-010-1234")))
         self.assertIn('href="https://example.com"', str(web_mod.website_html("example.com")))
@@ -345,10 +352,11 @@ class AppTests(unittest.TestCase):
             self.assertIn(b"Invite emailed", mailed.data)
             self.assertEqual(len(sent), 1)
             self.assertEqual(sent[0]["to"], "cousin@example.com")
-            self.assertIn("https://sandbox.familyshieldpro.com/join/", sent[0]["body"])
+            self.assertIn("<https://sandbox.familyshieldpro.com/join/", sent[0]["body"])
             self.assertIn("guidance, not a guarantee", sent[0]["body"])
             self.assertIn("Join this family circle", sent[0]["html"])
             self.assertIn('<a href="https://sandbox.familyshieldpro.com/join/', sent[0]["html"])
+            self.assertIn(">https://sandbox.familyshieldpro.com/join/", sent[0]["html"])
             cousin_at = mailed.data.rfind(b"cousin@example.com")
             cousin_chunk = mailed.data[cousin_at : cousin_at + 500]
             self.assertIn(b"Invite sent", cousin_chunk)
@@ -371,6 +379,13 @@ class AppTests(unittest.TestCase):
         kid_at = as_owner.data.rfind(b"kid@example.com")
         kid_active = as_owner.data[kid_at : kid_at + 400]
         self.assertIn(b"User Accesses the Circle", kid_active)
+
+    def test_expired_join_stays_on_public_page(self) -> None:
+        gone = self.client.get("/join/not-a-real-token")
+        self.assertEqual(gone.status_code, 404)
+        self.assertIn(b"This invite is not available", gone.data)
+        self.assertIn(b"Open Family Shield Pro", gone.data)
+        self.assertNotIn("/login", gone.headers.get("Location", ""))
 
     def test_robots_and_sitemap_use_familyshieldpro(self) -> None:
         robots = self.client.get("/robots.txt")

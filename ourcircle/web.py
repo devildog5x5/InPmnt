@@ -146,8 +146,9 @@ def join_url(token: str) -> str:
 def invite_email_body(join: str) -> str:
     return (
         "Someone invited you to a Family Shield Pro (OurCircle) family circle.\n\n"
-        f"Tap this link to join (you do not need to copy and paste it):\n{join}\n\n"
-        "It is only for this email. If you did not expect this, ignore the message.\n\n"
+        "Open this link to join. It is only for this email — tap it, you do not need to copy and paste:\n"
+        f"<{join}>\n\n"
+        "If you did not expect this, ignore the message.\n\n"
         f"{GUIDANCE}\n"
     )
 
@@ -162,9 +163,11 @@ def tap_link_email_html(intro_html: str, href: str, button: str, footer_html: st
         '<div style="max-width:560px;margin:0 auto;background:#fff8f0;padding:28px;border-radius:16px;'
         'font-family:Georgia,serif;color:#1d1e20;line-height:1.5">'
         f"{intro_html}"
+        "<p>Open this link:</p>"
+        f'<p style="word-break:break-all;font-size:16px;line-height:1.4">'
+        f'<a href="{safe_href}" style="color:#1f4f45;text-decoration:underline">{safe_href}</a></p>'
         f'<p><a href="{safe_href}" style="display:inline-block;background:#1f4f45;color:#ffffff;'
-        f'padding:14px 22px;border-radius:999px;text-decoration:none;font-weight:700">{safe_btn}</a></p>'
-        f'<p>Or tap this link: <a href="{safe_href}">{safe_href}</a></p>'
+        f'padding:14px 22px;border-radius:999px;text-decoration:underline;font-weight:700">{safe_btn}</a></p>'
         f"{footer_html}"
         "</div></body></html>"
     )
@@ -175,10 +178,11 @@ def invite_email_html(join: str) -> str:
 
     guidance = escape(GUIDANCE, quote=True)
     return tap_link_email_html(
-        "<p>Someone invited you to a Family Shield Pro (OurCircle) family circle.</p>",
+        "<p>Someone invited you to a Family Shield Pro (OurCircle) family circle.</p>"
+        "<p>Open this link to join. It is only for this email.</p>",
         join,
         "Join this family circle",
-        "<p>It is only for this email. If you did not expect this, ignore the message.</p>"
+        "<p>If you did not expect this, ignore the message.</p>"
         f'<p style="color:#5c5850;font-size:14px">{guidance}</p>',
     )
 
@@ -186,7 +190,8 @@ def invite_email_html(join: str) -> str:
 def reset_email_body(link: str) -> str:
     return (
         "Someone asked to reset the Family Shield Pro password for this email.\n\n"
-        f"Tap this link within one hour (you do not need to copy and paste it):\n{link}\n\n"
+        "Open this link within one hour — tap it, you do not need to copy and paste:\n"
+        f"<{link}>\n\n"
         "If you did not ask, ignore this message.\n"
     )
 
@@ -204,7 +209,8 @@ def alert_email_body(name: str, check_url: str, names: str) -> str:
     return (
         f"PLEASE CALL {name} BEFORE THEY PAY.\n\n"
         f"They asked the circle ({names}) to stop a payment or information request.\n\n"
-        f"Open this check:\n{check_url}\n\n"
+        "Open this check — tap the link, you do not need to copy and paste:\n"
+        f"<{check_url}>\n\n"
         f"{CORE_RULE}\n"
         f"{GUIDANCE}\n"
     )
@@ -1583,14 +1589,13 @@ def create_app() -> Flask:
         flash(msg, cat)
         return redirect(url_for("circle"))
 
-    @app.route("/join/<token>", methods=["GET", "POST"])
+    @app.route("/join/<token>", methods=["GET", "HEAD", "POST"])
     def join(token: str):
-        if request.method == "GET":
+        if request.method in ("GET", "HEAD"):
             with db_session() as conn:
                 inv = conn.execute("SELECT * FROM invitations WHERE token=? AND status='pending'", (token,)).fetchone()
             if not inv:
-                flash("That invite is expired or already used.", "error")
-                return redirect(url_for("login"))
+                return render_template("join_invalid.html", token=token), 404
             return render_template("join.html", invite=dict(inv), token=token)
         name = (request.form.get("name") or "").strip()
         password = request.form.get("password") or ""

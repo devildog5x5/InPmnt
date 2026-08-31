@@ -235,12 +235,12 @@ final class Mailer
                 . 'Content-Type: multipart/alternative; boundary="' . $boundary . "\"\r\n\r\n"
                 . '--' . $boundary . "\r\n"
                 . "Content-Type: text/plain; charset=UTF-8\r\n"
-                . "Content-Transfer-Encoding: 8bit\r\n\r\n"
-                . self::dotStuff($body) . "\r\n"
+                . "Content-Transfer-Encoding: quoted-printable\r\n\r\n"
+                . self::quotedPrintablePart($body) . "\r\n"
                 . '--' . $boundary . "\r\n"
                 . "Content-Type: text/html; charset=UTF-8\r\n"
-                . "Content-Transfer-Encoding: 8bit\r\n\r\n"
-                . self::dotStuff($html) . "\r\n"
+                . "Content-Transfer-Encoding: quoted-printable\r\n\r\n"
+                . self::quotedPrintablePart($html) . "\r\n"
                 . '--' . $boundary . "--";
             fwrite($fp, $msg . "\r\n.\r\n");
             self::smtpExpect($fp, [250]);
@@ -287,6 +287,13 @@ final class Mailer
     private static function headerSafe(string $value): string
     {
         return str_replace(["\r", "\n"], ' ', $value);
+    }
+
+    /** Quoted-printable so Hostinger/clients keep the HTML part (8bit is often stripped). */
+    private static function quotedPrintablePart(string $body): string
+    {
+        $normalized = str_replace(["\r\n", "\r"], "\n", $body);
+        return self::dotStuff(quoted_printable_encode($normalized));
     }
 
     private static function dotStuff(string $body): string

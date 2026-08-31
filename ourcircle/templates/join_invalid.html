@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block robots %}noindex,nofollow{% endblock %}
+{% block title %}Invite not available · OurCircle{% endblock %}
+{% block body %}
+<div class="auth-page">
+  <div class="auth-card">
+    {% with brand_sub="Join a circle" %}{% include "_brand.html" %}{% endwith %}
+    <h1>This invite is not available</h1>
+    <p class="core-rule">{{ core_rule }}</p>
+    {% include "_flashes.html" %}
+    <p>That join link is expired or already used. Ask someone in the circle to send a new invite.</p>
+    <p><a class="btn wide" href="{{ site_home }}">Open Family Shield Pro</a></p>
+    <p class="disclaimer">{{ guidance }}</p>
+  </div>
+</div>
+{% endblock %}

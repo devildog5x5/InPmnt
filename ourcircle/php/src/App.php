@@ -144,8 +144,9 @@ final class App
     public static function inviteEmailBody(string $join): string
     {
         return "Someone invited you to a Family Shield Pro (OurCircle) family circle.\n\n"
-            . "Tap this link to join (you do not need to copy and paste it):\n{$join}\n\n"
-            . "It is only for this email. If you did not expect this, ignore the message.\n\n"
+            . "Open this link to join. It is only for this email — tap it, you do not need to copy and paste:\n"
+            . "<{$join}>\n\n"
+            . "If you did not expect this, ignore the message.\n\n"
             . Analyze::GUIDANCE . "\n";
     }
 
@@ -156,8 +157,10 @@ final class App
         return '<!DOCTYPE html><html><body style="margin:0;background:#f4efe6;padding:24px">'
             . '<div style="max-width:560px;margin:0 auto;background:#fff8f0;padding:28px;border-radius:16px;font-family:Georgia,serif;color:#1d1e20;line-height:1.5">'
             . $introHtml
-            . '<p><a href="' . $safeHref . '" style="display:inline-block;background:#1f4f45;color:#ffffff;padding:14px 22px;border-radius:999px;text-decoration:none;font-weight:700">' . $safeBtn . '</a></p>'
-            . '<p>Or tap this link: <a href="' . $safeHref . '">' . $safeHref . '</a></p>'
+            . '<p>Open this link:</p>'
+            . '<p style="word-break:break-all;font-size:16px;line-height:1.4">'
+            . '<a href="' . $safeHref . '" style="color:#1f4f45;text-decoration:underline">' . $safeHref . '</a></p>'
+            . '<p><a href="' . $safeHref . '" style="display:inline-block;background:#1f4f45;color:#ffffff;padding:14px 22px;border-radius:999px;text-decoration:underline;font-weight:700">' . $safeBtn . '</a></p>'
             . $footerHtml
             . '</div></body></html>';
     }
@@ -166,10 +169,11 @@ final class App
     {
         $guidance = htmlspecialchars(Analyze::GUIDANCE, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         return self::tapLinkEmailHtml(
-            '<p>Someone invited you to a Family Shield Pro (OurCircle) family circle.</p>',
+            '<p>Someone invited you to a Family Shield Pro (OurCircle) family circle.</p>'
+            . '<p>Open this link to join. It is only for this email.</p>',
             $join,
             'Join this family circle',
-            '<p>It is only for this email. If you did not expect this, ignore the message.</p>'
+            '<p>If you did not expect this, ignore the message.</p>'
             . '<p style="color:#5c5850;font-size:14px">' . $guidance . '</p>'
         );
     }
@@ -177,7 +181,8 @@ final class App
     public static function resetEmailBody(string $link): string
     {
         return "Someone asked to reset the Family Shield Pro password for this email.\n\n"
-            . "Tap this link within one hour (you do not need to copy and paste it):\n{$link}\n\n"
+            . "Open this link within one hour — tap it, you do not need to copy and paste:\n"
+            . "<{$link}>\n\n"
             . "If you did not ask, ignore this message.\n";
     }
 
@@ -195,7 +200,8 @@ final class App
     {
         return "PLEASE CALL {$name} BEFORE THEY PAY.\n\n"
             . "They asked the circle ({$names}) to stop a payment or information request.\n\n"
-            . "Open this check:\n{$checkUrl}\n\n"
+            . "Open this check — tap the link, you do not need to copy and paste:\n"
+            . "<{$checkUrl}>\n\n"
             . Analyze::CORE_RULE . "\n"
             . Analyze::GUIDANCE . "\n";
     }
@@ -1513,13 +1519,17 @@ final class App
 
     private function join(string $token): void
     {
-        if (Http::method() === 'GET') {
+        if (in_array(Http::method(), ['GET', 'HEAD'], true)) {
             $st = $this->db->prepare("SELECT * FROM invitations WHERE token=? AND status='pending'");
             $st->execute([$token]);
             $inv = $st->fetch();
             if (!$inv) {
-                $this->flash('That invite is expired or already used.', 'error');
-                Http::redirect('/login');
+                http_response_code(404);
+                $this->page('join_invalid', [
+                    'title' => 'Invite not available · OurCircle',
+                    'robots' => 'noindex,nofollow',
+                    'token' => $token,
+                ]);
             }
             $this->page('join', [
                 'title' => 'Join a circle · OurCircle',

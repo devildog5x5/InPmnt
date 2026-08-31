@@ -205,8 +205,13 @@ def _send_smtp(
     msg["From"] = from_header
     msg["Reply-To"] = mail_from
     msg["To"] = to
-    msg.set_content(body or "")
-    msg.add_alternative(html or html_from_text(body or ""), subtype="html")
+    msg.set_content(body or "", charset="utf-8", cte="quoted-printable")
+    msg.add_alternative(
+        html or html_from_text(body or ""),
+        subtype="html",
+        charset="utf-8",
+        cte="quoted-printable",
+    )
 
     context = ssl.create_default_context()
     if use_ssl or port == 465:
