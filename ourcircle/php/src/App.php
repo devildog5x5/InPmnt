@@ -221,6 +221,28 @@ final class App
         );
     }
 
+    public static function lookEmailBody(string $name, string $checkUrl): string
+    {
+        return "{$name} asked the family circle to look at a request before they pay.\n\n"
+            . "Open this check — tap the link, you do not need to copy and paste:\n"
+            . "<{$checkUrl}>\n\n"
+            . Analyze::CORE_RULE . "\n"
+            . Analyze::GUIDANCE . "\n";
+    }
+
+    public static function lookEmailHtml(string $name, string $checkUrl): string
+    {
+        $nameE = htmlspecialchars($name, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $rule = htmlspecialchars(Analyze::CORE_RULE, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $guidance = htmlspecialchars(Analyze::GUIDANCE, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        return self::tapLinkEmailHtml(
+            '<p><strong>' . $nameE . ' asked the circle to look before they pay.</strong></p>',
+            $checkUrl,
+            'Open this check',
+            '<p style="color:#5c5850;font-size:14px">' . $rule . ' ' . $guidance . '</p>'
+        );
+    }
+
     private function parsePhoneField(string $raw): string
     {
         $text = trim($raw);
@@ -881,7 +903,7 @@ final class App
         $u = $this->db->prepare('SELECT * FROM users WHERE lower(email)=?');
         $u->execute([$email]);
         $this->loginUser($u->fetch());
-        $this->flash('Welcome. Add two trusted contacts, then invite someone who will pick up the phone.', 'ok');
+        $this->flash('Welcome. Paste anything odd below, or invite family from the right.', 'ok');
         Http::redirect('/home');
     }
 
@@ -1234,6 +1256,18 @@ final class App
             $this->flash('Paste the message, a phone number, a website, or upload a screenshot.', 'error');
             Http::redirect('/home');
         }
+        if ($phone === '') {
+            $found = Analyze::extractPhones($text);
+            if ($found) {
+                $phone = $found[0];
+            }
+        }
+        if ($url === '') {
+            $found = Analyze::extractUrls($text);
+            if ($found) {
+                $url = $found[0];
+            }
+        }
         $report = Analyze::analyze($text, $phone, $url, Db::trusted($this->db, $u['household_id']));
         $kind = $shot !== '' ? 'screenshot' : (($phone !== '' && $text === '') ? 'phone' : 'message');
         $this->db->prepare(
@@ -1274,15 +1308,90 @@ final class App
         ]);
     }
 
+    /**
+     * @param list<array<string,mixed>> $members
+     * @return array{0:int,1:int,2:string}
+     */
+    private function emailAndTextCircle(
+        array $members,
+        int $skipUserId,
+        string $subject,
+        string $body,
+        string $html,
+        string $smsBody
+    ): array {
+        $emailed = 0;
+        $texted = 0;
+        $mailFail = '';
+        if (Mailer::configured()) {
+            foreach ($members as $member) {
+                if ((int) ($member['id'] ?? 0) === $skipUserId) {
+                    continue;
+                }
+                $dest = trim((string) ($member['email'] ?? ''));
+                if ($dest === '' || !str_contains($dest, '@')) {
+                    continue;
+                }
+                try {
+                    Mailer::send($dest, $subject, $body, null, $html);
+                    $emailed++;
+                } catch (Throwable $e) {
+                    $mailFail = Mailer::lastStatus() !== '' ? Mailer::lastStatus() : $e->getMessage();
+                }
+            }
+        }
+        if (Sms::configured()) {
+            foreach ($members as $member) {
+                if ((int) ($member['id'] ?? 0) === $skipUserId) {
+                    continue;
+                }
+                $dest = trim((string) ($member['phone'] ?? ''));
+                if ($dest === '' || !empty($member['sms_opt_out'])) {
+                    continue;
+                }
+                try {
+                    Sms::send($dest, $smsBody);
+                    $texted++;
+                } catch (Throwable) {
+                }
+            }
+        }
+        return [$emailed, $texted, $mailFail];
+    }
+
     private function askReview(int $id): void
     {
         $u = $this->requireLogin();
         $this->loadCheck($id, $u['household_id']);
-        $comment = trim((string) ($_POST['comment'] ?? 'Please look at this with me before I do anything.'));
+        $comment = trim((string) ($_POST['comment'] ?? ''));
+        if ($comment === '') {
+            $comment = 'Please look at this with me before I do anything.';
+        }
         $this->db->prepare(
             "INSERT INTO reviews (check_id, household_id, requester_id, comment, status, created_at) VALUES (?,?,?,?, 'asked', ?)"
         )->execute([$id, $u['household_id'], $u['id'], $comment, Db::now()]);
-        $this->flash('Your circle can see this review request. Call them too if it feels urgent.', 'ok');
+        $members = Db::members($this->db, $u['household_id']);
+        $checkLink = $this->siteHome() . '/checks/' . $id;
+        [$emailed, $texted, $mailFail] = $this->emailAndTextCircle(
+            $members,
+            (int) $u['id'],
+            'Look before ' . $u['name'] . ' pays — Family Shield Pro',
+            self::lookEmailBody($u['name'], $checkLink),
+            self::lookEmailHtml($u['name'], $checkLink),
+            Sms::lookBody($u['name'], $checkLink)
+        );
+        $note = 'Asked the circle to look.';
+        if ($emailed > 0) {
+            $note .= ' Emailed ' . $emailed . ' circle member' . ($emailed === 1 ? '' : 's') . '.';
+        } elseif (Mailer::configured() && $mailFail !== '') {
+            $note .= ' Email did not send (' . $mailFail . ').';
+        } elseif (!Mailer::configured()) {
+            $note .= ' Mail is not set up, so nobody was emailed — call them.';
+        }
+        if ($texted > 0) {
+            $note .= ' Texted ' . $texted . '.';
+        }
+        $this->flash($note, ($mailFail !== '' && $emailed === 0) ? 'error' : 'ok');
         Http::redirect('/checks/' . $id);
     }
 
@@ -1296,8 +1405,7 @@ final class App
             $status = 'looked';
         }
         if ($comment === '') {
-            $this->flash('Add a short note for your family member.', 'error');
-            Http::redirect('/checks/' . $id);
+            $comment = 'I looked — keep pausing.';
         }
         $this->db->prepare(
             'INSERT INTO reviews (check_id, household_id, requester_id, comment, status, created_at) VALUES (?,?,?,?,?,?)'
@@ -1318,45 +1426,14 @@ final class App
         )->execute([$id, $u['household_id'], $u['id'], $msg, Db::now()]);
         $members = Db::members($this->db, $u['household_id']);
         $checkLink = $this->siteHome() . '/checks/' . $id;
-        $texted = 0;
-        $emailed = 0;
-        $mailFail = '';
-        if (Mailer::configured()) {
-            $body = self::alertEmailBody($u['name'], $checkLink, $names);
-            $html = self::alertEmailHtml($u['name'], $checkLink, $names);
-            foreach ($members as $member) {
-                if ((int) ($member['id'] ?? 0) === (int) $u['id']) {
-                    continue;
-                }
-                $dest = trim((string) ($member['email'] ?? ''));
-                if ($dest === '' || !str_contains($dest, '@')) {
-                    continue;
-                }
-                try {
-                    Mailer::send($dest, 'PLEASE CALL ' . $u['name'] . ' before they pay', $body, null, $html);
-                    $emailed++;
-                } catch (Throwable $e) {
-                    $mailFail = Mailer::lastStatus() !== '' ? Mailer::lastStatus() : $e->getMessage();
-                }
-            }
-        }
-        if (Sms::configured()) {
-            $smsBody = Sms::alertBody($u['name'], $checkLink);
-            foreach ($members as $member) {
-                if ((int) ($member['id'] ?? 0) === (int) $u['id']) {
-                    continue;
-                }
-                $dest = trim((string) ($member['phone'] ?? ''));
-                if ($dest === '' || !empty($member['sms_opt_out'])) {
-                    continue;
-                }
-                try {
-                    Sms::send($dest, $smsBody);
-                    $texted++;
-                } catch (Throwable) {
-                }
-            }
-        }
+        [$emailed, $texted, $mailFail] = $this->emailAndTextCircle(
+            $members,
+            (int) $u['id'],
+            'PLEASE CALL ' . $u['name'] . ' before they pay',
+            self::alertEmailBody($u['name'], $checkLink, $names),
+            self::alertEmailHtml($u['name'], $checkLink, $names),
+            Sms::alertBody($u['name'], $checkLink)
+        );
         $note = 'Urgent alert is on the circle home. Call them by voice if you can — do not rely on a banner alone.';
         if ($emailed > 0) {
             $note .= ' Emailed ' . $emailed . ' circle member' . ($emailed === 1 ? '' : 's') . '.';
@@ -1412,7 +1489,7 @@ final class App
             } catch (RuntimeException $e) {
                 $this->flash($e->getMessage(), 'error');
             }
-            Http::redirect('/circle');
+            Http::redirect((($_POST['return'] ?? '') === 'home') ? '/home' : '/circle');
         }
         $alerts = $this->db->prepare('SELECT * FROM alerts WHERE household_id=? ORDER BY id DESC LIMIT 12');
         $alerts->execute([$u['household_id']]);
@@ -1435,11 +1512,11 @@ final class App
         $inv = Db::pendingInvite($this->db, $u['household_id'], $inviteId);
         if (!$inv) {
             $this->flash('That invite is not waiting anymore.', 'error');
-            Http::redirect('/circle');
+            Http::redirect((($_POST['return'] ?? '') === 'home') ? '/home' : '/circle');
         }
         [$msg, $cat] = $this->notifyInvite($inv, $u['name']);
         $this->flash($msg, $cat);
-        Http::redirect('/circle');
+        Http::redirect((($_POST['return'] ?? '') === 'home') ? '/home' : '/circle');
     }
 
     private function smsInbound(): never

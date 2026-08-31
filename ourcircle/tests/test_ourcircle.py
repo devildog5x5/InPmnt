@@ -131,6 +131,8 @@ class AppTests(unittest.TestCase):
         )
         self.assertEqual(login.status_code, 200)
         self.assertIn(b"Check this with OurCircle", login.data)
+        self.assertIn(b"Invite by email", login.data)
+        self.assertIn(b"Add a number or website separately", login.data)
         self.assertIn(b"guidance, not a guarantee", login.data)
         self.assertIn(b'href="https://familyshieldpro.com"', login.data)
         self.assertIn(b"tel:", login.data)
@@ -290,9 +292,27 @@ class AppTests(unittest.TestCase):
             self.assertIn("Open this check", sent[0]["html"])
             self.assertIn('<a href=', sent[0]["html"])
             self.assertNotIn(b"this is safe", sent[0]["body"].encode().lower())
+            sent.clear()
+            with patch("web.send_email", side_effect=capture_send):
+                looked = self.client.post("/checks/1/review", follow_redirects=True)
+            self.assertIn(b"Emailed 1 circle member", looked.data)
+            self.assertEqual(sent[0]["to"], "kid-mail@example.com")
+            self.assertIn("asked the family circle to look", sent[0]["body"])
+            self.assertIn("/checks/1", sent[0]["body"])
         finally:
             for k in ("SMTP_HOST", "SMTP_USER", "SMTP_PASSWORD", "MAIL_FROM"):
                 os.environ.pop(k, None)
+
+    def test_paste_pulls_phone_and_url(self) -> None:
+        self.client.post("/login", data={"email": "family@ourcircle.app", "password": "password123"})
+        page = self.client.post(
+            "/check",
+            data={"text": "Call (800) 555-0199 now or go to https://paypa1.com/help"},
+            follow_redirects=True,
+        )
+        self.assertEqual(page.status_code, 200)
+        self.assertIn(b"8005550199", page.data)
+        self.assertIn(b"paypa1.com", page.data)
 
     def test_invite_limit_message_and_trusted(self) -> None:
         self.client.post("/login", data={"email": "family@ourcircle.app", "password": "password123"})
@@ -307,7 +327,7 @@ class AppTests(unittest.TestCase):
         self.assertIn(b"Invite created", inv.data)
         self.assertIn(b"/join/", inv.data)
         self.assertIn(b"Send invite", inv.data)
-        self.assertIn(b"Mobile (optional)", inv.data)
+        self.assertIn(b"Name or mobile (optional)", inv.data)
         self.assertIn(b"Resend invite", inv.data)
         self.assertIn(b'id="circle-resend"', inv.data)
         self.assertIn(b"kid@example.com", inv.data)

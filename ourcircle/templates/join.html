@@ -10,12 +10,23 @@
     {% include "_flashes.html" %}
     <p>Invite for {{ invite.email|mailto_link }}</p>
     <form method="post" action="{{ url_for('join', token=token) }}">
-      <label>Your name</label>
-      <input name="name" required value="{{ invite.name or '' }}" />
-      <label>Mobile (optional)</label>
-      <input name="phone" type="tel" inputmode="tel" value="{{ invite.phone or '' }}" placeholder="(555) 010-1234" autocomplete="tel" />
+      {% if invite.name %}
+        <input type="hidden" name="name" value="{{ invite.name }}" />
+        <p>Joining as <strong>{{ invite.name }}</strong></p>
+      {% else %}
+        <label>Your name</label>
+        <input name="name" required />
+      {% endif %}
       <label>Choose a password (8+)</label>
       <input name="password" type="password" required minlength="8" />
+      {% if invite.phone %}
+        <input type="hidden" name="phone" value="{{ invite.phone }}" />
+      {% else %}
+        <details class="more">
+          <summary>Mobile (optional — for call-me texts)</summary>
+          <input name="phone" type="tel" inputmode="tel" placeholder="(555) 010-1234" autocomplete="tel" />
+        </details>
+      {% endif %}
       <p><button class="btn wide" type="submit">Join the circle</button></p>
     </form>
     <p class="disclaimer">{{ guidance }}</p>

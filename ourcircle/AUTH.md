@@ -54,7 +54,7 @@ Until mail is set, `/forgot` **shows that reset email is not set up** instead of
 
 **Prove it:** Operator console → **Send test email**. If that does not arrive, invites and call-me emails will not either. Check inbox and spam. Last SMTP error is on that same Mail panel.
 
-**Hostinger:** PHP `mail()` is not used. All Family Shield Pro email goes through SMTP only. `SMTP_PASSWORD` is required. Enable **openssl** in hPanel → PHP Configuration. If SMTP fails, `/forgot` and Circle invite flashes show the error. `/healthz` `"mail": true` only when SMTP (with password) or Resend is set. `"version"` should be `1.2.25` after this zip — `0.0.0` means the zip was not unzipped into `public_html`.
+**Hostinger:** PHP `mail()` is not used. All Family Shield Pro email goes through SMTP only. `SMTP_PASSWORD` is required. Enable **openssl** in hPanel → PHP Configuration. If SMTP fails, `/forgot` and Circle invite flashes show the error. `/healthz` `"mail": true` only when SMTP (with password) or Resend is set. `"version"` should be `1.2.26` after this zip — `0.0.0` means the zip was not unzipped into `public_html`.
 
 **Circle invites:** Circle → **Send invite**. If mail is set, they get an HTML join email: the **https://…/join/… URL is a real link** plus a **Join this family circle** button. Password-reset and Please-call-me emails use the same tap-to-open links. Old inbox messages stay as they were — tap **Resend invite** after unzipping this zip. They open `/join/…` without signing in first. Always share the link in a call you already trust if the email is slow or lands in spam.
 

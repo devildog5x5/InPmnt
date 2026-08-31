@@ -28,23 +28,26 @@
 </div>
 <form class="panel" method="post" style="margin-top:16px" autocomplete="off">
   <h2>Add a real contact</h2>
-  <label>Kind</label>
-  <select name="kind">
-    <option value="bank">Bank</option>
-    <option value="doctor">Doctor / clinic</option>
-    <option value="insurer">Insurer</option>
-    <option value="utility">Utility</option>
-    <option value="family">Family</option>
-    <option value="other">Other</option>
-  </select>
   <label>Name</label>
   <input name="name" required placeholder="Credit union fraud line" autocomplete="off" />
   <label>Phone (from a statement or the back of a card)</label>
   <input name="phone" autocomplete="off" />
-  <label>Website</label>
-  <input name="website" placeholder="https://" autocomplete="off" />
-  <label>Notes</label>
-  <input name="notes" autocomplete="off" />
+  <details class="more">
+    <summary>Website, kind, or notes</summary>
+    <label>Website</label>
+    <input name="website" placeholder="https://" autocomplete="off" />
+    <label>Kind</label>
+    <select name="kind">
+      <option value="other">Other</option>
+      <option value="bank">Bank</option>
+      <option value="doctor">Doctor / clinic</option>
+      <option value="insurer">Insurer</option>
+      <option value="utility">Utility</option>
+      <option value="family">Family</option>
+    </select>
+    <label>Notes</label>
+    <input name="notes" autocomplete="off" />
+  </details>
   <p><button class="btn wide" type="submit">Save on trusted list</button></p>
 </form>
 {% endblock %}

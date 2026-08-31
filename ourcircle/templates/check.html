@@ -4,7 +4,13 @@
 <div class="check-card panel">
   <div class="risk {{ report.level }}">{{ report.title }}</div>
   <p>{{ report.explanation }}</p>
-  <p class="disclaimer">{{ report.disclaimer }}</p>
+  <form method="post" action="{{ url_for('send_alert', check_id=item.id) }}">
+    <button class="btn danger wide" type="submit">Please call me before I pay</button>
+  </form>
+  <form method="post" action="{{ url_for('ask_review', check_id=item.id) }}">
+    <p><button class="btn gold wide" type="submit">Send to family circle</button></p>
+  </form>
+  <p class="disclaimer">{{ guidance }}</p>
   {% if item.screenshot %}
     <p><img src="{{ url_for('uploaded', name=item.screenshot) }}" alt="Uploaded screenshot" style="max-width:420px;border-radius:12px" /></p>
   {% endif %}
@@ -27,15 +33,6 @@
   <div class="panel">
     <h2>What to do</h2>
     <ol class="list">{% for s in report.next_steps %}<li>{{ s }}</li>{% endfor %}</ol>
-    <form method="post" action="{{ url_for('send_alert', check_id=item.id) }}">
-      <button class="btn danger wide" type="submit">Please call me before I pay</button>
-    </form>
-    <p class="disclaimer">{{ guidance }}</p>
-    <form method="post" action="{{ url_for('ask_review', check_id=item.id) }}" style="margin-top:12px">
-      <label>Ask your circle to look</label>
-      <textarea name="comment" placeholder="Mom — can you look at this text before I send anything?"></textarea>
-      <p><button class="btn gold wide" type="submit">Send to family circle</button></p>
-    </form>
   </div>
 </div>
 
@@ -47,15 +44,8 @@
     <p class="muted">No one has left a note yet.</p>
   {% endfor %}
   <form method="post" action="{{ url_for('reply_review', check_id=item.id) }}">
-    <label>Your note (if you are the trusted reviewer)</label>
-    <textarea name="reply" required></textarea>
-    <label>How this feels</label>
-    <select name="status">
-      <option value="looked">I looked — keep pausing</option>
-      <option value="scam_likely">This looks like a scam</option>
-      <option value="wait">Wait until we talk by phone</option>
-      <option value="call_me">Call me before you do anything</option>
-    </select>
+    <label>Leave a note for the circle</label>
+    <textarea name="reply" placeholder="I looked — keep pausing."></textarea>
     <p><button class="btn" type="submit">Add note</button></p>
   </form>
 </div>

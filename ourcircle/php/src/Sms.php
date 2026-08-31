@@ -47,6 +47,13 @@ final class Sms
             . 'Tap the link to open the check. ' . Analyze::CORE_RULE . ' Reply STOP to opt out.';
     }
 
+    public static function lookBody(string $name, string $checkUrl): string
+    {
+        return $name . " asked the circle to look before they pay.\n"
+            . $checkUrl . "\n"
+            . 'Tap the link. ' . Analyze::CORE_RULE . ' Reply STOP to opt out.';
+    }
+
     public static function checkBody(string $title, string $checkUrl): string
     {
         return 'OurCircle: ' . $title . "\n"

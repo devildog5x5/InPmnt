@@ -24,7 +24,7 @@ from flask import (
 from werkzeug.utils import secure_filename
 
 from admin import admin_configured, admin_password_ok, email_is_admin
-from analyze import CORE_RULE, DISCLAIMER, GUIDANCE, analyze
+from analyze import CORE_RULE, DISCLAIMER, GUIDANCE, analyze, extract_phones, extract_urls
 from auth import (
     consume_recovery,
     group_secret,
@@ -100,6 +100,7 @@ from sms import (
     classify_inbound,
     inbound_auto_reply,
     invite_sms_body,
+    look_sms_body,
     normalize_phone,
     send_sms,
     sms_configured,
@@ -230,6 +231,69 @@ def alert_email_html(name: str, check_url: str, names: str) -> str:
         "Open this check",
         f'<p style="color:#5c5850;font-size:14px">{rule} {guidance}</p>',
     )
+
+
+def look_email_body(name: str, check_url: str) -> str:
+    return (
+        f"{name} asked the family circle to look at a request before they pay.\n\n"
+        "Open this check — tap the link, you do not need to copy and paste:\n"
+        f"<{check_url}>\n\n"
+        f"{CORE_RULE}\n"
+        f"{GUIDANCE}\n"
+    )
+
+
+def look_email_html(name: str, check_url: str) -> str:
+    from html import escape
+
+    name_e = escape(name, quote=True)
+    rule = escape(CORE_RULE, quote=True)
+    guidance = escape(GUIDANCE, quote=True)
+    return tap_link_email_html(
+        f"<p><strong>{name_e} asked the circle to look before they pay.</strong></p>",
+        check_url,
+        "Open this check",
+        f'<p style="color:#5c5850;font-size:14px">{rule} {guidance}</p>',
+    )
+
+
+def notify_circle_members(
+    members: list,
+    skip_id: int,
+    *,
+    subject: str,
+    body: str,
+    html: str,
+    sms_body: str,
+) -> tuple[int, int, str]:
+    emailed = 0
+    texted = 0
+    mail_fail = ""
+    if mail_configured():
+        for member in members:
+            if int(member["id"]) == int(skip_id):
+                continue
+            dest = (member.get("email") or "").strip()
+            if not dest or "@" not in dest:
+                continue
+            try:
+                send_email(to=dest, subject=subject, body=body, html=html)
+                emailed += 1
+            except Exception as exc:
+                mail_fail = last_mail_status() or str(exc)
+    if sms_configured():
+        for member in members:
+            if int(member["id"]) == int(skip_id):
+                continue
+            dest = (member.get("phone") or "").strip()
+            if not dest or member.get("sms_opt_out"):
+                continue
+            try:
+                send_sms(to=dest, body=sms_body)
+                texted += 1
+            except Exception:
+                pass
+    return emailed, texted, mail_fail
 
 
 def linkify_text(text: str | None) -> Markup:
@@ -1005,7 +1069,7 @@ def create_app() -> Flask:
         session["household_id"] = hid
         session["name"] = user["name"]
         session["email"] = user["email"]
-        flash("Welcome. Add two trusted contacts, then invite someone who will pick up the phone.", "ok")
+        flash("Welcome. Paste anything odd below, or invite family from the right.", "ok")
         return redirect(url_for("home"))
 
     @app.route("/login", methods=["GET", "POST"])
@@ -1361,6 +1425,14 @@ def create_app() -> Flask:
         if not text and not phone and not url:
             flash("Paste the message, a phone number, a website, or upload a screenshot.", "error")
             return redirect(url_for("home"))
+        if not phone:
+            found = extract_phones(text)
+            if found:
+                phone = found[0]
+        if not url:
+            found = extract_urls(text)
+            if found:
+                url = found[0]
         with db_session() as conn:
             trusted = trusted_list(conn, u["household_id"])
             report = analyze(text=text, phone=phone, url=url, trusted=trusted)
@@ -1413,7 +1485,10 @@ def create_app() -> Flask:
         if gate:
             return gate
         u = current_user()
-        comment = (request.form.get("comment") or "Please look at this with me before I do anything.").strip()
+        comment = (request.form.get("comment") or "").strip() or "Please look at this with me before I do anything."
+        emailed = 0
+        texted = 0
+        mail_fail = ""
         with db_session() as conn:
             row = conn.execute(
                 "SELECT id FROM checks WHERE id=? AND household_id=?",
@@ -1428,7 +1503,26 @@ def create_app() -> Flask:
                 """,
                 (check_id, u["household_id"], u["id"], comment, now()),
             )
-        flash("Your circle can see this review request. Call them too if it feels urgent.", "ok")
+            members, _p = household_members(conn, u["household_id"])
+        check_link = site_url() + f"/checks/{check_id}"
+        emailed, texted, mail_fail = notify_circle_members(
+            members,
+            int(u["id"]),
+            subject=f"Look before {u['name']} pays — Family Shield Pro",
+            body=look_email_body(u["name"], check_link),
+            html=look_email_html(u["name"], check_link),
+            sms_body=look_sms_body(u["name"], check_link),
+        )
+        note = "Asked the circle to look."
+        if emailed:
+            note += f" Emailed {emailed} circle member{'s' if emailed != 1 else ''}."
+        elif mail_configured() and mail_fail:
+            note += f" Email did not send ({mail_fail})."
+        elif not mail_configured():
+            note += " Mail is not set up, so nobody was emailed — call them."
+        if texted:
+            note += f" Texted {texted}."
+        flash(note, "error" if mail_fail and not emailed else "ok")
         return redirect(url_for("show_check", check_id=check_id))
 
     @app.post("/checks/<int:check_id>/review/reply")
@@ -1442,8 +1536,7 @@ def create_app() -> Flask:
         if status not in ("looked", "scam_likely", "wait", "call_me"):
             status = "looked"
         if not comment:
-            flash("Add a short note for your family member.", "error")
-            return redirect(url_for("show_check", check_id=check_id))
+            comment = "I looked — keep pausing."
         with db_session() as conn:
             row = conn.execute(
                 "SELECT id FROM checks WHERE id=? AND household_id=?",
@@ -1488,39 +1581,15 @@ def create_app() -> Flask:
                 "INSERT INTO alerts (check_id, household_id, user_id, message, created_at) VALUES (?,?,?,?,?)",
                 (check_id, u["household_id"], u["id"], msg, now()),
             )
-            check_link = site_url() + f"/checks/{check_id}"
-            if mail_configured():
-                email_body = alert_email_body(u["name"], check_link, names)
-                email_html = alert_email_html(u["name"], check_link, names)
-                for member in members:
-                    if int(member["id"]) == int(u["id"]):
-                        continue
-                    dest = (member.get("email") or "").strip()
-                    if not dest or "@" not in dest:
-                        continue
-                    try:
-                        send_email(
-                            to=dest,
-                            subject=f"PLEASE CALL {u['name']} before they pay",
-                            body=email_body,
-                            html=email_html,
-                        )
-                        emailed += 1
-                    except Exception as exc:
-                        mail_fail = last_mail_status() or str(exc)
-            if sms_configured():
-                body = alert_sms_body(u["name"], check_link)
-                for member in members:
-                    if int(member["id"]) == int(u["id"]):
-                        continue
-                    dest = (member.get("phone") or "").strip()
-                    if not dest or member.get("sms_opt_out"):
-                        continue
-                    try:
-                        send_sms(to=dest, body=body)
-                        texted += 1
-                    except Exception:
-                        pass
+        check_link = site_url() + f"/checks/{check_id}"
+        emailed, texted, mail_fail = notify_circle_members(
+            members,
+            int(u["id"]),
+            subject=f"PLEASE CALL {u['name']} before they pay",
+            body=alert_email_body(u["name"], check_link, names),
+            html=alert_email_html(u["name"], check_link, names),
+            sms_body=alert_sms_body(u["name"], check_link),
+        )
         note = "Urgent alert is on the circle home. Call them by voice if you can — do not rely on a banner alone."
         if emailed:
             note += f" Emailed {emailed} circle member{'s' if emailed != 1 else ''}."
@@ -1561,7 +1630,8 @@ def create_app() -> Flask:
                 flash(msg, cat)
             except ValueError as exc:
                 flash(str(exc), "error")
-            return redirect(url_for("circle"))
+            dest = "home" if request.form.get("return") == "home" else "circle"
+            return redirect(url_for(dest))
         with db_session() as conn:
             members, pending = household_members(conn, u["household_id"])
             alerts = [dict(r) for r in conn.execute(
@@ -1584,10 +1654,12 @@ def create_app() -> Flask:
             inv = pending_invite(conn, u["household_id"], invite_id)
         if not inv:
             flash("That invite is not waiting anymore.", "error")
-            return redirect(url_for("circle"))
+            dest = "home" if request.form.get("return") == "home" else "circle"
+            return redirect(url_for(dest))
         msg, cat = notify_invite(inv, u["name"])
         flash(msg, cat)
-        return redirect(url_for("circle"))
+        dest = "home" if request.form.get("return") == "home" else "circle"
+        return redirect(url_for(dest))
 
     @app.route("/join/<token>", methods=["GET", "HEAD", "POST"])
     def join(token: str):

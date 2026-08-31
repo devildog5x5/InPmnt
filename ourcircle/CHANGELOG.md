@@ -3,6 +3,10 @@
 Product: **Family Shield Pro** (app name in the UI: **OurCircle**).  
 Not InPmnt. Version file: `ourcircle/VERSION` (independent of repo-root InPmnt `VERSION`).
 
+## 1.2.26 — 2026-08-31
+
+- **Less clicking, same protection.** Check is paste + screenshot (numbers/links are pulled from the paste). Invite from home with just an email. Signup is name, email, password. Join is mostly a password. Call-me and **Send to family circle** sit at the top of a check — and Send now actually emails/texts the circle. Trusted add is name + phone; extra fields stay folded.
+
 ## 1.2.25 — 2026-08-31
 
 - Invite mail is **HTML only** (no text/plain alternative). Inboxes that preferred the plain part were showing the join URL as copy-paste text. The https://…/join/… URL is an `<a href>` plus a Join button. Unzip this zip and tap **Resend invite** — old messages in the inbox stay as they were.

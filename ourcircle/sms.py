@@ -55,6 +55,14 @@ def alert_sms_body(name: str, check_url: str) -> str:
     )
 
 
+def look_sms_body(name: str, check_url: str) -> str:
+    return (
+        f"{name} asked the circle to look before they pay.\n"
+        f"{check_url}\n"
+        f"Tap the link. {CORE_RULE} Reply STOP to opt out."
+    )
+
+
 def check_sms_body(title: str, check_url: str) -> str:
     return (
         f"OurCircle: {title}\n"

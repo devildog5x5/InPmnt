@@ -6,6 +6,8 @@
 /** @var array $invite */
 /** @var string $token */
 View::start($title, $site_home, 'noindex,nofollow', '/join/' . ($token ?? ''));
+$inviteName = (string) ($invite['name'] ?? '');
+$invitePhone = (string) ($invite['phone'] ?? '');
 ?>
 <div class="auth-page">
   <div class="auth-card">
@@ -15,12 +17,23 @@ View::start($title, $site_home, 'noindex,nofollow', '/join/' . ($token ?? ''));
     <?= View::flashesHtml($flashes) ?>
     <p>Invite for <?= Http::mailto((string) ($invite['email'] ?? '')) ?></p>
     <form method="post" action="/join/<?= Http::e((string) ($token ?? '')) ?>">
-      <label>Your name</label>
-      <input name="name" required value="<?= Http::e((string) ($invite['name'] ?? '')) ?>" />
-      <label>Mobile (optional)</label>
-      <input name="phone" type="tel" inputmode="tel" value="<?= Http::e((string) ($invite['phone'] ?? '')) ?>" placeholder="(555) 010-1234" autocomplete="tel" />
+      <?php if ($inviteName !== ''): ?>
+        <input type="hidden" name="name" value="<?= Http::e($inviteName) ?>" />
+        <p>Joining as <strong><?= Http::e($inviteName) ?></strong></p>
+      <?php else: ?>
+        <label>Your name</label>
+        <input name="name" required />
+      <?php endif; ?>
       <label>Choose a password (8+)</label>
       <input name="password" type="password" required minlength="8" />
+      <?php if ($invitePhone !== ''): ?>
+        <input type="hidden" name="phone" value="<?= Http::e($invitePhone) ?>" />
+      <?php else: ?>
+        <details class="more">
+          <summary>Mobile (optional — for call-me texts)</summary>
+          <input name="phone" type="tel" inputmode="tel" placeholder="(555) 010-1234" autocomplete="tel" />
+        </details>
+      <?php endif; ?>
       <p><button class="btn wide" type="submit">Join the circle</button></p>
     </form>
     <p class="disclaimer"><?= Http::e($guidance ?? Analyze::GUIDANCE) ?></p>

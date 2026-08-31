@@ -8,16 +8,7 @@ View::appOpen(get_defined_vars());
 ?>
 <div class="panel">
   <h2>People in this circle</h2>
-  <p class="muted">Up to five people on the family plan. Invite the person who will actually answer the phone. Everyone you invited stays in this list until they join or you replace them.</p>
-  <p class="status-legend" aria-label="Circle status">
-    <span class="pill status-invited">Invited</span>
-    <span class="status-arrow" aria-hidden="true">→</span>
-    <span class="pill status-sent">Invite sent</span>
-    <span class="status-arrow" aria-hidden="true">→</span>
-    <span class="pill status-accepted">Invite Accepted</span>
-    <span class="status-arrow" aria-hidden="true">→</span>
-    <span class="pill status-access">User Accesses the Circle</span>
-  </p>
+  <p class="muted">Up to five people. Invite the person who will actually answer the phone. Status: Invited → Invite sent → Invite Accepted → User Accesses the Circle.</p>
   <form id="circle-resend" method="post" action="/circle/resend"></form>
   <div class="table-wrap">
     <table class="table">
@@ -52,14 +43,17 @@ View::appOpen(get_defined_vars());
 </div>
 <form class="panel" method="post" style="margin-top:16px">
   <h2>Invite someone</h2>
-  <label>Their name</label>
-  <input name="name" autocomplete="name" />
   <label>Email</label>
-  <input name="email" type="email" required autocomplete="off" />
-  <label>Mobile (optional)</label>
-  <input name="phone" type="tel" inputmode="tel" placeholder="(555) 010-1234" autocomplete="off" />
+  <input name="email" type="email" required autocomplete="off" placeholder="family@example.com" />
+  <details class="more">
+    <summary>Name or mobile (optional)</summary>
+    <label>Their name</label>
+    <input name="name" autocomplete="name" />
+    <label>Mobile</label>
+    <input name="phone" type="tel" inputmode="tel" placeholder="(555) 010-1234" autocomplete="off" />
+  </details>
   <p><button class="btn wide" type="submit">Send invite</button></p>
-  <p class="disclaimer">We email a tap-to-open join button when mail is set up<?php if (!empty($sms_enabled)): ?>, and text the join URL when you add a mobile number<?php endif; ?>. You can also tap the join link in the status table and share it in a call you already trust — not inside a suspicious thread. Reply STOP on texts to opt out.</p>
+  <p class="disclaimer">We email a tap-to-open join link when mail is set up<?php if (!empty($sms_enabled)): ?>, and text it if you add a mobile<?php endif; ?>. Share the join link in a call you already trust — not inside a suspicious thread. Reply STOP on texts to opt out.</p>
 </form>
 <?php if ($alerts): ?>
 <div class="panel" style="margin-top:16px">

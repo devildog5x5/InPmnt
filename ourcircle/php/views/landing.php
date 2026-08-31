@@ -23,9 +23,9 @@ View::start($title, $site_home, 'index,follow', '/');
       <h1>A family pause before you send a dime.</h1>
       <p class="lede">Family Shield Pro (OurCircle) is a trusted circle for the text, call, prize, or “urgent” payment that feels a little off. We are not an AI that stamps a request as safe. We help you stop, read the warning signs in plain language, and get someone you trust on the phone — then you decide.</p>
       <p>
-        <a class="btn gold" href="/signup">Family yearly · $119.99</a>
-        <a class="btn ghost" href="/signup">or $14.99/month</a>
+        <a class="btn gold" href="/signup">Start a family circle</a>
       </p>
+      <p class="muted">Family yearly $119.99, or $14.99/month on Plans.</p>
       <p class="disclaimer"><?= Http::e($disclaimer) ?></p>
     </div>
     <div class="hero-card">

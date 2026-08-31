@@ -357,6 +357,16 @@ input.otp { font-size: 1.4rem; letter-spacing: 0.3em; text-align: center; }
 }
 .stat strong { display: block; font-size: 1.6rem; line-height: 1.2; }
 .stat span { color: var(--muted); font-size: 0.85rem; }
+details.more {
+  margin: 8px 0 16px;
+}
+details.more summary {
+  cursor: pointer;
+  font-weight: 650;
+  color: var(--teal-dark);
+}
+details.more[open] summary { margin-bottom: 10px; }
+details.more label { margin-top: 8px; }
 @media (max-width: 860px) {
   .hero, .grid-3, .grid-2 { grid-template-columns: 1fr; }
   .brand img { width: 48px; height: 48px; }

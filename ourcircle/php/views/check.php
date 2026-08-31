@@ -8,7 +8,13 @@ $level = Http::e((string) ($report['level'] ?? 'unknown'));
 <div class="check-card panel">
   <div class="risk <?= $level ?>"><?= Http::e((string) ($report['title'] ?? '')) ?></div>
   <p><?= Http::e((string) ($report['explanation'] ?? '')) ?></p>
-  <p class="disclaimer"><?= Http::e((string) ($report['disclaimer'] ?? '')) ?></p>
+  <form method="post" action="/checks/<?= (int) $item['id'] ?>/alert">
+    <button class="btn danger wide" type="submit">Please call me before I pay</button>
+  </form>
+  <form method="post" action="/checks/<?= (int) $item['id'] ?>/review">
+    <p><button class="btn gold wide" type="submit">Send to family circle</button></p>
+  </form>
+  <p class="disclaimer"><?= Http::e($guidance ?? Analyze::GUIDANCE) ?></p>
   <?php if (!empty($item['screenshot'])): ?>
     <p><img src="/uploads/<?= Http::e((string) $item['screenshot']) ?>" alt="Uploaded screenshot" style="max-width:420px;border-radius:12px" /></p>
   <?php endif; ?>
@@ -30,15 +36,6 @@ $level = Http::e((string) ($report['level'] ?? 'unknown'));
   <div class="panel">
     <h2>What to do</h2>
     <ol class="list"><?php foreach ($report['next_steps'] ?? [] as $s): ?><li><?= Http::e((string) $s) ?></li><?php endforeach; ?></ol>
-    <form method="post" action="/checks/<?= (int) $item['id'] ?>/alert">
-      <button class="btn danger wide" type="submit">Please call me before I pay</button>
-    </form>
-    <p class="disclaimer"><?= Http::e($guidance ?? Analyze::GUIDANCE) ?></p>
-    <form method="post" action="/checks/<?= (int) $item['id'] ?>/review" style="margin-top:12px">
-      <label>Ask your circle to look</label>
-      <textarea name="comment" placeholder="Mom — can you look at this text before I send anything?"></textarea>
-      <p><button class="btn gold wide" type="submit">Send to family circle</button></p>
-    </form>
   </div>
 </div>
 <div class="panel" style="margin-top:16px">
@@ -51,15 +48,8 @@ $level = Http::e((string) ($report['level'] ?? 'unknown'));
     <p class="muted">No one has left a note yet.</p>
   <?php endif; ?>
   <form method="post" action="/checks/<?= (int) $item['id'] ?>/review/reply">
-    <label>Your note (if you are the trusted reviewer)</label>
-    <textarea name="reply" required></textarea>
-    <label>How this feels</label>
-    <select name="status">
-      <option value="looked">I looked — keep pausing</option>
-      <option value="scam_likely">This looks like a scam</option>
-      <option value="wait">Wait until we talk by phone</option>
-      <option value="call_me">Call me before you do anything</option>
-    </select>
+    <label>Leave a note for the circle</label>
+    <textarea name="reply" placeholder="I looked — keep pausing."></textarea>
     <p><button class="btn" type="submit">Add note</button></p>
   </form>
 </div>
