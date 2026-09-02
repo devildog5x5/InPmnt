@@ -15,6 +15,12 @@ final class App
 
         if ($method === 'GET' && $path === '/') {
             $this->landing();
+        } elseif ($method === 'GET' && $path === '/robots.txt') {
+            Seo::robots();
+        } elseif ($method === 'GET' && $path === '/sitemap.xml') {
+            Seo::sitemap();
+        } elseif ($method === 'GET' && $path === '/llms.txt') {
+            Seo::llms();
         } elseif ($path === '/login') {
             $this->login();
         } elseif ($path === '/forgot-password') {

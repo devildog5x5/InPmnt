@@ -1,0 +1,41 @@
+InPmnt PHP — Hostinger / shared hosting
+========================================
+
+If File Manager already shows InPmnt's index.php but the browser still
+shows WordPress, the files are fine. Hostinger Cache Manager / LiteSpeed
+is serving a cached copy of the old WordPress homepage and is not running
+the new PHP at all.
+
+A subdomain (sandbox.example.com) can work while the main domain 500s:
+the first PHP zip looked for src/ in the PARENT of public_html. That
+accidentally works for a subfolder and fatals on the real domain root.
+
+Fix that first:
+  hPanel → the website dashboard → Advanced → Cache Manager → Purge all
+  Turn Automatic cache OFF while you test.
+  Then open the site in a private/incognito window.
+
+Quick check: open https://yourdomain.com/inpmnt-check.php
+  - If that page loads, PHP is running this folder.
+  - If the homepage is still WordPress after a purge, View Source:
+      wp-content / wp-includes  → still cache or the domain DNS is not this host
+      InPmnt / Get paid without the chase → this app is serving
+
+Install
+-------
+1. Unzip ALL of these files into public_html (File Manager or FTP).
+   Do not leave them in a folder named InPmnt-PHP (or similar).
+2. If WordPress is already there, OVERWRITE index.php and .htaccess.
+   Then remove wp-admin, wp-content, wp-includes, and wp-config.php
+   unless you truly want WordPress on this same domain (you should not).
+3. Copy .env.example to .env and set APP_SECRET and BASE_URL=https://yourdomain.com
+4. In hPanel → Advanced → PHP Configuration: PHP 8.2+ and enable pdo_sqlite
+5. The PHP zip is packed with files 644 and folders 755. On first request the
+   app chmods world-writable PHP files back to 644 and keeps data/ writable.
+   You should not need Fix File Ownership on a fresh unzip. If PHP never
+   starts (blank 500 before any InPmnt text), run hPanel → Advanced → Fix
+   File Ownership once — LiteSpeed will not execute 777 PHP files.
+6. Purge Cache Manager, then open https://yourdomain.com  → Sign up
+7. Stripe webhook: https://yourdomain.com/api/billing/webhook
+
+The SQLite database is created automatically at data/inpmnt.db (blocked from the web).

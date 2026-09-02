@@ -1,5 +1,16 @@
 RewriteEngine On
-RewriteBase /
+DirectoryIndex index.php
+
+# Hostinger LiteSpeed keeps a full-page cache of the old WordPress homepage.
+# Clearing public_html does not clear that cache; disable it for this app.
+<IfModule LiteSpeed>
+CacheDisable public /
+RewriteRule .* - [E=cache-control:no-cache]
+</IfModule>
+
+# Do not set RewriteBase / — Hostinger File Manager often extracts the zip
+# into a subfolder. RewriteBase / would send pretty URLs to the domain-root
+# index.php, which is usually WordPress.
 
 # Never serve secrets, PHP sources, or the SQLite file
 RewriteRule ^(\.env|bootstrap\.php)$ - [F,L]

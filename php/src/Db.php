@@ -23,14 +23,25 @@ final class Db
     {
         self::$path = $path;
         $dir = dirname($path);
-        if (!is_dir($dir)) {
-            mkdir($dir, 0775, true);
+        if (!is_dir($dir) && !@mkdir($dir, 0775, true) && !is_dir($dir)) {
+            throw new RuntimeException("Cannot create database folder {$dir}. Make the data/ directory writable in File Manager.");
+        }
+        if (is_dir($dir) && !is_writable($dir)) {
+            @chmod($dir, 0775);
+        }
+        if (!is_writable($dir)) {
+            throw new RuntimeException("Database folder is not writable: {$dir}. The app tried chmod 775; if this persists, hPanel → Advanced → Fix File Ownership.");
         }
         $pdo = new PDO('sqlite:' . $path, null, null, [
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         ]);
         $pdo->exec('PRAGMA foreign_keys = ON');
+        $pdo->exec('PRAGMA busy_timeout = 8000');
+        $pdo->exec('PRAGMA journal_mode = WAL');
+        if (is_file($path)) {
+            @chmod($path, 0664);
+        }
         return $pdo;
     }
 

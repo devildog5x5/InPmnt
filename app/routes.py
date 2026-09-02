@@ -46,6 +46,7 @@ from .database import (
     rows_to_list,
 )
 from .mail import mail_configured, send_email
+from . import seo
 from .workspace import (
     assert_can_add_open_invoice,
     effective_plan,
@@ -93,13 +94,35 @@ def landing():
     if session.get("user_id"):
         return redirect(url_for("main.app_home"))
     cfg = load_stripe_config()
+    root = seo.origin()
     return render_template(
         "landing.html",
         stripe_enabled=cfg.enabled,
         publishable_key=cfg.publishable_key,
         plans=PLANS,
         show_demo_login=_show_demo_login(),
+        faqs=seo.FAQS,
+        seo_title=seo.TITLE,
+        seo_description=seo.DESCRIPTION,
+        seo_canonical=root + "/",
+        seo_image=root + "/static/img/inpmnt-icon.png",
+        seo_json_ld=seo.json_ld(),
     )
+
+
+@bp.get("/robots.txt")
+def robots_txt():
+    return seo.robots_txt()
+
+
+@bp.get("/sitemap.xml")
+def sitemap_xml():
+    return seo.sitemap_xml()
+
+
+@bp.get("/llms.txt")
+def llms_txt():
+    return seo.llms_txt()
 
 
 def _show_demo_login() -> bool:
