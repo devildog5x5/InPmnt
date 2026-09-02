@@ -213,6 +213,15 @@ def init_db(db_path: str) -> None:
                 entity_id INTEGER,
                 created_at TEXT NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS password_resets (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                token_hash TEXT NOT NULL UNIQUE,
+                expires_at TEXT NOT NULL,
+                used_at TEXT,
+                created_at TEXT NOT NULL
+            );
             """
         )
         _migrate(conn)
@@ -447,20 +456,15 @@ def _ensure_system_accounts(conn: sqlite3.Connection) -> None:
         )
 
     admin = conn.execute(
-        "SELECT id, password_hash FROM users WHERE lower(email) = ?",
+        "SELECT id FROM users WHERE lower(email) = ?",
         (ADMIN_EMAIL,),
     ).fetchone()
     if admin:
-        if not check_password_hash(admin["password_hash"], ADMIN_PASSWORD):
-            conn.execute(
-                "UPDATE users SET password_hash = ?, name = ?, role = 'admin' WHERE id = ?",
-                (generate_password_hash(ADMIN_PASSWORD), ADMIN_NAME, admin["id"]),
-            )
-        else:
-            conn.execute(
-                "UPDATE users SET name = ?, role = 'admin' WHERE id = ?",
-                (ADMIN_NAME, admin["id"]),
-            )
+        # Keep the stored hash so Forgot password / recovery can stick.
+        conn.execute(
+            "UPDATE users SET name = ?, role = 'admin' WHERE id = ?",
+            (ADMIN_NAME, admin["id"]),
+        )
     else:
         create_workspace(
             conn,

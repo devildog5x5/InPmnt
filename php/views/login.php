@@ -42,6 +42,7 @@
         <button class="btn" type="submit">Sign in</button>
       </form>
       <p class="auth-foot">
+        <a href="/forgot-password">Forgot password?</a><br />
         New here? <a href="/signup">Start free trial</a><br />
         <a href="/">← Back to home</a>
         <?php if (!empty($show_demo_login)): ?><br />Demo: demouser@inpmnt.app / Demo<?php endif; ?>

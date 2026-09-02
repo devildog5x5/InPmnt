@@ -180,6 +180,7 @@ Without keys, the app still runs in demo/trial mode.
 - Email & SMS templates with merge fields
 - One-tap final notice + payment recording
 - Stripe subscriptions + customer portal
+- Password reset from the login page (email, or a local `password-reset.txt` if mail isn’t configured)
 - Marketing landing page
 
 ## Product

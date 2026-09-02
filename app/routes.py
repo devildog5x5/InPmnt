@@ -20,6 +20,14 @@ from flask import (
 )
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from .auth import (
+    FORGOT_NOTICE,
+    clear_reset_file,
+    consume_reset_token,
+    issue_reset_token,
+    peek_reset_token,
+    write_reset_file,
+)
 from .billing import (
     PLANS,
     create_checkout_session,
@@ -136,6 +144,88 @@ def login():
         error=error,
         next=next_url or "",
         show_demo_login=_show_demo_login(),
+    )
+
+
+def _public_base_url() -> str:
+    base = (os.environ.get("BASE_URL") or "").strip().rstrip("/")
+    if base:
+        return base
+    return request.url_root.rstrip("/")
+
+
+def _deliver_reset(email: str, url: str) -> None:
+    body = (
+        "Reset your InPmnt password\n\n"
+        "We received a request to reset the password for this account.\n\n"
+        f"Open this link within 1 hour:\n{url}\n\n"
+        "If you didn't request this, you can ignore this message.\n"
+    )
+    sent = False
+    if mail_configured():
+        try:
+            send_email(to=email, subject="Reset your InPmnt password", body=body)
+            sent = True
+        except Exception:  # noqa: BLE001
+            sent = False
+    if not sent:
+        write_reset_file(db_path(), url)
+
+
+@bp.route("/forgot-password", methods=["GET", "POST"])
+def forgot_password():
+    if session.get("user_id"):
+        return redirect(url_for("main.app_home"))
+    notice = None
+    if request.method == "POST":
+        email = (request.form.get("email") or "").strip().lower()
+        notice = FORGOT_NOTICE
+        reset_url = None
+        reset_email = None
+        if email and "@" in email:
+            with db_session(db_path()) as conn:
+                user = conn.execute(
+                    "SELECT id, email FROM users WHERE lower(email) = ?", (email,)
+                ).fetchone()
+                if user:
+                    token = issue_reset_token(conn, int(user["id"]))
+                    reset_url = f"{_public_base_url()}/reset-password?token={token}"
+                    reset_email = user["email"]
+        if reset_url and reset_email:
+            _deliver_reset(reset_email, reset_url)
+    return render_template("forgot_password.html", notice=notice)
+
+
+@bp.route("/reset-password", methods=["GET", "POST"])
+def reset_password():
+    if session.get("user_id"):
+        return redirect(url_for("main.app_home"))
+    token = (request.values.get("token") or "").strip()
+    error = None
+    with db_session(db_path()) as conn:
+        show_form = peek_reset_token(conn, token) is not None
+    if request.method == "POST":
+        password = request.form.get("password") or ""
+        confirm = request.form.get("password_confirm") or ""
+        if len(password) < 8:
+            error = "Password must be at least 8 characters."
+        elif password != confirm:
+            error = "Passwords do not match."
+        else:
+            with db_session(db_path()) as conn:
+                user = consume_reset_token(
+                    conn, token, generate_password_hash(password)
+                )
+            if user:
+                clear_reset_file(db_path())
+                session["user_id"] = user["user_id"]
+                return redirect(url_for("main.app_home"))
+            error = "This reset link is invalid or has expired."
+            show_form = False
+    elif not show_form:
+        error = "This reset link is invalid or has expired."
+    return render_template(
+        "reset_password.html", error=error, token=token, show_form=show_form
     )
 
 

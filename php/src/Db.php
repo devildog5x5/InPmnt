@@ -9,6 +9,7 @@ final class Db
     public const DEMO_EMAIL = 'demouser@inpmnt.app';
     public const DEMO_NAME = 'Demo User';
     public const DEMO_PASSWORD = 'Demo';
+    public const RESET_NOTICE = 'If that email is registered, a reset link is on the way. When email isn\'t configured, the link is saved as password-reset.txt in the same folder as your database.';
     public const RESERVED_SIGNUP = [
         'admin@inpmnt.app',
         'demouser@inpmnt.app',
@@ -16,8 +17,11 @@ final class Db
         'robert@inpmnt.app',
     ];
 
+    private static ?string $path = null;
+
     public static function connect(string $path): PDO
     {
+        self::$path = $path;
         $dir = dirname($path);
         if (!is_dir($dir)) {
             mkdir($dir, 0775, true);
@@ -122,6 +126,14 @@ final class Db
                 message TEXT NOT NULL,
                 entity_type TEXT,
                 entity_id INTEGER,
+                created_at TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS password_resets (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                token_hash TEXT NOT NULL UNIQUE,
+                expires_at TEXT NOT NULL,
+                used_at TEXT,
                 created_at TEXT NOT NULL
             );
         SQL);
@@ -268,6 +280,88 @@ final class Db
         return round((float) $inv['amount'] - (float) $inv['amount_paid'], 2);
     }
 
+    public static function resetFilePath(): string
+    {
+        $dir = self::$path ? dirname(self::$path) : (dirname(__DIR__) . '/data');
+        return $dir . DIRECTORY_SEPARATOR . 'password-reset.txt';
+    }
+
+    public static function writeResetFile(string $url): void
+    {
+        $path = self::resetFilePath();
+        $dir = dirname($path);
+        if (!is_dir($dir)) {
+            mkdir($dir, 0775, true);
+        }
+        $body = "InPmnt password reset\nGenerated: " . self::now() . "\n\n"
+            . "Open this link in your browser (expires in 1 hour):\n\n"
+            . $url . "\n\n"
+            . "If you did not request this, delete this file.\n";
+        file_put_contents($path, $body);
+    }
+
+    public static function clearResetFile(): void
+    {
+        $path = self::resetFilePath();
+        if (is_file($path)) {
+            @unlink($path);
+        }
+    }
+
+    public static function issueResetToken(PDO $db, int $userId): string
+    {
+        $token = rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');
+        $now = self::now();
+        $expires = (new DateTimeImmutable('now', new DateTimeZone('UTC')))
+            ->modify('+1 hour')
+            ->format('Y-m-d\TH:i:s\Z');
+        $db->prepare('UPDATE password_resets SET used_at = ? WHERE user_id = ? AND used_at IS NULL')
+            ->execute([$now, $userId]);
+        $db->prepare(
+            'INSERT INTO password_resets (user_id, token_hash, expires_at, created_at) VALUES (?, ?, ?, ?)'
+        )->execute([$userId, hash('sha256', $token), $expires, $now]);
+        return $token;
+    }
+
+    public static function peekResetToken(PDO $db, string $token): ?array
+    {
+        $token = trim($token);
+        if ($token === '') {
+            return null;
+        }
+        $st = $db->prepare(
+            'SELECT r.id, r.user_id, r.expires_at, r.used_at, u.email, u.workspace_id
+             FROM password_resets r
+             JOIN users u ON u.id = r.user_id
+             WHERE r.token_hash = ?'
+        );
+        $st->execute([hash('sha256', $token)]);
+        $row = $st->fetch();
+        if (!$row || !empty($row['used_at'])) {
+            return null;
+        }
+        if (($row['expires_at'] ?? '') < self::now()) {
+            return null;
+        }
+        return $row;
+    }
+
+    public static function consumeResetToken(PDO $db, string $token, string $passwordHash): ?array
+    {
+        $row = self::peekResetToken($db, $token);
+        if (!$row) {
+            return null;
+        }
+        $now = self::now();
+        $db->prepare('UPDATE users SET password_hash = ? WHERE id = ?')
+            ->execute([$passwordHash, $row['user_id']]);
+        $db->prepare('UPDATE password_resets SET used_at = ? WHERE id = ?')
+            ->execute([$now, $row['id']]);
+        $wid = isset($row['workspace_id']) ? (int) $row['workspace_id'] : null;
+        self::log($db, 'system', 'Password was reset', 'user', (int) $row['user_id'], $wid);
+        return $row;
+    }
+
     private static function ensureSystemAccounts(PDO $db): void
     {
         $demo = $db->prepare('SELECT id, password_hash FROM users WHERE lower(email) = ?');
@@ -288,14 +382,13 @@ final class Db
                 'user'
             );
         }
-        $admin = $db->prepare('SELECT id, password_hash FROM users WHERE lower(email) = ?');
+        $admin = $db->prepare('SELECT id FROM users WHERE lower(email) = ?');
         $admin->execute([self::ADMIN_EMAIL]);
         $arow = $admin->fetch();
         if ($arow) {
-            if (!password_verify(self::ADMIN_PASSWORD, $arow['password_hash'])) {
-                $db->prepare('UPDATE users SET password_hash=?, name=?, role=? WHERE id=?')
-                    ->execute([password_hash(self::ADMIN_PASSWORD, PASSWORD_DEFAULT), self::ADMIN_NAME, 'admin', $arow['id']]);
-            }
+            // Keep the stored hash so Forgot password / recovery can stick.
+            $db->prepare('UPDATE users SET name=?, role=? WHERE id=?')
+                ->execute([self::ADMIN_NAME, 'admin', $arow['id']]);
         } else {
             self::createWorkspace(
                 $db,

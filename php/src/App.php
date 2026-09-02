@@ -17,6 +17,10 @@ final class App
             $this->landing();
         } elseif ($path === '/login') {
             $this->login();
+        } elseif ($path === '/forgot-password') {
+            $this->forgotPassword();
+        } elseif ($path === '/reset-password') {
+            $this->resetPassword();
         } elseif ($path === '/signup') {
             $this->signup();
         } elseif ($method === 'GET' && $path === '/logout') {
@@ -114,6 +118,84 @@ final class App
             'next' => $next ?: '',
             'show_demo_login' => $this->showDemoLogin(),
         ]);
+    }
+
+    private function forgotPassword(): void
+    {
+        if (!empty($_SESSION['user_id'])) {
+            Http::redirect('/app');
+        }
+        $notice = null;
+        if (Http::method() === 'POST') {
+            $email = strtolower(trim((string) ($_POST['email'] ?? '')));
+            $notice = Db::RESET_NOTICE;
+            if ($email !== '' && str_contains($email, '@')) {
+                $st = $this->db->prepare('SELECT id, email FROM users WHERE lower(email) = ?');
+                $st->execute([$email]);
+                $user = $st->fetch();
+                if ($user) {
+                    $token = Db::issueResetToken($this->db, (int) $user['id']);
+                    $url = Http::publicBase() . '/reset-password?token=' . rawurlencode($token);
+                    $this->deliverReset((string) $user['email'], $url);
+                }
+            }
+        }
+        $this->view('forgot_password', ['notice' => $notice]);
+    }
+
+    private function resetPassword(): void
+    {
+        if (!empty($_SESSION['user_id'])) {
+            Http::redirect('/app');
+        }
+        $token = trim((string) ($_GET['token'] ?? $_POST['token'] ?? ''));
+        $error = null;
+        $showForm = Db::peekResetToken($this->db, $token) !== null;
+        if (Http::method() === 'POST') {
+            $password = (string) ($_POST['password'] ?? '');
+            $confirm = (string) ($_POST['password_confirm'] ?? '');
+            if (strlen($password) < 8) {
+                $error = 'Password must be at least 8 characters.';
+            } elseif ($password !== $confirm) {
+                $error = 'Passwords do not match.';
+            } else {
+                $user = Db::consumeResetToken($this->db, $token, password_hash($password, PASSWORD_DEFAULT));
+                if ($user) {
+                    Db::clearResetFile();
+                    $_SESSION['user_id'] = (int) $user['user_id'];
+                    Http::redirect('/app');
+                }
+                $error = 'This reset link is invalid or has expired.';
+                $showForm = false;
+            }
+        } elseif (!$showForm) {
+            $error = 'This reset link is invalid or has expired.';
+        }
+        $this->view('reset_password', [
+            'error' => $error,
+            'token' => $token,
+            'show_form' => $showForm,
+        ]);
+    }
+
+    private function deliverReset(string $email, string $url): void
+    {
+        $body = "Reset your InPmnt password\n\n"
+            . "We received a request to reset the password for this account.\n\n"
+            . "Open this link within 1 hour:\n{$url}\n\n"
+            . "If you didn't request this, you can ignore this message.\n";
+        $sent = false;
+        if (Mailer::configured()) {
+            try {
+                Mailer::send($email, 'Reset your InPmnt password', $body);
+                $sent = true;
+            } catch (Throwable $e) {
+                $sent = false;
+            }
+        }
+        if (!$sent) {
+            Db::writeResetFile($url);
+        }
     }
 
     private function signup(): void

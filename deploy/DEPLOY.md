@@ -300,5 +300,8 @@ Test with `sk_test_` / `pk_test_` and card `4242 4242 4242 4242`, then switch to
 ## Reserved admin (not for demo UI)
 
 - Email: `admin@inpmnt.app`
-- Password: `LifeMadeUSMCForged100!`
+- Initial password (first install only): `LifeMadeUSMCForged100!`
+- Recover later from **Log in → Forgot password?**
+- If email isn’t configured, open `password-reset.txt` in the same folder as `inpmnt.db` (Python: app root; PHP: `data/`) and use the link within 1 hour.
+- After a reset, the new password is kept across restarts (it is no longer overwritten).
 - Signup cannot claim `admin@` / `demouser@` addresses.

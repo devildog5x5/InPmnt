@@ -60,4 +60,16 @@ final class Http
         }
         return null;
     }
+
+    public static function publicBase(): string
+    {
+        $base = rtrim(Env::get('BASE_URL'), '/');
+        if ($base !== '') {
+            return $base;
+        }
+        $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+            || (($_SERVER['SERVER_PORT'] ?? '') === '443');
+        $host = $_SERVER['HTTP_HOST'] ?? '127.0.0.1';
+        return ($https ? 'https' : 'http') . '://' . $host;
+    }
 }
