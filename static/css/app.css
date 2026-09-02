@@ -262,6 +262,7 @@ button { font-family: var(--font-body); }
 }
 .btn.ghost:hover { background: var(--brand-soft); box-shadow: inset 0 0 0 1px rgba(13, 107, 102, 0.4); }
 .btn.danger { background: var(--danger); box-shadow: none; }
+.btn.danger:hover { background: #931c14; }
 .btn.sm { padding: 7px 11px; font-size: 0.82rem; border-radius: 8px; }
 
 /* ---------- KPIs ---------- */
@@ -603,6 +604,16 @@ td.mono, .mono {
   color: var(--muted);
   font-size: 0.9rem;
   line-height: 1.45;
+}
+.danger-zone {
+  border-color: var(--danger-line);
+  background: linear-gradient(180deg, #fff 0%, var(--danger-soft) 160%);
+}
+.danger-zone .panel-header h2 { color: var(--danger); }
+.danger-zone .settings-note {
+  background: #fff;
+  border-color: var(--danger-line);
+  color: var(--ink-soft);
 }
 
 @keyframes rise {

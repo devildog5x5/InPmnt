@@ -37,6 +37,19 @@ Installs to `%LOCALAPPDATA%\InPmnt`. If an older copy is already installed, you 
 
 Uninstall later: `powershell -File .\uninstall.ps1` (add `-RemoveData` to delete the database too).
 
+## Factory reset
+
+Wipes **all** users, passwords, invoices, clients, and reminders, then recreates the default admin and demo accounts.
+
+- In the app (admin only): **Settings → Danger zone → Clear database…** and type `RESET`
+- From the app folder (stops a running instance first):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\reset_db.ps1
+```
+
+Sign in afterwards as `admin@inpmnt.app` with the initial password (see [deploy/DEPLOY.md](deploy/DEPLOY.md)).
+
 ## Quick start
 
 ```powershell
@@ -181,6 +194,7 @@ Without keys, the app still runs in demo/trial mode.
 - One-tap final notice + payment recording
 - Stripe subscriptions + customer portal
 - Password reset from the login page (email, or a local `password-reset.txt` if mail isn’t configured)
+- Factory reset (admin Settings, or `reset_db.ps1`) wipes users, passwords, and all app data
 - Marketing landing page
 
 ## Product

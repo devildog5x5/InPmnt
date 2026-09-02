@@ -145,6 +145,24 @@ final class Db
         }
     }
 
+    public static function reset(PDO $db): void
+    {
+        $db->exec('PRAGMA foreign_keys = OFF');
+        $tables = $db->query(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+        )->fetchAll(PDO::FETCH_COLUMN);
+        foreach ($tables as $name) {
+            $name = (string) $name;
+            if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $name)) {
+                continue;
+            }
+            $db->exec('DROP TABLE IF EXISTS "' . $name . '"');
+        }
+        $db->exec('PRAGMA foreign_keys = ON');
+        self::init($db);
+        self::clearResetFile();
+    }
+
     public static function now(): string
     {
         return gmdate('Y-m-d\TH:i:s\Z');

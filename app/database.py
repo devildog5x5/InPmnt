@@ -232,6 +232,27 @@ def init_db(db_path: str) -> None:
             _ensure_system_accounts(conn)
 
 
+def reset_database(db_path: str) -> None:
+    """Drop every app table (users, passwords, invoices, …) and re-seed defaults."""
+    with db_session(db_path) as conn:
+        conn.execute("PRAGMA foreign_keys = OFF")
+        tables = [
+            row["name"]
+            for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+            ).fetchall()
+        ]
+        for name in tables:
+            if not str(name).replace("_", "").isalnum():
+                continue
+            conn.execute(f'DROP TABLE IF EXISTS "{name}"')
+        conn.execute("PRAGMA foreign_keys = ON")
+    init_db(db_path)
+    reset_file = Path(db_path).resolve().parent / "password-reset.txt"
+    if reset_file.is_file():
+        reset_file.unlink()
+
+
 def _table_sql(conn: sqlite3.Connection, name: str) -> str:
     row = conn.execute(
         "SELECT sql FROM sqlite_master WHERE type='table' AND name=?", (name,)

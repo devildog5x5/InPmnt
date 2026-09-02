@@ -49,7 +49,7 @@ final class App
         if (!$uid) {
             return;
         }
-        $st = $this->db->prepare('SELECT id, email, name, workspace_id FROM users WHERE id = ?');
+        $st = $this->db->prepare('SELECT id, email, name, workspace_id, role FROM users WHERE id = ?');
         $st->execute([(int) $uid]);
         $row = $st->fetch();
         $GLOBALS['inpmnt_user'] = $row ?: null;
@@ -67,6 +67,14 @@ final class App
             Http::json(['error' => 'Unauthorized'], 401);
         }
         Http::redirect('/login');
+    }
+
+    private function requireAdmin(): void
+    {
+        $role = strtolower((string) ($GLOBALS['inpmnt_user']['role'] ?? ''));
+        if ($role !== 'admin') {
+            Http::json(['error' => 'Forbidden'], 403);
+        }
     }
 
     private function showDemoLogin(): bool
@@ -248,10 +256,28 @@ final class App
         $this->view('signup', ['error' => $error]);
     }
 
+    private function apiResetDatabase(): void
+    {
+        $this->requireAdmin();
+        $data = Http::bodyJson();
+        $confirm = trim((string) ($data['confirm'] ?? ''));
+        if ($confirm !== 'RESET') {
+            Http::json(['error' => 'Type RESET to confirm.'], 400);
+        }
+        Db::reset($this->db);
+        $_SESSION = [];
+        session_destroy();
+        Http::json(['ok' => true, 'redirect' => '/login']);
+    }
+
     private function api(string $method, string $path): void
     {
         $this->requireLogin(true);
         $wid = Workspace::requireId();
+
+        if ($method === 'POST' && $path === '/api/admin/reset-database') {
+            $this->apiResetDatabase();
+        }
 
         if ($method === 'GET' && $path === '/api/me') {
             $settings = Workspace::settings($this->db, $wid);

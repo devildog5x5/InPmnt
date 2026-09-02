@@ -305,3 +305,4 @@ Test with `sk_test_` / `pk_test_` and card `4242 4242 4242 4242`, then switch to
 - If email isn’t configured, open `password-reset.txt` in the same folder as `inpmnt.db` (Python: app root; PHP: `data/`) and use the link within 1 hour.
 - After a reset, the new password is kept across restarts (it is no longer overwritten).
 - Signup cannot claim `admin@` / `demouser@` addresses.
+- Factory reset (admin **Settings → Danger zone**, or `reset_db.ps1`) wipes all users/passwords/data and recreates these default accounts.

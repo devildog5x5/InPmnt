@@ -673,7 +673,12 @@ async function renderTemplates() {
 
 /* ---------- Settings ---------- */
 async function renderSettings() {
-  const [s, billing] = await Promise.all([api("/api/settings"), api("/api/billing/status")]);
+  const [s, billing, me] = await Promise.all([
+    api("/api/settings"),
+    api("/api/billing/status"),
+    api("/api/me"),
+  ]);
+  const isAdmin = String(me.user?.role || window.__INPMNT__?.user?.role || "").toLowerCase() === "admin";
   appEl.innerHTML = `
     ${topbar({
       eyebrow: "Workspace",
@@ -720,6 +725,17 @@ async function renderSettings() {
         <button class="btn" type="submit">Save settings</button>
       </div>
     </form>
+    ${isAdmin ? `
+    <div class="panel danger-zone" style="margin-top:14px">
+      <div class="panel-header"><h2>Danger zone</h2></div>
+      <p class="settings-note" style="margin-bottom:14px">
+        Clear the entire database: users, passwords, invoices, clients, and reminders.
+        Default admin and demo accounts are recreated. This cannot be undone.
+      </p>
+      <div class="actions">
+        <button class="btn danger" type="button" id="btn-reset-db">Clear database…</button>
+      </div>
+    </div>` : ""}
   `;
   document.getElementById("workspace-label").textContent =
     `${s.business_name} · ${s.plan === "trial" ? "Trial" : s.plan}`;
@@ -750,6 +766,41 @@ async function renderSettings() {
     } catch (err) {
       toast(err.message || "Portal unavailable");
     }
+  });
+  appEl.querySelector("#btn-reset-db")?.addEventListener("click", () => {
+    openModal({
+      title: "Clear the database",
+      lead: "This deletes every user, password, invoice, client, and reminder, then recreates the default admin and demo accounts. Type RESET to confirm.",
+      body: `
+        <form id="reset-db-form">
+          <div class="field">
+            <label for="reset-confirm">Type RESET</label>
+            <input id="reset-confirm" name="confirm" autocomplete="off" required />
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn secondary" id="m-cancel">Cancel</button>
+            <button class="btn danger" type="submit">Clear database</button>
+          </div>
+        </form>
+      `,
+      onMount: (modal) => {
+        modal.querySelector("#m-cancel").onclick = closeModal;
+        modal.querySelector("#reset-db-form").onsubmit = async (e) => {
+          e.preventDefault();
+          const confirm = String(new FormData(e.target).get("confirm") || "").trim();
+          try {
+            const res = await api("/api/admin/reset-database", {
+              method: "POST",
+              body: JSON.stringify({ confirm }),
+            });
+            closeModal();
+            location.href = res.redirect || "/login";
+          } catch (err) {
+            toast(err.message || "Reset failed");
+          }
+        };
+      },
+    });
   });
 }
 

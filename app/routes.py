@@ -42,6 +42,7 @@ from .database import (
     log_activity,
     next_invoice_number,
     refresh_invoice_status,
+    reset_database,
     row_to_dict,
     rows_to_list,
 )
@@ -73,6 +74,22 @@ def login_required(fn):
     return wrapper
 
 
+def _is_admin() -> bool:
+    return ((g.user or {}).get("role") or "").strip().lower() == "admin"
+
+
+def admin_required(fn):
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        if not session.get("user_id"):
+            return jsonify({"error": "Unauthorized"}), 401
+        if not _is_admin():
+            return jsonify({"error": "Forbidden"}), 403
+        return fn(*args, **kwargs)
+
+    return wrapper
+
+
 @bp.before_app_request
 def load_user() -> None:
     g.user = None
@@ -81,7 +98,7 @@ def load_user() -> None:
         return
     with db_session(db_path()) as conn:
         row = conn.execute(
-            "SELECT id, email, name, workspace_id FROM users WHERE id = ?", (uid,)
+            "SELECT id, email, name, workspace_id, role FROM users WHERE id = ?", (uid,)
         ).fetchone()
         g.user = row_to_dict(row)
 
@@ -422,6 +439,19 @@ def api_me():
         wid = require_workspace_id()
         settings = row_to_dict(get_settings(conn, wid))
     return jsonify({"user": g.user, "settings": settings})
+
+
+@bp.post("/api/admin/reset-database")
+@login_required
+@admin_required
+def api_reset_database():
+    data = request.get_json(force=True) or {}
+    confirm = str(data.get("confirm") or "").strip()
+    if confirm != "RESET":
+        return jsonify({"error": "Type RESET to confirm."}), 400
+    reset_database(db_path())
+    session.clear()
+    return jsonify({"ok": True, "redirect": "/login"})
 
 
 @bp.get("/api/dashboard")
