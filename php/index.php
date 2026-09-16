@@ -1,6 +1,13 @@
 <?php
 declare(strict_types=1);
 
+/**
+ * InPmnt v1.4.14
+ *
+ * Hostinger entry point. The version string above stays in lockstep with
+ * Http::VERSION and the root VERSION file so a text search of index.php finds it.
+ */
+
 $db = require __DIR__ . '/bootstrap.php';
 
 $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';

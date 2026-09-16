@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>InPmnt â€” Get paid without the chase</title>
+  <title>InPmnt v{{ app_version }} — Get paid without the chase</title>
   <meta name="description" content="InPmnt automatically reminds clients about unpaid invoices so solo trades and freelancers get paid faster." />
   <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/inpmnt-icon.png') }}" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -125,8 +125,8 @@
     </p>
   </section>
 
-  <footer class="landing-footer">
-    <p class="site-version">InPmnt v{{ app_version }}</p>
+  <footer class="landing-footer" id="site-version">
+    <p>InPmnt v{{ app_version }}</p>
     <p>© 2026 Robert Foster · MIT License</p>
     {% if show_demo_login %}
     <p>Local demo: demouser@inpmnt.app / Demo (SHOW_DEMO_LOGIN=1)</p>

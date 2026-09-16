@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-$root = dirname(__DIR__);
+$root = is_dir(__DIR__ . '/src') ? __DIR__ : dirname(__DIR__);
 require $root . '/src/Env.php';
 require $root . '/src/Http.php';
 require $root . '/src/Db.php';

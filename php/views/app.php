@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>InPmnt</title>
+  <title>InPmnt v<?= Http::e(Http::VERSION) ?></title>
   <link rel="icon" type="image/png" href="/static/img/inpmnt-icon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -72,6 +72,8 @@
 
     <main class="main" id="app"></main>
   </div>
+
+  <footer class="page-version" id="site-version">InPmnt v<?= Http::e(Http::VERSION) ?></footer>
 
   <div id="toast-host" class="toast-host"></div>
   <div id="modal-root" class="modal-backdrop"></div>
