@@ -126,8 +126,8 @@
   </section>
 
   <footer class="landing-footer">
-    <p>Â© 2026 Robert Foster Â· InPmnt Â· MIT License</p>
-    <p>v<?= Http::e(Http::VERSION) ?></p>
+    <p class="site-version">InPmnt v<?= Http::e(Http::VERSION) ?></p>
+    <p>© 2026 Robert Foster · MIT License</p>
     <?php if (!empty($show_demo_login)): ?>
     <p>Local demo: demouser@inpmnt.app / Demo (SHOW_DEMO_LOGIN=1)</p>
     <?php endif; ?>

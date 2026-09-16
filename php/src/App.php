@@ -117,6 +117,7 @@ final class App
             $user = $st->fetch();
             if ($user && password_verify($password, $user['password_hash'])) {
                 $_SESSION['user_id'] = (int) $user['id'];
+                Http::setTheme('light');
                 Http::redirect($next ?: '/app');
             }
             $error = 'Invalid email or password.';

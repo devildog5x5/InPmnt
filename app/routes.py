@@ -173,6 +173,7 @@ def login():
             ).fetchone()
             if user and check_password_hash(user["password_hash"], password):
                 session["user_id"] = user["id"]
+                session["ui_theme"] = "light"
                 return redirect(next_url or url_for("main.app_home"))
         error = "Invalid email or password."
     return render_template(
@@ -255,6 +256,7 @@ def reset_password():
             if user:
                 clear_reset_file(db_path())
                 session["user_id"] = user["user_id"]
+                session["ui_theme"] = "light"
                 return redirect(url_for("main.app_home"))
             error = "This reset link is invalid or has expired."
             show_form = False
@@ -300,6 +302,7 @@ def signup():
                             business_name=business or None,
                         )
                         session["user_id"] = uid
+                        session["ui_theme"] = "light"
                         return redirect(url_for("main.app_home"))
             except Exception as exc:  # noqa: BLE001
                 error = str(exc)
