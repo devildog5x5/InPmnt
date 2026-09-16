@@ -3,7 +3,23 @@ declare(strict_types=1);
 
 final class Http
 {
-    public const VERSION = '1.4.11';
+    public const VERSION = '1.4.12';
+
+    public static function theme(): string
+    {
+        $t = strtolower(trim((string) ($_SESSION['ui_theme'] ?? 'light')));
+        return ($t === 'dark' || $t === 'light') ? $t : 'light';
+    }
+
+    public static function setTheme(string $name): string
+    {
+        $t = strtolower(trim($name));
+        if ($t !== 'dark' && $t !== 'light') {
+            $t = 'light';
+        }
+        $_SESSION['ui_theme'] = $t;
+        return $t;
+    }
 
     public static function json(mixed $data, int $status = 200): never
     {

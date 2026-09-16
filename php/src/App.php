@@ -281,7 +281,12 @@ final class App
 
         if ($method === 'GET' && $path === '/api/me') {
             $settings = Workspace::settings($this->db, $wid);
-            Http::json(['user' => $GLOBALS['inpmnt_user'], 'settings' => $settings]);
+            Http::json(['user' => $GLOBALS['inpmnt_user'], 'settings' => $settings, 'theme' => Http::theme()]);
+        }
+        if ($method === 'POST' && $path === '/api/theme') {
+            $data = Http::bodyJson();
+            $theme = Http::setTheme((string) ($data['theme'] ?? 'light'));
+            Http::json(['ok' => true, 'theme' => $theme]);
         }
         if ($method === 'GET' && $path === '/api/dashboard') {
             $this->apiDashboard($wid);

@@ -59,6 +59,24 @@ from .workspace import (
 bp = Blueprint("main", __name__)
 
 
+def _app_version() -> str:
+    path = Path(__file__).resolve().parents[1] / "VERSION"
+    try:
+        return path.read_text(encoding="utf-8").strip() or "0"
+    except OSError:
+        return "0"
+
+
+def _ui_theme() -> str:
+    t = str(session.get("ui_theme") or "light").strip().lower()
+    return t if t in ("light", "dark") else "light"
+
+
+@bp.context_processor
+def inject_ui() -> dict[str, str]:
+    return {"ui_theme": _ui_theme(), "app_version": _app_version()}
+
+
 def db_path() -> str:
     return current_app.config["DATABASE"]
 
@@ -117,16 +135,7 @@ def landing():
         publishable_key=cfg.publishable_key,
         plans=PLANS,
         show_demo_login=_show_demo_login(),
-        app_version=_app_version(),
     )
-
-
-def _app_version() -> str:
-    path = Path(__file__).resolve().parents[1] / "VERSION"
-    try:
-        return path.read_text(encoding="utf-8").strip() or "0"
-    except OSError:
-        return "0"
 
 
 def _show_demo_login() -> bool:
@@ -448,7 +457,18 @@ def api_me():
     with db_session(db_path()) as conn:
         wid = require_workspace_id()
         settings = row_to_dict(get_settings(conn, wid))
-    return jsonify({"user": g.user, "settings": settings})
+    return jsonify({"user": g.user, "settings": settings, "theme": _ui_theme()})
+
+
+@bp.post("/api/theme")
+@login_required
+def api_theme():
+    data = request.get_json(silent=True) or {}
+    mode = str(data.get("theme") or "").strip().lower()
+    if mode not in ("light", "dark"):
+        return jsonify({"error": "Theme must be light or dark."}), 400
+    session["ui_theme"] = mode
+    return jsonify({"ok": True, "theme": mode})
 
 
 @bp.post("/api/admin/reset-database")

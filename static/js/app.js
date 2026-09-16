@@ -671,6 +671,18 @@ async function renderTemplates() {
   });
 }
 
+function applyTheme(mode) {
+  const theme = mode === "dark" ? "dark" : "light";
+  document.documentElement.setAttribute("data-theme", theme);
+  document.documentElement.style.colorScheme = theme;
+  if (window.__INPMNT__) window.__INPMNT__.theme = theme;
+}
+
+async function setTheme(mode) {
+  applyTheme(mode);
+  await api("/api/theme", { method: "POST", body: JSON.stringify({ theme: mode }) });
+}
+
 /* ---------- Settings ---------- */
 async function renderSettings() {
   const [s, billing, me] = await Promise.all([
@@ -679,6 +691,8 @@ async function renderSettings() {
     api("/api/me"),
   ]);
   const isAdmin = String(me.user?.role || window.__INPMNT__?.user?.role || "").toLowerCase() === "admin";
+  const theme = me.theme || window.__INPMNT__?.theme || "light";
+  applyTheme(theme);
   appEl.innerHTML = `
     ${topbar({
       eyebrow: "Workspace",
@@ -686,6 +700,16 @@ async function renderSettings() {
       subtitle: "Business profile, reminder cadence, and billing.",
       actions: `<a class="btn secondary" href="${window.__INPMNT__.logoutUrl}">Log out</a>`,
     })}
+    <div class="panel" style="margin-bottom:14px">
+      <div class="panel-header"><h2>Appearance</h2></div>
+      <p class="settings-note" style="margin-bottom:14px">
+        Light or dark for this browser session only. Sign out returns to Light.
+      </p>
+      <div class="theme-swatches" role="group" aria-label="Appearance">
+        <button type="button" class="theme-swatch theme-light ${theme === "light" ? "on" : ""}" data-theme-pick="light" aria-pressed="${theme === "light"}">Light</button>
+        <button type="button" class="theme-swatch theme-dark ${theme === "dark" ? "on" : ""}" data-theme-pick="dark" aria-pressed="${theme === "dark"}">Dark</button>
+      </div>
+    </div>
     <div class="panel" style="margin-bottom:14px">
       <div class="panel-header"><h2>Billing</h2></div>
       <p class="settings-note" style="margin-bottom:14px">
@@ -739,6 +763,17 @@ async function renderSettings() {
   `;
   document.getElementById("workspace-label").textContent =
     `${s.business_name} · ${s.plan === "trial" ? "Trial" : s.plan}`;
+  appEl.querySelectorAll("[data-theme-pick]").forEach((btn) => {
+    btn.onclick = async () => {
+      try {
+        await setTheme(btn.getAttribute("data-theme-pick"));
+        toast("Appearance updated");
+        renderSettings();
+      } catch (err) {
+        toast(err.message || "Could not save appearance");
+      }
+    };
+  });
   appEl.querySelector("#settings-form").onsubmit = async (e) => {
     e.preventDefault();
     const payload = Object.fromEntries(new FormData(e.target).entries());
@@ -840,7 +875,9 @@ async function route() {
 }
 
 window.addEventListener("hashchange", route);
+applyTheme(window.__INPMNT__?.theme || "light");
 api("/api/me").then((me) => {
+  if (me.theme) applyTheme(me.theme);
   if (me.settings) {
     document.getElementById("workspace-label").textContent =
       `${me.settings.business_name} · ${me.settings.plan === "trial" ? "Trial" : me.settings.plan}`;
