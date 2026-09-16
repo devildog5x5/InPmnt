@@ -16,24 +16,25 @@ alwaysApply: true
 ## Builds + GitHub Release (required)
 
 1. `powershell -File .\build_release.ps1 <version>`
-2. Produce **all four** zips under `installers\`:
-   - `InPmnt-PHP.zip` — Hostinger / `public_html` drop
-   - `InPmnt-Portable.zip` — runnable Windows app (use `start.ps1`)
-   - `InPmnt-Source.zip` — source distribution
-   - `InPmnt-Icon.zip` — brand icon assets
+2. Produce **all four** zips under `installers\` with the version **at the end** of the filename:
+   - `InPmnt-PHP.vX.Y.Z.zip` — Hostinger / `public_html` drop
+   - `InPmnt-Portable.vX.Y.Z.zip` — runnable Windows app (use `start.ps1`)
+   - `InPmnt-Source.vX.Y.Z.zip` — source distribution
+   - `InPmnt-Icon.vX.Y.Z.zip` — brand icon assets
 3. Create the next tag (`vX.Y.Z`) and **GitHub Release**, uploading **all four** assets.
-4. Update README Downloads with verbatim HTTPS links for the same tag.
+4. Update README Downloads with verbatim HTTPS links for the same tag and filenames.
 5. Commit and push the README if links changed.
 
 ## Chat handoff — **### New build links**
 
 | Line | Content |
 |------|---------|
-| **PHP** | Full URL to `InPmnt-PHP.zip` |
-| **Portable** | Full URL to `InPmnt-Portable.zip` |
-| **Source** | Full URL to `InPmnt-Source.zip` |
-| **Icon** | Full URL to `InPmnt-Icon.zip` |
+| **PHP** | Full URL to `InPmnt-PHP.vX.Y.Z.zip` |
+| **Portable** | Full URL to `InPmnt-Portable.vX.Y.Z.zip` |
+| **Source** | Full URL to `InPmnt-Source.vX.Y.Z.zip` |
+| **Icon** | Full URL to `InPmnt-Icon.vX.Y.Z.zip` |
 | **Release page** | `https://github.com/devildog5x5/InPmnt/releases/tag/{tag}` |
 | **Local smoke** | `http://127.0.0.1:5055` after `.\start.ps1` |
 
 Never invent `releases/download/...` URLs — verify with `gh release view` after upload.
+Never ship unversioned zip names (`InPmnt-PHP.zip`).

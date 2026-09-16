@@ -12,12 +12,12 @@ Packages are published on the [GitHub Releases](https://github.com/devildog5x5/I
 
 | Package | What you get | Download |
 |---------|----------------|----------|
-| **PHP (Hostinger)** | Unzip into `public_html` — no VPS | [InPmnt-PHP.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.4.10/InPmnt-PHP.zip) |
-| **Portable** | Runnable Windows app — `install.ps1` or `start.ps1` | [InPmnt-Portable.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.4.10/InPmnt-Portable.zip) |
-| **Source** | Full source (Python + PHP + Docker) | [InPmnt-Source.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.4.10/InPmnt-Source.zip) |
-| **Icon** | Brand icon assets (blue / teal / violet) | [InPmnt-Icon.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.4.10/InPmnt-Icon.zip) |
+| **PHP (Hostinger)** | Unzip into `public_html` — no VPS | [InPmnt-PHP.v1.4.11.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.4.11/InPmnt-PHP.v1.4.11.zip) |
+| **Portable** | Runnable Windows app — `install.ps1` or `start.ps1` | [InPmnt-Portable.v1.4.11.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.4.11/InPmnt-Portable.v1.4.11.zip) |
+| **Source** | Full source (Python + PHP + Docker) | [InPmnt-Source.v1.4.11.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.4.11/InPmnt-Source.v1.4.11.zip) |
+| **Icon** | Brand icon assets (blue / teal / violet) | [InPmnt-Icon.v1.4.11.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.4.11/InPmnt-Icon.v1.4.11.zip) |
 
-- Latest release: [v1.4.10](https://github.com/devildog5x5/InPmnt/releases/tag/v1.4.10)
+- Latest release: [v1.4.11](https://github.com/devildog5x5/InPmnt/releases/tag/v1.4.11)
 - Sign up: `/signup` · Local demo (optional): set `SHOW_DEMO_LOGIN=1` then `demouser@inpmnt.app` / `Demo`
 - App URL (local): `https://127.0.0.1:5055` (self-signed cert; accept the browser warning)
 - Rebuild locally: `powershell -File .\build_release.ps1` → `installers\*.zip`
@@ -112,7 +112,7 @@ Production TLS (Let's Encrypt / IIS) is handled by nginx or IIS in front of the 
 
 InPmnt now ships a **PHP** build you can drop on Hostinger Web/Cloud (no VPS).
 
-1. Download [InPmnt-PHP.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.4.9/InPmnt-PHP.zip).
+1. Download [InPmnt-PHP.v1.4.11.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.4.11/InPmnt-PHP.v1.4.11.zip).
 2. In hPanel → **Files → File Manager** (or FTP), unzip **all files into `public_html`**.
 3. Copy `.env.example` → `.env`. Set `APP_SECRET` (long random string) and `BASE_URL=https://yourdomain.com`.
 4. hPanel → **Advanced → PHP Configuration**: PHP **8.2+**, enable **pdo_sqlite**.
@@ -125,11 +125,11 @@ The Windows portable app is still Python (`start.ps1`). Use PHP only on shared h
 
 ## FTP / shared hosting
 
-Use **InPmnt-PHP.zip** on Hostinger Web/Cloud (unzip into `public_html`). The Python app still will not run from `public_html`.
+Use **InPmnt-PHP.vX.Y.Z.zip** on Hostinger Web/Cloud (unzip into `public_html`). The Python app still will not run from `public_html`.
 
 | Host | What to do |
 |------|------------|
-| **Hostinger Web / Cloud** | Download **InPmnt-PHP.zip** and unzip into `public_html`. See [Hostinger PHP](#hostinger-php--shared-hosting). |
+| **Hostinger Web / Cloud** | Download **InPmnt-PHP.vX.Y.Z.zip** and unzip into `public_html`. See [Hostinger PHP](#hostinger-php--shared-hosting). |
 | **cPanel with Setup Python App** | Optional Python path: FTP source into the app root; startup file `passenger_wsgi.py`. See [deploy/DEPLOY.md](deploy/DEPLOY.md#ftp--cpanel-python-app). |
 
 ## Docker (Linux container)

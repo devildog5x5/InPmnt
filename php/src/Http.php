@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 final class Http
 {
-    public const VERSION = '1.4.10';
+    public const VERSION = '1.4.11';
 
     public static function json(mixed $data, int $status = 200): never
     {

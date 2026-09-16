@@ -32,10 +32,11 @@ foreach ($item in $include) {
     }
 }
 
-$portableZip = Join-Path $Out "InPmnt-Portable.zip"
-$sourceZip = Join-Path $Out "InPmnt-Source.zip"
-$iconZip = Join-Path $Out "InPmnt-Icon.zip"
-$phpZip = Join-Path $Out "InPmnt-PHP.zip"
+$portableZip = Join-Path $Out "InPmnt-Portable.v$Version.zip"
+$sourceZip = Join-Path $Out "InPmnt-Source.v$Version.zip"
+$iconZip = Join-Path $Out "InPmnt-Icon.v$Version.zip"
+$phpZip = Join-Path $Out "InPmnt-PHP.v$Version.zip"
+Get-ChildItem -Path $Out -Filter "InPmnt-*.zip" -ErrorAction SilentlyContinue | Remove-Item -Force
 foreach ($z in @($portableZip, $sourceZip, $iconZip, $phpZip)) {
     if (Test-Path $z) { Remove-Item $z -Force }
 }

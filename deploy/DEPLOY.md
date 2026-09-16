@@ -12,7 +12,7 @@ InPmnt is a **Python (Flask)** app for Windows/VPS, and a **PHP** app for Hostin
 | **Windows Server** | Waitress + Windows Service (NSSM) + IIS reverse proxy → [Windows](#windows-server) |
 
 Download zips: [latest release](https://github.com/devildog5x5/InPmnt/releases/latest)  
-(`InPmnt-PHP.zip` → Hostinger `public_html`; `InPmnt-Portable.zip` for native Windows; Docker uses the repo `Dockerfile`.)
+(`InPmnt-PHP.vX.Y.Z.zip` → Hostinger `public_html`; `InPmnt-Portable.vX.Y.Z.zip` for native Windows; Docker uses the repo `Dockerfile`.)
 
 ---
 
@@ -20,7 +20,7 @@ Download zips: [latest release](https://github.com/devildog5x5/InPmnt/releases/l
 
 No VPS. Uses the PHP rewrite in `php/`.
 
-1. Download **[InPmnt-PHP.zip](https://github.com/devildog5x5/InPmnt/releases/latest)**.
+1. Download **[InPmnt-PHP.vX.Y.Z.zip](https://github.com/devildog5x5/InPmnt/releases/latest)**.
 2. hPanel → **Files → File Manager** (or FTP). Unzip **every file into `public_html`** (not a subfolder).
 3. Copy `.env.example` to `.env`. Set:
    - `APP_SECRET` — long random string
@@ -197,7 +197,7 @@ cd /var/www/inpmnt && sudo -u www-data git pull && sudo systemctl restart inpmnt
 3. Open **PowerShell as Administrator** and run:
 
 ```powershell
-# From a clone or extracted InPmnt-Portable.zip
+# From a clone or extracted InPmnt-Portable.vX.Y.Z.zip
 cd C:\inetpub\inpmnt   # or wherever you placed the app
 powershell -ExecutionPolicy Bypass -File .\deploy\setup-windows.ps1 -Domain yourdomain.com
 ```
