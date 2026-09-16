@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 final class Http
 {
+    public const VERSION = '1.4.10';
+
     public static function json(mixed $data, int $status = 200): never
     {
         http_response_code($status);

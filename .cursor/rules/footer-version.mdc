@@ -1,0 +1,12 @@
+---
+description: Always show the software version in the main (landing) page footer.
+alwaysApply: true
+---
+
+# Footer version (InPmnt)
+
+Every shippable build must show the current software version on the **main/landing page footer**.
+
+- Keep root `VERSION` and any PHP/Python constants in lockstep (`Http::VERSION`, template `app_version`).
+- Footer line shape: `© … · InPmnt · MIT License` plus a clear version (e.g. `v1.4.10` or `Revision 1.4.10`).
+- When bumping a release, update the footer source of truth — never leave a stale version on `/`.

@@ -127,6 +127,7 @@
 
   <footer class="landing-footer">
     <p>© 2026 Robert Foster · InPmnt · MIT License</p>
+    <p>v<?= Http::e(Http::VERSION) ?></p>
     <?php if (!empty($show_demo_login)): ?>
     <p>Local demo: demouser@inpmnt.app / Demo (SHOW_DEMO_LOGIN=1)</p>
     <?php endif; ?>

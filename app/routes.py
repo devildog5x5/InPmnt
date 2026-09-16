@@ -5,6 +5,7 @@ import os
 import re
 from datetime import date, datetime, timedelta
 from functools import wraps
+from pathlib import Path
 from typing import Any
 
 from flask import (
@@ -116,7 +117,16 @@ def landing():
         publishable_key=cfg.publishable_key,
         plans=PLANS,
         show_demo_login=_show_demo_login(),
+        app_version=_app_version(),
     )
+
+
+def _app_version() -> str:
+    path = Path(__file__).resolve().parents[1] / "VERSION"
+    try:
+        return path.read_text(encoding="utf-8").strip() or "0"
+    except OSError:
+        return "0"
 
 
 def _show_demo_login() -> bool:
