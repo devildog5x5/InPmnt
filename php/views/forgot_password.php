@@ -1,9 +1,9 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en" data-theme="<?= Http::e(Http::theme()) ?>" style="color-scheme: <?= Http::theme() === 'dark' ? 'dark' : 'light' ?>">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Forgot password Â· InPmnt</title>
+  <title>Forgot password · InPmnt</title>
   <link rel="icon" type="image/png" href="/static/img/inpmnt-icon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -23,7 +23,7 @@
         </div>
       </div>
       <h1>Reset your password</h1>
-      <p class="lead">Enter the email for your admin or workspace account. Weâ€™ll send a reset link, or save one next to the database if email isnâ€™t set up.</p>
+      <p class="lead">Enter the email for your admin or workspace account. We’ll send a reset link, or save one next to the database if email isn’t set up.</p>
       <?php if (!empty($notice)): ?>
       <div class="auth-ok"><?= Http::e($notice) ?></div>
       <?php endif; ?>
@@ -37,7 +37,7 @@
       </form>
       <?php endif; ?>
       <p class="auth-foot">
-        <a href="/login">â† Back to log in</a>
+        <a href="/login">← Back to log in</a>
       </p>
     </div>
   </div>

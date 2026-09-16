@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en" data-theme="{{ ui_theme }}" style="color-scheme: {{ ui_theme }}">
 <head>
   <meta charset="UTF-8" />
@@ -19,7 +19,7 @@
       </div>
       <div class="brand-copy">
         <div class="brand-mark" style="color:var(--ink)">InPmnt</div>
-        <div class="brand-sub" style="color:var(--muted)">Invoice chase Â· Payment reminders</div>
+        <div class="brand-sub" style="color:var(--muted)">Invoice chase · Payment reminders</div>
       </div>
     </div>
     <div class="nav-actions">
@@ -48,27 +48,27 @@
 
   <section class="landing-section" id="features">
     <h2>Everything you need to collect faster</h2>
-    <p class="sub">A focused tool â€” not another bloated accounting suite.</p>
+    <p class="sub">A focused tool — not another bloated accounting suite.</p>
     <div class="feature-grid">
       <article class="feature">
         <h3>Smart reminder schedules</h3>
-        <p>Auto-queue friendly nudges before due date, on the day, and after â€” email or SMS templates you control.</p>
+        <p>Auto-queue friendly nudges before due date, on the day, and after — email or SMS templates you control.</p>
       </article>
       <article class="feature">
         <h3>Aging &amp; overdue dashboard</h3>
-        <p>See open balances, 1â€“30 / 31â€“60 / 60+ aging, and which invoices need a final notice today.</p>
+        <p>See open balances, 1–30 / 31–60 / 60+ aging, and which invoices need a final notice today.</p>
       </article>
       <article class="feature">
         <h3>One-tap final notice</h3>
-        <p>Escalate politely when someoneâ€™s been quiet too long. Log every send for your records.</p>
+        <p>Escalate politely when someone’s been quiet too long. Log every send for your records.</p>
       </article>
       <article class="feature">
         <h3>Clients &amp; open balances</h3>
-        <p>Keep contact details, notes, and who still owes you â€” without leaving the app.</p>
+        <p>Keep contact details, notes, and who still owes you — without leaving the app.</p>
       </article>
       <article class="feature">
         <h3>Payment tracking</h3>
-        <p>Record partial or full payments and watch reminders cancel themselves when youâ€™re paid.</p>
+        <p>Record partial or full payments and watch reminders cancel themselves when you’re paid.</p>
       </article>
       <article class="feature">
         <h3>Pays for itself</h3>
@@ -117,9 +117,9 @@
     </div>
     <p class="sub" style="margin-top:18px">
       {% if stripe_enabled %}
-      Stripe Checkout is live â€” cards processed securely by Stripe.
+      Stripe Checkout is live — cards processed securely by Stripe.
       {% else %}
-      Stripe keys not configured yet â€” buttons open the demo workspace. Add keys from <code>.env.example</code> to go live.
+      Stripe keys not configured yet — buttons open the demo workspace. Add keys from <code>.env.example</code> to go live.
       {% endif %}
       Or <a href="{{ url_for('main.signup') }}">start the free trial</a> first.
     </p>
@@ -127,7 +127,7 @@
 
   <footer class="landing-footer" id="site-version">
     <p>InPmnt v{{ app_version }}</p>
-    <p>© 2026 Robert Foster · MIT License</p>
+    <p>© 2026 Robert Foster</p>
     {% if show_demo_login %}
     <p>Local demo: demouser@inpmnt.app / Demo (SHOW_DEMO_LOGIN=1)</p>
     {% endif %}
@@ -152,7 +152,7 @@
             location.href = data.url;
             return;
           }
-          // Stripe not configured â€” send to demo login
+          // Stripe not configured — send to demo login
           location.href = "{{ url_for('main.login') }}";
         } catch (e) {
           location.href = "{{ url_for('main.login') }}";

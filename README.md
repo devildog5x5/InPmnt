@@ -12,12 +12,12 @@ Packages are published on the [GitHub Releases](https://github.com/devildog5x5/I
 
 | Package | What you get | Download |
 |---------|----------------|----------|
-| **PHP (Hostinger)** | Unzip into `public_html` — no VPS | [InPmnt-PHP.v1.4.14.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.4.14/InPmnt-PHP.v1.4.14.zip) |
-| **Portable** | Runnable Windows app — `install.ps1` or `start.ps1` | [InPmnt-Portable.v1.4.14.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.4.14/InPmnt-Portable.v1.4.14.zip) |
-| **Source** | Full source (Python + PHP + Docker) | [InPmnt-Source.v1.4.14.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.4.14/InPmnt-Source.v1.4.14.zip) |
-| **Icon** | Brand icon assets (blue / teal / violet) | [InPmnt-Icon.v1.4.14.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.4.14/InPmnt-Icon.v1.4.14.zip) |
+| **PHP (Hostinger)** | Unzip into `public_html` — no VPS | [InPmnt-PHP.v1.4.15.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.4.15/InPmnt-PHP.v1.4.15.zip) |
+| **Portable** | Runnable Windows app — `install.ps1` or `start.ps1` | [InPmnt-Portable.v1.4.15.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.4.15/InPmnt-Portable.v1.4.15.zip) |
+| **Source** | Full source (Python + PHP + Docker) | [InPmnt-Source.v1.4.15.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.4.15/InPmnt-Source.v1.4.15.zip) |
+| **Icon** | Brand icon assets (blue / teal / violet) | [InPmnt-Icon.v1.4.15.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.4.15/InPmnt-Icon.v1.4.15.zip) |
 
-- Latest release: [v1.4.14](https://github.com/devildog5x5/InPmnt/releases/tag/v1.4.14)
+- Latest release: [v1.4.15](https://github.com/devildog5x5/InPmnt/releases/tag/v1.4.15)
 - Sign up: `/signup` · Local demo (optional): set `SHOW_DEMO_LOGIN=1` then `demouser@inpmnt.app` / `Demo`
 - App URL (local): `https://127.0.0.1:5055` (self-signed cert; accept the browser warning)
 - Rebuild locally: `powershell -File .\build_release.ps1` → `installers\*.zip`
@@ -112,7 +112,7 @@ Production TLS (Let's Encrypt / IIS) is handled by nginx or IIS in front of the 
 
 InPmnt now ships a **PHP** build you can drop on Hostinger Web/Cloud (no VPS).
 
-1. Download [InPmnt-PHP.v1.4.14.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.4.14/InPmnt-PHP.v1.4.14.zip).
+1. Download [InPmnt-PHP.v1.4.15.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.4.15/InPmnt-PHP.v1.4.15.zip).
 2. In hPanel → **Files → File Manager** (or FTP), unzip **all files into `public_html`**.
 3. Copy `.env.example` → `.env`. Set `APP_SECRET` (long random string) and `BASE_URL=https://yourdomain.com`.
 4. hPanel → **Advanced → PHP Configuration**: PHP **8.2+**, enable **pdo_sqlite**.
@@ -206,7 +206,6 @@ Without keys, the app still runs in demo/trial mode.
 | Brand | **InPmnt** |
 | Tagline | Get paid without the chase |
 | Author | Robert Foster |
-| License | MIT |
 | Icon | `static/img/inpmnt-icon.png` |
 | UI | Teal + slate system aligned with Coalesce ERP |
 | Repo / releases | https://github.com/devildog5x5/InPmnt |
@@ -220,7 +219,3 @@ See [GO_TO_MARKET.md](GO_TO_MARKET.md).
 - Python 3 + Flask + SQLite
 - Stripe Checkout / Billing Portal / webhooks
 - Vanilla HTML / CSS / JS (Source Serif 4 + IBM Plex)
-
-## License
-
-MIT © 2026 Robert Foster

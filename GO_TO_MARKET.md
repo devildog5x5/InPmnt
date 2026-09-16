@@ -33,7 +33,7 @@ Offer a **14-day trial** (already seeded in the app). Collect card on day 0 or d
 ### Day 1–2 — Ship the demo
 - [x] Working app + demo data
 - [x] Landing page + pricing
-- [x] App icon + MIT license
+- [x] App icon
 - [x] Docker image + Hostinger deploy docs
 - [ ] Deploy to Hostinger VPS + point domain
 

@@ -20,7 +20,7 @@ $include = @(
     "app", "static", "templates", "assets", "deploy", "php",
     "requirements.txt", "run.py", "passenger_wsgi.py", "start.ps1", "install.ps1", "uninstall.ps1", "reset_db.ps1", "VERSION",
     "Dockerfile", "docker-compose.yml", "docker-entrypoint.sh", ".dockerignore",
-    "README.md", "GO_TO_MARKET.md", "LICENSE", ".env.example", ".gitignore", ".gitattributes"
+    "README.md", "GO_TO_MARKET.md", ".env.example", ".gitignore", ".gitattributes"
 )
 
 $PortableDir = Join-Path $Stage "InPmnt"

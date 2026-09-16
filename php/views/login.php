@@ -1,9 +1,9 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en" data-theme="<?= Http::e(Http::theme()) ?>" style="color-scheme: <?= Http::theme() === 'dark' ? 'dark' : 'light' ?>">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Log in Â· InPmnt</title>
+  <title>Log in · InPmnt</title>
   <link rel="icon" type="image/png" href="/static/img/inpmnt-icon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -44,7 +44,7 @@
       <p class="auth-foot">
         <a href="/forgot-password">Forgot password?</a><br />
         New here? <a href="/signup">Start free trial</a><br />
-        <a href="/">â† Back to home</a>
+        <a href="/">← Back to home</a>
         <?php if (!empty($show_demo_login)): ?><br />Demo: demouser@inpmnt.app / Demo<?php endif; ?>
       </p>
     </div>
