@@ -1,0 +1,12 @@
+---
+description: Always fix defects as soon as they are found; do not leave known bugs for later.
+alwaysApply: true
+---
+
+# Fix errors as you find them (InPmnt)
+
+When testing, reviewing, or shipping, **fix every clear defect in the same turn** — do not only report it and ask whether to fix.
+
+Examples: encoding/mojibake, broken links, missing version text, 500s you caused, UI copy errors, auth/logout gaps.
+
+Ship the fix (bump patch, build, release, handoff) unless the user explicitly said to stop.

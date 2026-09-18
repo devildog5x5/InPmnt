@@ -1,0 +1,14 @@
+---
+description: Keep an admin-only /admin SQLite console on InPmnt.
+alwaysApply: true
+---
+
+# Admin panel (`/admin`)
+
+InPmnt PHP always exposes `/admin` for users with `role = admin`:
+
+- Browse every SQLite table; create / edit / delete rows
+- Run SQL (writes need confirm)
+- Light / dark via `sessionStorage` (`inpmnt_admin_theme`) — per browser window
+
+Do not remove `/admin` without Robert asking. Keep it gated.

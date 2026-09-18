@@ -30,6 +30,8 @@ final class App
         } elseif ($method === 'GET' && ($path === '/app' || str_starts_with($path, '/app/'))) {
             $this->requireLogin();
             $this->view('app', ['user' => $GLOBALS['inpmnt_user']]);
+        } elseif ($path === '/admin') {
+            $this->admin();
         } elseif ($method === 'GET' && $path === '/billing/success') {
             $this->billingSuccess();
         } elseif ($method === 'POST' && $path === '/api/billing/webhook') {
@@ -56,6 +58,113 @@ final class App
         if (!$row) {
             unset($_SESSION['user_id']);
         }
+    }
+
+    private function requireAdminPage(): void
+    {
+        $this->requireLogin();
+        $role = strtolower((string) ($GLOBALS['inpmnt_user']['role'] ?? ''));
+        if ($role !== 'admin') {
+            Http::redirect('/app');
+        }
+    }
+
+    private function admin(): void
+    {
+        $this->requireAdminPage();
+        header('Cache-Control: private, no-store, no-cache, must-revalidate');
+        header('X-Robots-Tag: noindex, nofollow');
+        $admin = new Admin($this->db);
+        if (Http::method() === 'POST') {
+            Admin::verifyCsrf($_POST['csrf'] ?? null);
+            $op = (string) ($_POST['op'] ?? '');
+            try {
+                if ($op === 'sql') {
+                    $sql = (string) ($_POST['sql'] ?? '');
+                    $result = $admin->runSql($sql, !empty($_POST['confirm_write']));
+                    $this->view('admin', [
+                        'tables' => $admin->tables(),
+                        'table' => null,
+                        'browse' => null,
+                        'edit' => null,
+                        'columns' => [],
+                        'mode' => 'sql',
+                        'sql' => $sql,
+                        'sql_result' => $result,
+                        'flash' => $result['ok'] ? 'SQL finished.' : null,
+                        'error' => $result['ok'] ? null : ($result['error'] ?? 'SQL failed.'),
+                    ]);
+                }
+                $table = $admin->assertTable((string) ($_POST['table'] ?? ''));
+                $fields = $_POST['f'] ?? [];
+                if (!is_array($fields)) {
+                    $fields = [];
+                }
+                if ($op === 'insert') {
+                    $id = $admin->insert($table, $fields);
+                    $_SESSION['admin_flash'] = 'Inserted row ' . $id . '.';
+                    Http::redirect('/admin?table=' . rawurlencode($table));
+                }
+                if ($op === 'update') {
+                    $rowid = (int) ($_POST['rowid'] ?? 0);
+                    $admin->update($table, $rowid, $fields);
+                    $_SESSION['admin_flash'] = 'Row saved.';
+                    Http::redirect('/admin?table=' . rawurlencode($table) . '&rowid=' . $rowid);
+                }
+                if ($op === 'delete') {
+                    $admin->delete($table, (int) ($_POST['rowid'] ?? 0));
+                    $_SESSION['admin_flash'] = 'Row deleted.';
+                    Http::redirect('/admin?table=' . rawurlencode($table));
+                }
+                throw new InvalidArgumentException('Unknown admin action.');
+            } catch (InvalidArgumentException $e) {
+                $_SESSION['admin_flash'] = $e->getMessage();
+                Http::redirect('/admin');
+            }
+        }
+
+        $flash = $_SESSION['admin_flash'] ?? null;
+        unset($_SESSION['admin_flash']);
+        $view = (string) ($_GET['view'] ?? '');
+        $table = isset($_GET['table']) ? (string) $_GET['table'] : null;
+        $data = [
+            'tables' => $admin->tables(),
+            'table' => null,
+            'browse' => null,
+            'edit' => null,
+            'columns' => [],
+            'mode' => 'home',
+            'sql' => '',
+            'sql_result' => null,
+            'flash' => $flash,
+            'error' => null,
+        ];
+        try {
+            if ($view === 'sql') {
+                $data['mode'] = 'sql';
+            } elseif ($table) {
+                $table = $admin->assertTable($table);
+                $data['table'] = $table;
+                $data['columns'] = $admin->columns($table);
+                if (!empty($_GET['new'])) {
+                    $data['mode'] = 'new';
+                } elseif (isset($_GET['rowid'])) {
+                    $row = $admin->row($table, (int) $_GET['rowid']);
+                    if (!$row) {
+                        throw new InvalidArgumentException('Row not found.');
+                    }
+                    $data['mode'] = 'edit';
+                    $data['edit'] = $row;
+                } else {
+                    $data['mode'] = 'browse';
+                    $data['browse'] = $admin->browse($table, (int) ($_GET['page'] ?? 1));
+                }
+            }
+        } catch (InvalidArgumentException $e) {
+            $data['error'] = $e->getMessage();
+            $data['mode'] = 'home';
+        }
+        $this->view('admin', $data);
     }
 
     private function requireLogin(bool $api = false): void
