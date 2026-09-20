@@ -15,6 +15,8 @@ final class App
 
         if ($method === 'GET' && $path === '/') {
             $this->landing();
+        } elseif ($method === 'POST' && $path === '/support/chat') {
+            $this->supportChat();
         } elseif ($path === '/login') {
             $this->login();
         } elseif ($path === '/forgot-password') {
@@ -42,6 +44,20 @@ final class App
             http_response_code(404);
             echo 'Not found';
         }
+    }
+
+    private function supportChat(): never
+    {
+        if (!Http::verifyCsrfHeader()) {
+            Http::json(['reply' => 'That help session expired. Refresh the page, or email ' . HelpChat::supportEmail() . '.'], 403);
+        }
+        $body = Http::bodyJson();
+        $msg = trim((string) ($body['message'] ?? ''));
+        $history = $body['history'] ?? [];
+        if (!is_array($history)) {
+            $history = [];
+        }
+        Http::json(['reply' => HelpChat::reply($msg, $history)]);
     }
 
     private function loadUser(): void

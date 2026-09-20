@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="csrf-token" content="<?= Http::e(Http::csrfToken()) ?>" />
   <title>Choose a new password · InPmnt</title>
   <link rel="icon" type="image/png" href="/static/img/inpmnt-icon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -47,5 +48,6 @@
       </p>
     </div>
   </div>
+<?php require __DIR__ . '/_help_chat.php'; ?>
 </body>
 </html>

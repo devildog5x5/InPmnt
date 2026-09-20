@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="csrf-token" content="<?= Http::e(Http::csrfToken()) ?>" />
   <title>InPmnt v<?= Http::e(Http::VERSION) ?> — Get paid without the chase</title>
   <meta name="description" content="InPmnt automatically reminds clients about unpaid invoices so solo trades and freelancers get paid faster." />
   <link rel="icon" type="image/png" href="/static/img/inpmnt-icon.png" />
@@ -161,5 +162,6 @@
       });
     });
   </script>
+<?php require __DIR__ . '/_help_chat.php'; ?>
 </body>
 </html>

@@ -20,7 +20,9 @@ $csrf = Admin::csrfToken();
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex, nofollow">
+  <meta name="csrf-token" content="<?= Http::e(Http::csrfToken()) ?>">
   <title>Admin · InPmnt <?= Http::e($ver) ?></title>
+  <link rel="stylesheet" href="/static/css/app.css?v=<?= rawurlencode(Http::VERSION) ?>">
   <script>
   (function () {
     try {
@@ -35,10 +37,16 @@ $csrf = Admin::csrfToken();
     :root {
       --bg: #f4f7f6; --card: #fff; --text: #14201c; --muted: #5b6b65; --line: #d7e0dc;
       --accent: #0d7a62; --danger: #a4262c; --nav: #eef5f2;
+      --brand: #0d7a62; --brand-dark: #0a5f4c; --brand-soft: #e5f4f3;
+      --surface: #fff; --surface-2: #f4f7f6; --ink: #14201c;
+      --font-body: "IBM Plex Sans", system-ui, sans-serif;
+      --shadow-lg: 0 16px 40px rgba(0,0,0,0.16);
     }
     html[data-theme="dark"] {
       --bg: #101816; --card: #1a2421; --text: #e8f2ee; --muted: #9bb0a7; --line: #2c3a35;
       --accent: #3dba9a; --danger: #f1707b; --nav: #0c1210;
+      --brand: #3dba9a; --brand-dark: #2a9a7e; --brand-soft: #1a2421;
+      --surface: #1a2421; --surface-2: #101816; --ink: #e8f2ee;
     }
     * { box-sizing: border-box; }
     body { margin: 0; font: 14px/1.45 "IBM Plex Sans", system-ui, sans-serif; background: var(--bg); color: var(--text); }
@@ -269,5 +277,6 @@ $csrf = Admin::csrfToken();
     });
   })();
   </script>
+<?php require __DIR__ . '/_help_chat.php'; ?>
 </body>
 </html>

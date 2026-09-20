@@ -9,6 +9,7 @@ require $root . '/src/Mail.php';
 require $root . '/src/Billing.php';
 require $root . '/src/Workspace.php';
 require $root . '/src/Admin.php';
+require $root . '/src/HelpChat.php';
 require $root . '/src/App.php';
 
 Env::load($root . '/.env');

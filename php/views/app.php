@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="csrf-token" content="<?= Http::e(Http::csrfToken()) ?>" />
   <title>InPmnt v<?= Http::e(Http::VERSION) ?></title>
   <link rel="icon" type="image/png" href="/static/img/inpmnt-icon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -92,5 +93,6 @@
     };
   </script>
   <script type="module" src="/static/js/app.js?v=<?= rawurlencode(Http::VERSION) ?>"></script>
+<?php require __DIR__ . '/_help_chat.php'; ?>
 </body>
 </html>

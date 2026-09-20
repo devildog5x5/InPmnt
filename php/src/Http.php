@@ -3,12 +3,27 @@ declare(strict_types=1);
 
 final class Http
 {
-    public const VERSION = '1.5.00';
+    public const VERSION = '1.5.01';
 
     public static function theme(): string
     {
         $t = strtolower(trim((string) ($_SESSION['ui_theme'] ?? 'light')));
         return ($t === 'dark' || $t === 'light') ? $t : 'light';
+    }
+
+    public static function csrfToken(): string
+    {
+        if (empty($_SESSION['csrf'])) {
+            $_SESSION['csrf'] = bin2hex(random_bytes(16));
+        }
+        return (string) $_SESSION['csrf'];
+    }
+
+    public static function verifyCsrfHeader(): bool
+    {
+        $token = (string) ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '');
+        $need = self::csrfToken();
+        return $token !== '' && strlen($token) === strlen($need) && hash_equals($need, $token);
     }
 
     public static function setTheme(string $name): string
