@@ -66,6 +66,8 @@ InPmnt PHP — Hostinger / shared hosting
 3. In hPanel → Advanced → PHP Configuration: PHP 8.2+ and enable pdo_sqlite
 4. Open https://yourdomain.com  → Sign up
 5. Stripe webhook: https://yourdomain.com/api/billing/webhook
+6. Search engines: robots.txt and sitemap.xml are in this zip (site root).
+   The app fills Sitemap URLs from BASE_URL.
 
 Do not upload into a subfolder unless that subfolder is the site document root.
 The SQLite database is created automatically at data/inpmnt.db (blocked from the web).

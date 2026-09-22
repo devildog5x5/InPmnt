@@ -6,6 +6,9 @@ RewriteRule ^(\.env|bootstrap\.php)$ - [F,L]
 RewriteRule ^(src|views|data)(/|$) - [F,L]
 RewriteRule \.db$ - [F,L]
 
+# robots.txt / sitemap.xml go through PHP so Sitemap URLs use BASE_URL
+RewriteRule ^(robots\.txt|sitemap\.xml)$ index.php [QSA,L]
+
 # Existing public files (CSS/JS/images) are served as-is
 RewriteCond %{REQUEST_FILENAME} -f
 RewriteRule ^ - [L]

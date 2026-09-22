@@ -9,6 +9,9 @@ final class App
 
     public function run(): void
     {
+        if (Http::maybeSendSeo()) {
+            exit;
+        }
         $this->loadUser();
         $method = Http::method();
         $path = Http::path();

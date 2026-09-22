@@ -8,7 +8,7 @@ InPmnt helps plumbers, landscapers, photographers, and consultants stop losing c
 
 ## Downloads
 
-Packages are published on the [GitHub Releases](https://github.com/devildog5x5/InPmnt/releases) page. Each release ships **all three** archives.
+Packages are published on the [GitHub Releases](https://github.com/devildog5x5/InPmnt/releases) page. Each release ships **all four** archives.
 
 | Package | What you get | Download |
 |---------|----------------|----------|
@@ -117,6 +117,8 @@ InPmnt now ships a **PHP** build you can drop on Hostinger Web/Cloud (no VPS).
 3. Copy `.env.example` → `.env`. Set `APP_SECRET` (long random string) and `BASE_URL=https://yourdomain.com`.
 4. hPanel → **Advanced → PHP Configuration**: PHP **8.2+**, enable **pdo_sqlite**.
 5. Open `https://yourdomain.com` and sign up.
+
+`robots.txt` and `sitemap.xml` ship at the zip root (so they land in `public_html`). Set `BASE_URL` to your live domain so the sitemap URLs match.
 
 Stripe webhook: `https://yourdomain.com/api/billing/webhook`  
 SQLite is created at `data/inpmnt.db` (blocked from the web).

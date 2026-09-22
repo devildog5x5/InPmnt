@@ -1,0 +1,16 @@
+# InPmnt — index the marketing pages, skip the signed-in app
+User-agent: *
+Allow: /
+Allow: /signup
+Allow: /static/
+
+Disallow: /app
+Disallow: /admin
+Disallow: /api/
+Disallow: /login
+Disallow: /logout
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /billing/
+
+Sitemap: https://yourdomain.com/sitemap.xml
