@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 final class Http
 {
-    public const VERSION = '1.5.02';
+    public const VERSION = '1.5.03';
 
     public static function theme(): string
     {
@@ -104,5 +104,38 @@ final class Http
             || (($_SERVER['SERVER_PORT'] ?? '') === '443');
         $host = $_SERVER['HTTP_HOST'] ?? '127.0.0.1';
         return ($https ? 'https' : 'http') . '://' . $host;
+    }
+
+    public static function maybeSendSeo(): bool
+    {
+        if (self::method() !== 'GET' && self::method() !== 'HEAD') {
+            return false;
+        }
+        $map = [
+            '/robots.txt' => ['robots.txt', 'text/plain; charset=utf-8'],
+            '/sitemap.xml' => ['sitemap.xml', 'application/xml; charset=utf-8'],
+        ];
+        $path = self::path();
+        if (!isset($map[$path])) {
+            return false;
+        }
+        [$file, $type] = $map[$path];
+        $full = dirname(__DIR__) . '/' . $file;
+        if (!is_file($full)) {
+            return false;
+        }
+        $body = str_replace(
+            'https://yourdomain.com',
+            self::publicBase(),
+            (string) file_get_contents($full)
+        );
+        header('Content-Type: ' . $type);
+        header('Cache-Control: public, max-age=3600');
+        if (self::method() === 'GET') {
+            echo $body;
+        } else {
+            header('Content-Length: ' . (string) strlen($body));
+        }
+        return true;
     }
 }

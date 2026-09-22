@@ -1,0 +1,40 @@
+name: Release zips
+
+# Every tagged version publishes downloadable zip assets on GitHub Releases.
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build zips
+        run: python3 build_release.py
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            installers/InPmnt-PHP.v*.zip
+            installers/InPmnt-Portable.v*.zip
+            installers/InPmnt-Source.v*.zip
+            installers/InPmnt-Icon.v*.zip
+          fail_on_unmatched_files: true
+          generate_release_notes: true
+          body: |
+            Hostinger PHP zip includes `robots.txt` and `sitemap.xml` at the site root.
+
+            Unzip **InPmnt-PHP** into `public_html`. Portable Windows app: `install.ps1` or `start.ps1`.

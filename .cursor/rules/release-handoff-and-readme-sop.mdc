@@ -15,13 +15,17 @@ alwaysApply: true
 
 ## Builds + GitHub Release (required)
 
-1. `powershell -File .\build_release.ps1 <version>`
+A zip is **not shipped** until it is a GitHub Release asset with a public `releases/download/` URL. Never leave the user with only a local `installers\` path.
+
+1. `powershell -File .\build_release.ps1 <version>` (or `python3 build_release.py` on Linux).
 2. Produce **all four** zips under `installers\` with the version **at the end** of the filename:
    - `InPmnt-PHP.vX.Y.Z.zip` — Hostinger / `public_html` drop
    - `InPmnt-Portable.vX.Y.Z.zip` — runnable Windows app (use `start.ps1`)
    - `InPmnt-Source.vX.Y.Z.zip` — source distribution
    - `InPmnt-Icon.vX.Y.Z.zip` — brand icon assets
 3. Create the next tag (`vX.Y.Z`) and **GitHub Release**, uploading **all four** assets.
+   - Prefer `gh release create vX.Y.Z installers/InPmnt-*.vX.Y.Z.zip --title "InPmnt X.Y.Z"`.
+   - If `gh` cannot create the release, **push the tag** (`git tag vX.Y.Z && git push origin vX.Y.Z`) so `.github/workflows/release.yml` publishes the zips.
 4. Update README Downloads with verbatim HTTPS links for the same tag and filenames.
 5. Commit and push the README if links changed.
 

@@ -6,6 +6,7 @@
   <meta name="csrf-token" content="<?= Http::e(Http::csrfToken()) ?>" />
   <title>InPmnt v<?= Http::e(Http::VERSION) ?> — Get paid without the chase</title>
   <meta name="description" content="InPmnt automatically reminds clients about unpaid invoices so solo trades and freelancers get paid faster." />
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml" />
   <link rel="icon" type="image/png" href="/static/img/inpmnt-icon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

@@ -124,6 +124,35 @@ def load_user() -> None:
 
 # ---------- Pages ----------
 
+def _php_dir() -> Path:
+    return Path(__file__).resolve().parents[1] / "php"
+
+
+def _public_base() -> str:
+    base = (os.environ.get("BASE_URL") or "").strip().rstrip("/")
+    if base:
+        return base
+    return request.url_root.rstrip("/")
+
+
+def _seo_file(filename: str, mimetype: str):
+    path = _php_dir() / filename
+    text = path.read_text(encoding="utf-8").replace("https://yourdomain.com", _public_base())
+    resp = current_app.response_class(text, content_type=mimetype)
+    resp.headers["Cache-Control"] = "public, max-age=3600"
+    return resp
+
+
+@bp.get("/robots.txt")
+def robots_txt():
+    return _seo_file("robots.txt", "text/plain; charset=utf-8")
+
+
+@bp.get("/sitemap.xml")
+def sitemap_xml():
+    return _seo_file("sitemap.xml", "application/xml; charset=utf-8")
+
+
 @bp.get("/")
 def landing():
     if session.get("user_id"):

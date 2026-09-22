@@ -30,6 +30,8 @@ No VPS. Uses the PHP rewrite in `php/`.
 5. Open `https://yourdomain.com` → **Start free trial**.
 6. Stripe webhook: `https://yourdomain.com/api/billing/webhook`
 
+The zip includes `robots.txt` and `sitemap.xml` at the site root. Set `BASE_URL` to the public https origin so sitemap `<loc>` values match the live domain.
+
 The database file is `public_html/data/inpmnt.db`. `.htaccess` blocks web access to `data/`, `src/`, and `.env`.
 
 Leave `SHOW_DEMO_LOGIN=0` on a public site. Point the domain at this Web hosting plan (not a separate VPS).

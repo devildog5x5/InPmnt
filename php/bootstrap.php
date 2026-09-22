@@ -2,15 +2,15 @@
 declare(strict_types=1);
 
 $root = is_dir(__DIR__ . '/src') ? __DIR__ : dirname(__DIR__);
-require $root . '/src/Env.php';
-require $root . '/src/Http.php';
-require $root . '/src/Db.php';
-require $root . '/src/Mail.php';
-require $root . '/src/Billing.php';
-require $root . '/src/Workspace.php';
-require $root . '/src/Admin.php';
-require $root . '/src/HelpChat.php';
-require $root . '/src/App.php';
+require_once $root . '/src/Env.php';
+require_once $root . '/src/Http.php';
+require_once $root . '/src/Db.php';
+require_once $root . '/src/Mail.php';
+require_once $root . '/src/Billing.php';
+require_once $root . '/src/Workspace.php';
+require_once $root . '/src/Admin.php';
+require_once $root . '/src/HelpChat.php';
+require_once $root . '/src/App.php';
 
 Env::load($root . '/.env');
 
