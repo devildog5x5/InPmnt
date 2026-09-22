@@ -22,6 +22,7 @@ $csrf = Admin::csrfToken();
   <meta name="robots" content="noindex, nofollow">
   <meta name="csrf-token" content="<?= Http::e(Http::csrfToken()) ?>">
   <title>Admin · InPmnt <?= Http::e($ver) ?></title>
+  <meta name="description" content="Owner console to browse InPmnt accounts, invoices, payment reminders, and billing records.">
   <link rel="stylesheet" href="/static/css/app.css?v=<?= rawurlencode(Http::VERSION) ?>">
   <script>
   (function () {
