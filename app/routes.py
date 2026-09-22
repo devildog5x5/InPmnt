@@ -138,7 +138,7 @@ def _public_base() -> str:
 def _seo_file(filename: str, mimetype: str):
     path = _php_dir() / filename
     text = path.read_text(encoding="utf-8").replace("https://yourdomain.com", _public_base())
-    resp = current_app.response_class(text, mimetype=mimetype)
+    resp = current_app.response_class(text, content_type=mimetype)
     resp.headers["Cache-Control"] = "public, max-age=3600"
     return resp
 
