@@ -12,12 +12,12 @@ Packages are published on the [GitHub Releases](https://github.com/devildog5x5/I
 
 | Package | What you get | Download |
 |---------|----------------|----------|
-| **PHP (Hostinger)** | Unzip into `public_html` — no VPS | [InPmnt-PHP.v1.5.01.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.5.01/InPmnt-PHP.v1.5.01.zip) |
-| **Portable** | Runnable Windows app — `install.ps1` or `start.ps1` | [InPmnt-Portable.v1.5.01.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.5.01/InPmnt-Portable.v1.5.01.zip) |
-| **Source** | Full source (Python + PHP + Docker) | [InPmnt-Source.v1.5.01.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.5.01/InPmnt-Source.v1.5.01.zip) |
-| **Icon** | Brand icon assets (blue / teal / violet) | [InPmnt-Icon.v1.5.01.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.5.01/InPmnt-Icon.v1.5.01.zip) |
+| **PHP (Hostinger)** | Unzip into `public_html` — no VPS | [InPmnt-PHP.v1.5.02.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.5.02/InPmnt-PHP.v1.5.02.zip) |
+| **Portable** | Runnable Windows app — `install.ps1` or `start.ps1` | [InPmnt-Portable.v1.5.02.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.5.02/InPmnt-Portable.v1.5.02.zip) |
+| **Source** | Full source (Python + PHP + Docker) | [InPmnt-Source.v1.5.02.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.5.02/InPmnt-Source.v1.5.02.zip) |
+| **Icon** | Brand icon assets (blue / teal / violet) | [InPmnt-Icon.v1.5.02.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.5.02/InPmnt-Icon.v1.5.02.zip) |
 
-- Latest release: [v1.5.01](https://github.com/devildog5x5/InPmnt/releases/tag/v1.5.01)
+- Latest release: [v1.5.02](https://github.com/devildog5x5/InPmnt/releases/tag/v1.5.02)
 - Sign up: `/signup` · Local demo (optional): set `SHOW_DEMO_LOGIN=1` then `demouser@inpmnt.app` / `Demo`
 - App URL (local): `https://127.0.0.1:5055` (self-signed cert; accept the browser warning)
 - Rebuild locally: `powershell -File .\build_release.ps1` → `installers\*.zip`
@@ -112,7 +112,7 @@ Production TLS (Let's Encrypt / IIS) is handled by nginx or IIS in front of the 
 
 InPmnt now ships a **PHP** build you can drop on Hostinger Web/Cloud (no VPS).
 
-1. Download [InPmnt-PHP.v1.5.01.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.5.01/InPmnt-PHP.v1.5.01.zip).
+1. Download [InPmnt-PHP.v1.5.02.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.5.02/InPmnt-PHP.v1.5.02.zip).
 2. In hPanel → **Files → File Manager** (or FTP), unzip **all files into `public_html`**.
 3. Copy `.env.example` → `.env`. Set `APP_SECRET` (long random string) and `BASE_URL=https://yourdomain.com`.
 4. hPanel → **Advanced → PHP Configuration**: PHP **8.2+**, enable **pdo_sqlite**.
