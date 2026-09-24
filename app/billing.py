@@ -16,7 +16,7 @@ PLANS = {
         "env_price": "STRIPE_PRICE_PRO",
     },
     "annual": {
-        "name": "Annual",
+        "name": "Starter Annual",
         "amount_label": "$99/yr",
         "env_price": "STRIPE_PRICE_ANNUAL",
     },

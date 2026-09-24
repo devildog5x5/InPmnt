@@ -11,7 +11,7 @@
   var history = [];
   var ignoreToggleUntil = 0;
   var chatUrl = wrap.getAttribute("data-url") || "/support/chat";
-  var supportEmail = wrap.getAttribute("data-email") || "CustomerService@FamilyShieldPro.com";
+  var supportEmail = wrap.getAttribute("data-email") || "support@invcpay.com";
 
   function linkify(text) {
     var div = document.createElement("div");

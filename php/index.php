@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 /**
- * InPmnt v1.5.02
+ * InPmnt v1.5.03
  *
  * Hostinger entry point. The version string above stays in lockstep with
  * Http::VERSION and the root VERSION file so a text search of index.php finds it.

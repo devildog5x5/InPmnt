@@ -18,7 +18,7 @@ final class HelpChat
     public static function supportEmail(): string
     {
         $em = trim(Env::get('SUPPORT_EMAIL'));
-        return $em !== '' ? $em : 'CustomerService@FamilyShieldPro.com';
+        return $em !== '' ? $em : 'support@invcpay.com';
     }
 
     public static function configured(): bool
@@ -83,7 +83,7 @@ final class HelpChat
         }
         $low = strtolower($msg);
         if (preg_match('/price|cost|plan|month|year|annual|19|39|99|billing|subscribe|stripe/', $low)) {
-            return 'InPmnt plans: Starter $19/mo, Pro $39/mo, or Annual $99/yr (Starter features). Open Billing in the app or start from the home page. Cards go through Stripe when keys are in .env.';
+            return 'InPmnt by InvcPay: Starter $19/mo, Pro $39/mo, or Starter Annual $99/yr (save $129, over 55% off). The 14-day trial does not need a card. You can change plans later from Billing. Email ' . $em . '.';
         }
         if (preg_match('/login|password|sign in|forgot|reset/', $low)) {
             return 'Sign in at /login. Forgot password is at /forgot-password — it emails a reset link when mail is configured. For a person, email ' . $em . '.';
@@ -187,7 +187,9 @@ You are the Help assistant for InPmnt, an invoice chase / payment reminder app.
 Speak in short, plain sentences. Do not invent features or prices.
 
 Product facts:
-- Plans: Starter \$19/mo, Pro \$39/mo, Annual \$99/yr (Starter features) via Stripe when configured.
+- Brand: InPmnt by InvcPay. Plans: Starter \$19/mo, Pro \$39/mo, Starter Annual \$99/yr (Starter features; save \$129, over 55% off — not two months free).
+- 14-day trial, no credit card required to start. A card is required only when subscribing. Plans can be changed later from Billing. Cancel anytime.
+- Stripe processes checkout. InPmnt does not store customers' card details.
 - Sign up at /signup. Sign in at /login. Forgot password at /forgot-password.
 - In the app, paste unpaid invoices and schedule polite reminder emails to clients.
 - Workspace admin console at /admin for admin-role users.

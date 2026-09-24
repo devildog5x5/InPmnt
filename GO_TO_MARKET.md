@@ -24,9 +24,9 @@ Pitch in one line: *“Pays for itself after one recovered invoice.”*
 |------|-------|------|
 | Starter | $19/mo | Up to 40 open invoices, email reminders |
 | Pro | $39/mo | Unlimited + SMS + custom templates |
-| Annual | $99/yr | Starter features, 2 months free |
+| Starter Annual | $99/yr | Starter features. Save $129 — over 55% off ($19 × 12 = $228). |
 
-Offer a **14-day trial** (already seeded in the app). Collect card on day 0 or day 7 once Stripe is wired.
+Offer a **14-day trial** (already seeded in the app). No card is required to start. A card is required only when the customer subscribes.
 
 ## 7-day launch plan
 
