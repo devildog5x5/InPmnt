@@ -172,7 +172,7 @@
     <div class="pricing-grid">
       <article class="price-card">
         <h3>Starter</h3>
-        <div class="price">$19<span>/mo</span></div>
+        <div class="price">$10<span>/mo</span></div>
         <p class="plan-save">Billed monthly.</p>
         <ul>
           <li>Up to 40 open invoices</li>
@@ -185,7 +185,7 @@
       <article class="price-card featured">
         <div class="popular">Most Popular</div>
         <h3>Pro</h3>
-        <div class="price">$39<span>/mo</span></div>
+        <div class="price">$20<span>/mo</span></div>
         <p class="plan-save">Billed monthly.</p>
         <ul>
           <li>Unlimited invoices</li>
@@ -197,8 +197,8 @@
       </article>
       <article class="price-card">
         <h3>Starter Annual</h3>
-        <div class="price">$99<span>/yr</span></div>
-        <p class="plan-save">Save $129 — over 55% off monthly Starter.</p>
+        <div class="price">$100<span>/yr</span></div>
+        <p class="plan-save">Save $20 — 2 months free versus monthly Starter.</p>
         <ul>
           <li>Starter features</li>
           <li>Up to 40 open invoices</li>
@@ -214,7 +214,7 @@
       <?php else: ?>
       Stripe keys are not configured yet — the trial still opens without a card. Add keys from <code>.env.example</code> before charging cards.
       <?php endif; ?>
-      Cancel anytime. Starter Annual is $99/year (Starter features): save $129, over 55% off the $228 you would pay monthly.
+      Cancel anytime. Starter Annual is $100/year (Starter features): save $20, which is 2 months free versus $10 × 12.
     </p>
   </section>
 

@@ -131,8 +131,8 @@ def support_chat():
     email = "support@invcpay.com"
     if any(w in msg for w in ("price", "plan", "annual", "billing", "cost")):
         reply = (
-            "InPmnt by InvcPay: Starter $19/mo, Pro $39/mo, or Starter Annual $99/yr "
-            "(save $129, over 55% off). The 14-day trial does not need a card. "
+            "InPmnt by InvcPay: Starter $10/mo, Pro $20/mo, or Starter Annual $100/yr "
+            "(save $20, 2 months free). The 14-day trial does not need a card. "
             f"You can change plans later from Billing. Email {email}."
         )
     else:

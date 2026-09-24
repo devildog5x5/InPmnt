@@ -173,7 +173,7 @@ powershell -ExecutionPolicy Bypass -File .\deploy\setup-windows.ps1 -Domain your
 
 ## Stripe billing
 
-InPmnt ships with **Stripe Checkout** (Starter $19/mo, Pro $39/mo, Starter Annual $99/yr — save $129, over 55% off) and the Customer Portal. The 14-day trial does not require a card.
+InPmnt ships with **Stripe Checkout** (Starter $10/mo, Pro $20/mo, Starter Annual $100/yr — save $20, 2 months free) and the Customer Portal. The 14-day trial does not require a card.
 
 1. Create products + recurring prices in the [Stripe Dashboard](https://dashboard.stripe.com/products).
 2. Copy `.env.example` → `.env` and set:

@@ -83,7 +83,7 @@ final class HelpChat
         }
         $low = strtolower($msg);
         if (preg_match('/price|cost|plan|month|year|annual|19|39|99|billing|subscribe|stripe/', $low)) {
-            return 'InPmnt by InvcPay: Starter $19/mo, Pro $39/mo, or Starter Annual $99/yr (save $129, over 55% off). The 14-day trial does not need a card. You can change plans later from Billing. Email ' . $em . '.';
+            return 'InPmnt by InvcPay: Starter $10/mo, Pro $20/mo, or Starter Annual $100/yr (save $20, 2 months free). The 14-day trial does not need a card. You can change plans later from Billing. Email ' . $em . '.';
         }
         if (preg_match('/login|password|sign in|forgot|reset/', $low)) {
             return 'Sign in at /login. Forgot password is at /forgot-password — it emails a reset link when mail is configured. For a person, email ' . $em . '.';
@@ -187,7 +187,7 @@ You are the Help assistant for InPmnt, an invoice chase / payment reminder app.
 Speak in short, plain sentences. Do not invent features or prices.
 
 Product facts:
-- Brand: InPmnt by InvcPay. Plans: Starter \$19/mo, Pro \$39/mo, Starter Annual \$99/yr (Starter features; save \$129, over 55% off — not two months free).
+- Brand: InPmnt by InvcPay. Plans: Starter \$10/mo, Pro \$20/mo, Starter Annual \$100/yr (Starter features; save \$20, which is 2 months free versus \$10 × 12).
 - 14-day trial, no credit card required to start. A card is required only when subscribing. Plans can be changed later from Billing. Cancel anytime.
 - Stripe processes checkout. InPmnt does not store customers' card details.
 - Sign up at /signup. Sign in at /login. Forgot password at /forgot-password.
