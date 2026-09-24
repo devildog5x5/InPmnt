@@ -169,15 +169,11 @@
   <section class="landing-section" id="pricing">
     <h2>Simple pricing</h2>
     <p class="sub">Start on a 14-day trial. No credit card required until you choose a paid plan. You can change plans later from Billing.</p>
-    <div class="bill-toggle" role="group" aria-label="Billing period">
-      <button type="button" class="is-on" data-period="month">Monthly</button>
-      <button type="button" data-period="year">Annual</button>
-    </div>
     <div class="pricing-grid">
-      <article class="price-card" data-plan="starter">
-        <h3 data-plan-name>Starter</h3>
-        <div class="price" data-plan-price>$19<span>/mo</span></div>
-        <p class="plan-save" data-plan-save hidden>Save $129 — over 55% off monthly Starter.</p>
+      <article class="price-card">
+        <h3>Starter</h3>
+        <div class="price">$19<span>/mo</span></div>
+        <p class="plan-save">Billed monthly.</p>
         <ul>
           <li>Up to 40 open invoices</li>
           <li>Email reminders</li>
@@ -190,7 +186,7 @@
         <div class="popular">Most Popular</div>
         <h3>Pro</h3>
         <div class="price">$39<span>/mo</span></div>
-        <p class="plan-save">Billed monthly. Switch to Starter Annual anytime.</p>
+        <p class="plan-save">Billed monthly.</p>
         <ul>
           <li>Unlimited invoices</li>
           <li>Email + SMS reminders</li>
@@ -198,6 +194,18 @@
           <li>Final notice workflows</li>
         </ul>
         <a class="btn" href="/signup">Start free trial</a>
+      </article>
+      <article class="price-card">
+        <h3>Starter Annual</h3>
+        <div class="price">$99<span>/yr</span></div>
+        <p class="plan-save">Save $129 — over 55% off monthly Starter.</p>
+        <ul>
+          <li>Starter features</li>
+          <li>Up to 40 open invoices</li>
+          <li>Email reminders</li>
+          <li>Best for solo operators</li>
+        </ul>
+        <a class="btn secondary" href="/signup">Start free trial</a>
       </article>
     </div>
     <p class="sub pricing-note">
@@ -245,23 +253,6 @@
       <?php endif; ?>
     </div>
   </footer>
-  <script>
-    (function () {
-      var buttons = document.querySelectorAll(".bill-toggle button");
-      var nameEl = document.querySelector("[data-plan-name]");
-      var priceEl = document.querySelector("[data-plan-price]");
-      var saveEl = document.querySelector("[data-plan-save]");
-      buttons.forEach(function (btn) {
-        btn.addEventListener("click", function () {
-          var year = btn.getAttribute("data-period") === "year";
-          buttons.forEach(function (b) { b.classList.toggle("is-on", b === btn); });
-          nameEl.textContent = year ? "Starter Annual" : "Starter";
-          priceEl.innerHTML = year ? "$99<span>/yr</span>" : "$19<span>/mo</span>";
-          saveEl.hidden = !year;
-        });
-      });
-    })();
-  </script>
 <?php require __DIR__ . '/_help_chat.php'; ?>
 </body>
 </html>

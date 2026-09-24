@@ -1074,10 +1074,7 @@ html[data-theme="dark"] .pricing-note { color: var(--muted); }
 .trust-strip ul { display: flex; flex-wrap: wrap; gap: 8px 18px; list-style: none; margin: 0; padding: 14px 16px; background: #fff; border: 1px solid var(--line); border-radius: 12px; }
 .trust-strip li { color: #243B53; font-size: 0.88rem; font-weight: 600; }
 .trust-strip li::before { content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 8px; border-radius: 50%; background: #087F78; }
-.bill-toggle { display: inline-flex; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 999px; background: #fff; margin: 0 0 16px; }
-.bill-toggle button { border: 0; background: transparent; color: #425466; font: inherit; font-weight: 650; padding: 8px 14px; border-radius: 999px; cursor: pointer; }
-.bill-toggle button.is-on { background: #087F78; color: #fff; }
-.pricing-grid { grid-template-columns: repeat(2, minmax(0, 360px)); }
+.pricing-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .price-card { display: flex; flex-direction: column; position: relative; }
 .price-card .btn { width: 100%; text-align: center; margin-top: auto; text-decoration: none; }
 .plan-save { min-height: 2.6em; margin: 0 0 10px; color: #425466; font-size: 0.88rem; }
