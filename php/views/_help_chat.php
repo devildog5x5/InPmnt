@@ -20,3 +20,4 @@ $helpEmail = HelpChat::supportEmail();
   </div>
 </div>
 <script src="/static/js/help-chat.js?v=<?= rawurlencode(Http::VERSION) ?>"></script>
+<script src="/static/js/password-toggle.js?v=<?= rawurlencode(Http::VERSION) ?>"></script>
