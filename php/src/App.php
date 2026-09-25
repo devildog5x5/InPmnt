@@ -15,6 +15,8 @@ final class App
 
         if ($method === 'GET' && $path === '/') {
             $this->landing();
+        } elseif ($method === 'GET' && isset(self::LEGAL[$path])) {
+            $this->legal($path);
         } elseif ($method === 'POST' && $path === '/support/chat') {
             $this->supportChat();
         } elseif ($path === '/login') {
@@ -213,6 +215,25 @@ final class App
         $root = dirname(__DIR__);
         require $root . '/views/' . $name . '.php';
         exit;
+    }
+
+    private const LEGAL = [
+        '/privacy' => ['title' => 'Privacy Policy', 'slug' => 'privacy'],
+        '/terms' => ['title' => 'Terms of Service', 'slug' => 'terms'],
+        '/contact' => ['title' => 'Contact', 'slug' => 'contact'],
+        '/support' => ['title' => 'Support', 'slug' => 'support'],
+        '/security' => ['title' => 'Data Security', 'slug' => 'security'],
+        '/refunds' => ['title' => 'Refund and cancellation policy', 'slug' => 'refunds'],
+    ];
+
+    private function legal(string $path): void
+    {
+        $page = self::LEGAL[$path];
+        $this->view('legal', [
+            'title' => $page['title'],
+            'slug' => $page['slug'],
+            'support_email' => HelpChat::supportEmail(),
+        ]);
     }
 
     private function landing(): void

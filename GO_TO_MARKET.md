@@ -22,11 +22,11 @@ Pitch in one line: *“Pays for itself after one recovered invoice.”*
 
 | Plan | Price | Hook |
 |------|-------|------|
-| Starter | $19/mo | Up to 40 open invoices, email reminders |
-| Pro | $39/mo | Unlimited + SMS + custom templates |
-| Annual | $99/yr | Starter features, 2 months free |
+| Starter | $10/mo | Up to 40 open invoices, email reminders |
+| Pro | $20/mo | Unlimited + SMS + custom templates |
+| Starter Annual | $100/yr | Starter features. Save $20 — 2 months free ($10 × 12 = $120). |
 
-Offer a **14-day trial** (already seeded in the app). Collect card on day 0 or day 7 once Stripe is wired.
+Offer a **14-day trial** (already seeded in the app). No card is required to start. A card is required only when the customer subscribes.
 
 ## 7-day launch plan
 
@@ -63,13 +63,13 @@ Offer a **14-day trial** (already seeded in the app). Collect card on day 0 or d
 - [ ] $20–50/day Facebook/Nextdoor ads targeting “plumber / landscaper / photographer” + city
 - [ ] 20 cold DMs/day: “Curious if late invoices are a pain — built a tiny tool that auto-nudges clients”
 - [ ] Post in 5 local trade / freelancer groups (value first, link in comments)
-- [ ] Offer founding rate: $99/yr locked for early users
+- [ ] Offer founding rate: $100/yr locked for early users
 
 ## Ad angles that convert
 
 1. **Money left on the table** — “How much are you owed right now?”
 2. **Awkward texts** — “Stop writing ‘just checking in on that invoice…’”
-3. **One recovered invoice** — “$39/mo vs one $640 job paid late”
+3. **One recovered invoice** — “$20/mo vs one $640 job paid late”
 4. **Not another QuickBooks** — “Reminders only. Takes 2 minutes to set up.”
 
 ## Demo script (under 60 seconds)

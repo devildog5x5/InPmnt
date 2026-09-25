@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="csrf-token" content="<?= Http::e(Http::csrfToken()) ?>" />
   <title>InPmnt v<?= Http::e(Http::VERSION) ?> — Get paid without the chase</title>
-  <meta name="description" content="InPmnt automatically reminds clients about unpaid invoices so solo trades and freelancers get paid faster." />
+  <meta name="description" content="InPmnt by InvcPay sends automated, professional invoice reminders so small businesses collect overdue payments without awkward follow-up." />
   <link rel="icon" type="image/png" href="/static/img/inpmnt-icon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -14,16 +14,18 @@
 </head>
 <body class="landing">
   <nav class="landing-nav">
-    <div class="brand">
+    <a class="brand" href="/">
       <div class="brand-logo img" aria-hidden="true">
         <img src="/static/img/inpmnt-icon.png" alt="" />
       </div>
       <div class="brand-copy">
-        <div class="brand-mark" style="color:var(--ink)">InPmnt</div>
-        <div class="brand-sub" style="color:var(--muted)">Invoice chase · Payment reminders</div>
+        <div class="brand-mark">InPmnt</div>
+        <div class="brand-sub">by InvcPay</div>
       </div>
-    </div>
+    </a>
     <div class="nav-actions">
+      <a href="#pricing">Pricing</a>
+      <a href="#how">How it works</a>
       <a class="btn secondary sm" href="/login">Log in</a>
       <a class="btn sm" href="/signup">Start free trial</a>
     </div>
@@ -31,47 +33,133 @@
 
   <header class="landing-hero">
     <div>
-      <div class="brand-mark">InPmnt</div>
       <h1>Get paid without the chase.</h1>
-      <p class="sub">
-        Paste unpaid invoices, set polite reminder schedules, and stop losing cash to late payers.
-        Built for plumbers, landscapers, photographers, and consultants.
-      </p>
+      <p class="sub">Automated, professional invoice reminders that help small businesses collect overdue payments without awkward follow-up.</p>
+      <p class="audience">Built for contractors, consultants, photographers, landscapers and other service businesses.</p>
       <div class="hero-cta">
         <a class="btn" href="/signup">Start free trial</a>
         <a class="btn secondary" href="#pricing">See pricing</a>
       </div>
+      <p class="hero-note">14-day trial. No credit card required to start.</p>
     </div>
-    <div class="hero-visual" aria-hidden="true">
-      <img src="/static/img/inpmnt-icon.png" alt="InPmnt icon" />
+    <div class="hero-visual">
+      <div class="browser-frame">
+        <div class="browser-chrome" aria-hidden="true">
+          <span></span><span></span><span></span>
+          <div class="browser-url">app.invcpay.com</div>
+        </div>
+        <div class="dash-shot">
+          <div class="dash-top">
+            <strong>Outstanding</strong>
+            <span class="dash-toast">Payment received · Harbor Studio · $1,240</span>
+          </div>
+          <div class="dash-kpis">
+            <div>
+              <em>Total outstanding</em>
+              <b>$18,460</b>
+            </div>
+            <div>
+              <em>Overdue invoices</em>
+              <b>7</b>
+            </div>
+          </div>
+          <div class="dash-aging" aria-label="Aging buckets">
+            <div><span>1–30</span><i style="width:72%"></i><small>$6,200</small></div>
+            <div><span>31–60</span><i style="width:48%"></i><small>$4,180</small></div>
+            <div><span>60+</span><i style="width:34%"></i><small>$8,080</small></div>
+          </div>
+          <ul class="dash-reminders">
+            <li><span>Tomorrow</span> Northside Landscaping · invoice 1042</li>
+            <li><span>Fri</span> Keller Consulting · final notice</li>
+            <li><span>Mon</span> Bright Frame Photo · due-date reminder</li>
+          </ul>
+        </div>
+      </div>
     </div>
   </header>
+
+  <section class="trust-strip" aria-label="Security and trial">
+    <ul>
+      <li>Secure checkout through Stripe</li>
+      <li>Your customers’ card details are not stored by InPmnt</li>
+      <li>Cancel anytime</li>
+      <li>14-day trial</li>
+    </ul>
+  </section>
+
+  <section class="landing-section" id="how">
+    <h2>How it works</h2>
+    <p class="sub">Three steps from an unpaid invoice to a recorded payment.</p>
+    <div class="steps">
+      <article class="step">
+        <div class="step-art" aria-hidden="true">
+          <div class="mini-row"></div>
+          <div class="mini-row short"></div>
+          <div class="mini-row"></div>
+        </div>
+        <h3>1. Add your unpaid invoices</h3>
+        <p>Enter them manually or import your existing list.</p>
+      </article>
+      <article class="step">
+        <div class="step-art" aria-hidden="true">
+          <div class="mini-cal"><b>Due</b><b class="on">+3</b><b>+7</b></div>
+        </div>
+        <h3>2. Choose your reminder schedule</h3>
+        <p>Select when email or SMS reminders should be sent.</p>
+      </article>
+      <article class="step">
+        <div class="step-art" aria-hidden="true">
+          <div class="mini-paid">Paid · reminders stopped</div>
+        </div>
+        <h3>3. Get paid and move on</h3>
+        <p>Record the payment and future reminders stop automatically.</p>
+      </article>
+    </div>
+  </section>
 
   <section class="landing-section" id="features">
     <h2>Everything you need to collect faster</h2>
     <p class="sub">A focused tool — not another bloated accounting suite.</p>
     <div class="feature-grid">
       <article class="feature">
+        <div class="feat-icon teal" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v5l3 2"/></svg>
+        </div>
         <h3>Smart reminder schedules</h3>
         <p>Auto-queue friendly nudges before due date, on the day, and after — email or SMS templates you control.</p>
       </article>
       <article class="feature">
+        <div class="feat-icon blue" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M4 19V10M10 19V5M16 19v-7M22 19H2"/></svg>
+        </div>
         <h3>Aging &amp; overdue dashboard</h3>
         <p>See open balances, 1–30 / 31–60 / 60+ aging, and which invoices need a final notice today.</p>
       </article>
       <article class="feature">
+        <div class="feat-icon violet" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v5h5M9 13h6M9 17h4"/></svg>
+        </div>
         <h3>One-tap final notice</h3>
         <p>Escalate politely when someone’s been quiet too long. Log every send for your records.</p>
       </article>
       <article class="feature">
+        <div class="feat-icon teal" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><circle cx="9" cy="9" r="3"/><circle cx="16" cy="10" r="2.2"/><path d="M4 19c.6-2.6 2.6-4 5-4s4.4 1.4 5 4M14 15.2c1.4-.5 2.8-.3 4 .6.8.7 1.3 1.7 1.5 3.2"/></svg>
+        </div>
         <h3>Clients &amp; open balances</h3>
         <p>Keep contact details, notes, and who still owes you — without leaving the app.</p>
       </article>
       <article class="feature">
+        <div class="feat-icon blue" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M8.5 12.2l2.4 2.4 4.6-5"/></svg>
+        </div>
         <h3>Payment tracking</h3>
         <p>Record partial or full payments and watch reminders cancel themselves when you’re paid.</p>
       </article>
       <article class="feature">
+        <div class="feat-icon violet" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M12 3v18M16.5 7.5c-.8-1.2-2.2-2-4.2-2-2.6 0-4.3 1.4-4.3 3.3 0 4.6 8.5 2.4 8.5 6.4 0 2-1.8 3.5-4.5 3.5-2.2 0-3.8-.9-4.6-2.3"/><path d="M16 5l3-2v5"/></svg>
+        </div>
         <h3>Pays for itself</h3>
         <p>Recover one late invoice and the subscription is covered. Built by Robert Foster.</p>
       </article>
@@ -80,88 +168,91 @@
 
   <section class="landing-section" id="pricing">
     <h2>Simple pricing</h2>
-    <p class="sub">Start on a 14-day trial. Upgrade when the first recovered invoice proves it.</p>
+    <p class="sub">Start on a 14-day trial. No credit card required until you choose a paid plan. You can change plans later from Billing.</p>
     <div class="pricing-grid">
       <article class="price-card">
         <h3>Starter</h3>
-        <div class="price">$19<span>/mo</span></div>
+        <div class="price">$10<span>/mo</span></div>
+        <p class="plan-save">Billed monthly.</p>
         <ul>
           <li>Up to 40 open invoices</li>
           <li>Email reminders</li>
           <li>Dashboard &amp; aging</li>
           <li>1 workspace user</li>
         </ul>
-        <button class="btn secondary" type="button" data-checkout="starter">Subscribe with Stripe</button>
+        <a class="btn secondary" href="/signup">Start free trial</a>
       </article>
       <article class="price-card featured">
+        <div class="popular">Most Popular</div>
         <h3>Pro</h3>
-        <div class="price">$39<span>/mo</span></div>
+        <div class="price">$20<span>/mo</span></div>
+        <p class="plan-save">Billed monthly.</p>
         <ul>
           <li>Unlimited invoices</li>
           <li>Email + SMS reminders</li>
           <li>Custom templates</li>
           <li>Final notice workflows</li>
         </ul>
-        <button class="btn" type="button" data-checkout="pro">Subscribe with Stripe</button>
+        <a class="btn" href="/signup">Start free trial</a>
       </article>
       <article class="price-card">
-        <h3>Annual</h3>
-        <div class="price">$99<span>/yr</span></div>
+        <h3>Starter Annual</h3>
+        <div class="price">$100<span>/yr</span></div>
+        <p class="plan-save">Save $20 — 2 months free versus monthly Starter.</p>
         <ul>
           <li>Starter features</li>
-          <li>2 months free</li>
+          <li>Up to 40 open invoices</li>
+          <li>Email reminders</li>
           <li>Best for solo operators</li>
-          <li>Cancel anytime</li>
         </ul>
-        <button class="btn secondary" type="button" data-checkout="annual">Subscribe with Stripe</button>
+        <a class="btn secondary" href="/signup">Start free trial</a>
       </article>
     </div>
-    <p class="sub" style="margin-top:18px">
+    <p class="sub pricing-note">
       <?php if (!empty($stripe_enabled)): ?>
-      Stripe Checkout is live — cards processed securely by Stripe.
+      Paid plans use secure checkout through Stripe. InPmnt does not store your customers’ card details.
       <?php else: ?>
-      Stripe keys not configured yet — buttons open the demo workspace. Add keys from <code>.env.example</code> to go live.
+      Stripe keys are not configured yet — the trial still opens without a card. Add keys from <code>.env.example</code> before charging cards.
       <?php endif; ?>
-      Or <a href="/signup">start the free trial</a> first.
+      Cancel anytime. Starter Annual is $100/year (Starter features): save $20, which is 2 months free versus $10 × 12.
     </p>
   </section>
 
-  <footer class="landing-footer" id="site-version">
-    <p>InPmnt v<?= Http::e(Http::VERSION) ?></p>
-    <p>© 2026 Robert Foster</p>
-    <?php if (!empty($show_demo_login)): ?>
-    <p>Local demo: demouser@inpmnt.app / Demo (SHOW_DEMO_LOGIN=1)</p>
-    <?php endif; ?>
+  <footer class="landing-footer">
+    <div class="footer-brand">
+      <div class="brand">
+        <div class="brand-logo img" aria-hidden="true">
+          <img src="/static/img/inpmnt-icon.png" alt="" />
+        </div>
+        <div class="brand-copy">
+          <div class="brand-mark">InPmnt</div>
+          <div class="brand-sub">by InvcPay</div>
+        </div>
+      </div>
+      <p>Automated invoice reminders that help service businesses get paid without the chase.</p>
+    </div>
+    <div class="footer-col">
+      <h2>Product</h2>
+      <a href="#pricing">Pricing</a>
+      <a href="#how">How it works</a>
+      <a href="/support">Help</a>
+      <a href="/contact">Contact</a>
+    </div>
+    <div class="footer-col">
+      <h2>Legal</h2>
+      <a href="/privacy">Privacy</a>
+      <a href="/terms">Terms</a>
+      <a href="/security">Security</a>
+      <a href="/refunds">Refund and cancellation</a>
+    </div>
+    <div class="footer-meta">
+      <p>© 2026 Robert Foster</p>
+      <p>Support: <a href="mailto:support@invcpay.com">support@invcpay.com</a></p>
+      <?php if (!empty($show_demo_login)): ?>
+      <p>Local demo: demouser@inpmnt.app / Demo (SHOW_DEMO_LOGIN=1)</p>
+      <?php endif; ?>
+    </div>
   </footer>
-  <script>
-    document.querySelectorAll("[data-checkout]").forEach((btn) => {
-      btn.addEventListener("click", async () => {
-        const plan = btn.getAttribute("data-checkout");
-        btn.disabled = true;
-        try {
-          const res = await fetch("/api/billing/checkout", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ plan }),
-          });
-          const data = await res.json();
-          if (res.status === 401) {
-            location.href = "/login?next=" + encodeURIComponent("/app#/settings");
-            return;
-          }
-          if (data.url) {
-            location.href = data.url;
-            return;
-          }
-          location.href = "/login";
-        } catch (e) {
-          location.href = "/login";
-        } finally {
-          btn.disabled = false;
-        }
-      });
-    });
-  </script>
 <?php require __DIR__ . '/_help_chat.php'; ?>
 </body>
 </html>

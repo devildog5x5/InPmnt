@@ -124,6 +124,45 @@ def load_user() -> None:
 
 # ---------- Pages ----------
 
+@bp.post("/support/chat")
+def support_chat():
+    data = request.get_json(silent=True) or {}
+    msg = (data.get("message") or "").strip().lower()
+    email = "support@invcpay.com"
+    if any(w in msg for w in ("price", "plan", "annual", "billing", "cost")):
+        reply = (
+            "InPmnt by InvcPay: Starter $10/mo, Pro $20/mo, or Starter Annual $100/yr "
+            "(save $20, 2 months free). The 14-day trial does not need a card. "
+            f"You can change plans later from Billing. Email {email}."
+        )
+    else:
+        reply = f"Ask about plans, invoices, reminders, or login. For a person, email {email}."
+    return jsonify({"reply": reply})
+
+
+_LEGAL = {
+    "privacy": "Privacy Policy",
+    "terms": "Terms of Service",
+    "contact": "Contact",
+    "support": "Support",
+    "security": "Data Security",
+    "refunds": "Refund and cancellation policy",
+}
+
+
+@bp.get("/<slug>")
+def legal(slug: str):
+    title = _LEGAL.get(slug)
+    if not title:
+        return ("Not found", 404)
+    return render_template(
+        "legal.html",
+        title=title,
+        slug=slug,
+        support_email="support@invcpay.com",
+    )
+
+
 @bp.get("/")
 def landing():
     if session.get("user_id"):

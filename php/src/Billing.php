@@ -4,9 +4,9 @@ declare(strict_types=1);
 final class Billing
 {
     public const PLANS = [
-        'starter' => ['name' => 'Starter', 'amount_label' => '$19/mo', 'env_price' => 'STRIPE_PRICE_STARTER'],
-        'pro' => ['name' => 'Pro', 'amount_label' => '$39/mo', 'env_price' => 'STRIPE_PRICE_PRO'],
-        'annual' => ['name' => 'Annual', 'amount_label' => '$99/yr', 'env_price' => 'STRIPE_PRICE_ANNUAL'],
+        'starter' => ['name' => 'Starter', 'amount_label' => '$10/mo', 'env_price' => 'STRIPE_PRICE_STARTER'],
+        'pro' => ['name' => 'Pro', 'amount_label' => '$20/mo', 'env_price' => 'STRIPE_PRICE_PRO'],
+        'annual' => ['name' => 'Starter Annual', 'amount_label' => '$100/yr', 'env_price' => 'STRIPE_PRICE_ANNUAL'],
     ];
 
     public static function configuredValue(string $value, string $prefix = '', int $minLen = 16): bool
