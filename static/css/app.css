@@ -525,6 +525,22 @@ td.mono, .mono {
   box-shadow: 0 0 0 3px rgba(13, 107, 102, 0.14);
 }
 .field textarea { min-height: 96px; resize: vertical; }
+.pw-field { position: relative; }
+.pw-field input { width: 100%; padding-right: 64px; }
+.pw-toggle {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 0;
+  background: transparent;
+  color: var(--brand);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 4px;
+}
 
 /* ---------- Reminders ---------- */
 .stack { display: flex; flex-direction: column; gap: 10px; }
