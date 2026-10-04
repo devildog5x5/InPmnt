@@ -10,6 +10,7 @@ from typing import Any
 
 from flask import (
     Blueprint,
+    Response,
     current_app,
     g,
     jsonify,
@@ -72,9 +73,91 @@ def _ui_theme() -> str:
     return t if t in ("light", "dark") else "light"
 
 
+def _public_base() -> str:
+    base = (os.environ.get("BASE_URL") or "").strip().rstrip("/")
+    if base:
+        return base
+    return request.host_url.rstrip("/")
+
+
+_MARKETING_PAGES = (
+    ("/", "weekly", "1.0"),
+    ("/signup", "monthly", "0.6"),
+    ("/support", "monthly", "0.5"),
+    ("/contact", "monthly", "0.5"),
+    ("/privacy", "yearly", "0.3"),
+    ("/terms", "yearly", "0.3"),
+    ("/security", "yearly", "0.3"),
+    ("/refunds", "yearly", "0.3"),
+)
+
+
 @bp.context_processor
-def inject_ui() -> dict[str, str]:
-    return {"ui_theme": _ui_theme(), "app_version": _app_version()}
+def inject_ui() -> dict[str, Any]:
+    base = _public_base()
+    path = request.path or "/"
+    if len(path) > 1:
+        path = path.rstrip("/")
+    user = getattr(g, "user", None)
+    role = ""
+    if isinstance(user, dict):
+        role = str(user.get("role") or "")
+    return {
+        "ui_theme": _ui_theme(),
+        "app_version": _app_version(),
+        "canonical_url": base + ("/" if path == "/" else path),
+        "og_image": base + "/static/img/og-image.png",
+        "google_site_verification": (os.environ.get("GOOGLE_SITE_VERIFICATION") or "").strip(),
+        "msvalidate": (os.environ.get("MSVALIDATE_01") or "").strip(),
+        "nav_user": user,
+        "nav_logged_in": bool(user),
+        "nav_is_admin": role.strip().lower() == "admin",
+    }
+
+
+@bp.get("/robots.txt")
+def robots_txt():
+    base = _public_base()
+    body = (
+        "User-agent: *\n"
+        "Allow: /\n"
+        "Allow: /signup\n"
+        "Allow: /login\n"
+        "Allow: /forgot-password\n"
+        "Allow: /support\n"
+        "Allow: /contact\n"
+        "Allow: /privacy\n"
+        "Allow: /terms\n"
+        "Allow: /security\n"
+        "Allow: /refunds\n"
+        "Disallow: /app\n"
+        "Disallow: /app/\n"
+        "Disallow: /admin\n"
+        "Disallow: /dashboard\n"
+        "Disallow: /api/\n"
+        "Disallow: /billing/\n"
+        "Disallow: /logout\n"
+        "Disallow: /support/chat\n"
+        "\n"
+        f"Sitemap: {base}/sitemap.xml\n"
+    )
+    return Response(body, mimetype="text/plain; charset=utf-8")
+
+
+@bp.get("/sitemap.xml")
+def sitemap_xml():
+    base = _public_base()
+    lines = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+    ]
+    for path, freq, priority in _MARKETING_PAGES:
+        loc = base + ("/" if path == "/" else path)
+        lines.append(
+            f"  <url><loc>{loc}</loc><changefreq>{freq}</changefreq><priority>{priority}</priority></url>"
+        )
+    lines.append("</urlset>")
+    return Response("\n".join(lines) + "\n", mimetype="application/xml; charset=utf-8")
 
 
 def db_path() -> str:

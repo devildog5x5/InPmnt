@@ -4,15 +4,19 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="csrf-token" content="<?= Http::e(Http::csrfToken()) ?>" />
-  <title>Forgot password · InPmnt</title>
-  <meta name="description" content="Request a password reset for your InPmnt account and return to invoice tracking and payment reminders." />
+  <?php
+    $meta_title = 'Forgot password · InPmnt';
+    $meta_description = 'Request a password reset for your InPmnt account and return to invoice tracking and payment reminders.';
+    require __DIR__ . '/_meta.php';
+  ?>
   <link rel="icon" type="image/png" href="/static/img/inpmnt-icon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/css/app.css?v=<?= rawurlencode(Http::VERSION) ?>" />
 </head>
-<body>
+<body class="landing">
+<?php require __DIR__ . '/_nav.php'; ?>
   <div class="auth-page">
     <div class="auth-card">
       <div class="auth-brand">
@@ -43,6 +47,7 @@
       </p>
     </div>
   </div>
+<?php require __DIR__ . '/_version.php'; ?>
 <?php require __DIR__ . '/_help_chat.php'; ?>
 </body>
 </html>

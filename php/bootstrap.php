@@ -45,7 +45,24 @@ if (!extension_loaded('pdo_sqlite')) {
     exit;
 }
 
-$db = Db::connect($dbPath);
-Db::init($db);
+$attempts = 0;
+while (true) {
+    try {
+        $db = Db::connect($dbPath);
+        Db::init($db);
+        break;
+    } catch (PDOException $e) {
+        $attempts++;
+        $locked = str_contains($e->getMessage(), 'locked') || str_contains($e->getMessage(), 'busy');
+        if (!$locked || $attempts >= 4) {
+            http_response_code(500);
+            header('Content-Type: text/plain; charset=utf-8');
+            header_remove('X-Powered-By');
+            echo "InPmnt could not open its database. Reload the page in a moment.";
+            exit;
+        }
+        usleep(150000 * $attempts);
+    }
+}
 
 return $db;

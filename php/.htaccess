@@ -1,10 +1,44 @@
 RewriteEngine On
 RewriteBase /
 
-# Never serve secrets, PHP sources, or the SQLite file
-RewriteRule ^(\.env|bootstrap\.php)$ - [F,L]
-RewriteRule ^(src|views|data)(/|$) - [F,L]
-RewriteRule \.db$ - [F,L]
+# Hide the PHP banner where the host honors mod_headers / php_flag.
+<IfModule mod_headers.c>
+  Header always unset X-Powered-By
+  Header unset X-Powered-By
+</IfModule>
+<IfModule mod_php.c>
+  php_flag expose_php Off
+</IfModule>
+<IfModule mod_php8.c>
+  php_flag expose_php Off
+</IfModule>
+<IfModule lsapi_module>
+  php_flag expose_php Off
+</IfModule>
+
+# Never serve secrets, VCS metadata, dependency manifests, archives, or logs.
+RewriteRule (?i)(^|/)\.(env|git|svn|hg)(/|$) - [F,L]
+RewriteRule (?i)(^|/)(composer\.(json|lock)|package(-lock)?\.json|phpunit\.xml(\.dist)?)$ - [F,L]
+RewriteRule (?i)^(\.env.*|bootstrap\.php)$ - [F,L]
+RewriteRule ^(src|views|data|vendor|\.git)(/|$) - [F,L]
+RewriteRule (?i)\.(db|sqlite|sqlite3|sql|zip|log|ini|ps1|sh|md|bak|yml|yaml|lock|dist|env)$ - [F,L]
+
+<FilesMatch "(?i)^(composer\.(json|lock)|package(-lock)?\.json|\.env.*|\.gitignore|\.gitattributes|phpunit\.xml)$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Deny from all
+  </IfModule>
+</FilesMatch>
+<FilesMatch "(?i)\.(env|sql|zip|log|sqlite|sqlite3|db|bak|ps1|sh|md|ini)$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Deny from all
+  </IfModule>
+</FilesMatch>
 
 # Existing public files (CSS/JS/images) are served as-is
 RewriteCond %{REQUEST_FILENAME} -f

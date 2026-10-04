@@ -3,8 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>InPmnt v{{ app_version }} — Get paid without the chase</title>
-  <meta name="description" content="InPmnt by InvcPay sends automated, professional invoice reminders so small businesses collect overdue payments without awkward follow-up." />
+  {% set meta_title = "InPmnt — Get paid without the chase" %}
+  {% set meta_description = "InPmnt by InvcPay sends automated, professional invoice reminders so small businesses collect overdue payments without awkward follow-up." %}
+  {% include "_meta.html" %}
   <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/inpmnt-icon.png') }}" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -12,23 +13,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v={{ app_version }}" />
 </head>
 <body class="landing">
-  <nav class="landing-nav">
-    <a class="brand" href="{{ url_for('main.landing') }}">
-      <div class="brand-logo img" aria-hidden="true">
-        <img src="{{ url_for('static', filename='img/inpmnt-icon.png') }}" alt="" />
-      </div>
-      <div class="brand-copy">
-        <div class="brand-mark">InPmnt</div>
-        <div class="brand-sub">by InvcPay</div>
-      </div>
-    </a>
-    <div class="nav-actions">
-      <a href="#pricing">Pricing</a>
-      <a href="#how">How it works</a>
-      <a class="btn secondary sm" href="{{ url_for('main.login') }}">Log in</a>
-      <a class="btn sm" href="{{ url_for('main.signup') }}">Start free trial</a>
-    </div>
-  </nav>
+  {% include "_nav.html" %}
 
   <header class="landing-hero">
     <div>
@@ -245,6 +230,7 @@
       <a href="{{ url_for('main.legal', slug='refunds') }}">Refund and cancellation</a>
     </div>
     <div class="footer-meta">
+      <p class="site-version" id="site-version">InPmnt v{{ app_version }}</p>
       <p>© 2026 Robert Foster</p>
       <p>Support: <a href="mailto:support@invcpay.com">support@invcpay.com</a></p>
       {% if show_demo_login %}

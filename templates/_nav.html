@@ -1,0 +1,39 @@
+<nav class="landing-nav site-nav" aria-label="Main">
+  <a class="brand" href="{{ url_for('main.app_home') if nav_logged_in else url_for('main.landing') }}">
+    <div class="brand-logo img" aria-hidden="true"><img src="{{ url_for('static', filename='img/inpmnt-icon.png') }}" alt="" /></div>
+    <div class="brand-copy">
+      <div class="brand-mark">InPmnt</div>
+      <div class="brand-sub">by InvcPay</div>
+    </div>
+  </a>
+  <div class="nav-actions">
+    {% if nav_logged_in %}
+    <a href="{{ url_for('main.app_home') }}#/">Dashboard</a>
+    <a href="{{ url_for('main.app_home') }}#/reminders">Reminders</a>
+    <a href="{{ url_for('main.app_home') }}#/invoices">Invoices</a>
+    <a href="{{ url_for('main.app_home') }}#/clients">Clients</a>
+    <a href="{{ url_for('main.app_home') }}#/templates">Templates</a>
+    <a href="{{ url_for('main.app_home') }}#/settings">Settings</a>
+    <a href="{{ url_for('main.legal', slug='support') }}">Help</a>
+    <a href="{{ url_for('main.legal', slug='contact') }}">Contact</a>
+    <a href="{{ url_for('main.legal', slug='privacy') }}">Privacy</a>
+    <a href="{{ url_for('main.legal', slug='terms') }}">Terms</a>
+    <a href="{{ url_for('main.legal', slug='security') }}">Security</a>
+    <a href="{{ url_for('main.legal', slug='refunds') }}">Refunds</a>
+    {% if nav_is_admin %}<a href="/admin">Admin</a>{% endif %}
+    <a class="btn secondary sm" href="{{ url_for('main.logout') }}">Log out</a>
+    {% else %}
+    <a href="{{ url_for('main.landing') }}">Home</a>
+    <a href="{{ url_for('main.landing') }}#how">How it works</a>
+    <a href="{{ url_for('main.landing') }}#pricing">Pricing</a>
+    <a href="{{ url_for('main.legal', slug='support') }}">Help</a>
+    <a href="{{ url_for('main.legal', slug='contact') }}">Contact</a>
+    <a href="{{ url_for('main.legal', slug='privacy') }}">Privacy</a>
+    <a href="{{ url_for('main.legal', slug='terms') }}">Terms</a>
+    <a href="{{ url_for('main.legal', slug='security') }}">Security</a>
+    <a href="{{ url_for('main.legal', slug='refunds') }}">Refunds</a>
+    <a class="btn secondary sm" href="{{ url_for('main.login') }}">Log in</a>
+    <a class="btn sm" href="{{ url_for('main.signup') }}">Start free trial</a>
+    {% endif %}
+  </div>
+</nav>

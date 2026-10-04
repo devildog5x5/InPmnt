@@ -4,15 +4,20 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="csrf-token" content="<?= Http::e(Http::csrfToken()) ?>" />
-  <title>InPmnt v<?= Http::e(Http::VERSION) ?></title>
-  <meta name="description" content="InPmnt workspace for invoices, client payment reminders, and getting paid without chasing unpaid bills." />
+  <?php
+    $meta_title = 'InPmnt';
+    $meta_description = 'InPmnt workspace for invoices, client payment reminders, and getting paid without chasing unpaid bills.';
+    $meta_robots = 'noindex, nofollow';
+    require __DIR__ . '/_meta.php';
+  ?>
   <link rel="icon" type="image/png" href="/static/img/inpmnt-icon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/css/app.css?v=<?= rawurlencode(Http::VERSION) ?>" />
 </head>
-<body>
+<body class="app-body">
+<?php require __DIR__ . '/_nav.php'; ?>
   <div class="app-shell">
     <aside class="sidebar">
       <div class="brand">
@@ -64,6 +69,14 @@
             Admin
           </a>
           <?php endif; ?>
+          <a href="/support">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 16.5V7.5A3.5 3.5 0 0 1 8.5 4h7A3.5 3.5 0 0 1 19 7.5v5A3.5 3.5 0 0 1 15.5 16H9l-4 3.5z"/></svg>
+            Help
+          </a>
+          <a href="/contact">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16v12H4z"/><path d="m4 7 8 6 8-6"/></svg>
+            Contact
+          </a>
           <a href="/logout">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
             Log out
@@ -74,7 +87,6 @@
       <div class="sidebar-footer">
         <strong><?= Http::e($user['name'] ?? '') ?></strong>
         <span id="workspace-label">Foster Field Services · Trial</span>
-        <span class="site-version">InPmnt v<?= Http::e(Http::VERSION) ?></span>
       </div>
     </aside>
 

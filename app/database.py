@@ -81,9 +81,12 @@ DEFAULT_TEMPLATE_DEFS = [
 
 
 def connect(db_path: str) -> sqlite3.Connection:
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(db_path, timeout=5)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("PRAGMA journal_mode = WAL")
+    conn.execute("PRAGMA busy_timeout = 5000")
+    conn.execute("PRAGMA synchronous = NORMAL")
     return conn
 
 
@@ -451,17 +454,19 @@ def _ensure_system_accounts(conn: sqlite3.Connection) -> None:
             )
 
     demo = conn.execute(
-        "SELECT id, password_hash FROM users WHERE lower(email) = ?",
+        "SELECT id, name, role, password_hash FROM users WHERE lower(email) = ?",
         (DEMO_EMAIL,),
     ).fetchone()
     if demo:
         # System demo account: keep published Demo password.
+        # Skip the write when the row is already correct so startup (and any
+        # later init) does not take an exclusive lock on every call.
         if not check_password_hash(demo["password_hash"], DEMO_PASSWORD):
             conn.execute(
                 "UPDATE users SET password_hash = ?, name = ?, role = 'user' WHERE id = ?",
                 (generate_password_hash(DEMO_PASSWORD), DEMO_NAME, demo["id"]),
             )
-        else:
+        elif demo["name"] != DEMO_NAME or str(demo["role"] or "").lower() != "user":
             conn.execute(
                 "UPDATE users SET name = ?, role = 'user' WHERE id = ?",
                 (DEMO_NAME, demo["id"]),
@@ -477,15 +482,16 @@ def _ensure_system_accounts(conn: sqlite3.Connection) -> None:
         )
 
     admin = conn.execute(
-        "SELECT id FROM users WHERE lower(email) = ?",
+        "SELECT id, name, role FROM users WHERE lower(email) = ?",
         (ADMIN_EMAIL,),
     ).fetchone()
     if admin:
         # Keep the stored hash so Forgot password / recovery can stick.
-        conn.execute(
-            "UPDATE users SET name = ?, role = 'admin' WHERE id = ?",
-            (ADMIN_NAME, admin["id"]),
-        )
+        if admin["name"] != ADMIN_NAME or str(admin["role"] or "").lower() != "admin":
+            conn.execute(
+                "UPDATE users SET name = ?, role = 'admin' WHERE id = ?",
+                (ADMIN_NAME, admin["id"]),
+            )
     else:
         create_workspace(
             conn,

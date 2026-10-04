@@ -4,8 +4,11 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="csrf-token" content="<?= Http::e(Http::csrfToken()) ?>" />
-  <title>InPmnt v<?= Http::e(Http::VERSION) ?> — Get paid without the chase</title>
-  <meta name="description" content="InPmnt by InvcPay sends automated, professional invoice reminders so small businesses collect overdue payments without awkward follow-up." />
+  <?php
+    $meta_title = 'InPmnt — Get paid without the chase';
+    $meta_description = 'InPmnt by InvcPay sends automated, professional invoice reminders so small businesses collect overdue payments without awkward follow-up.';
+    require __DIR__ . '/_meta.php';
+  ?>
   <link rel="icon" type="image/png" href="/static/img/inpmnt-icon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -13,23 +16,7 @@
   <link rel="stylesheet" href="/static/css/app.css?v=<?= rawurlencode(Http::VERSION) ?>" />
 </head>
 <body class="landing">
-  <nav class="landing-nav">
-    <a class="brand" href="/">
-      <div class="brand-logo img" aria-hidden="true">
-        <img src="/static/img/inpmnt-icon.png" alt="" />
-      </div>
-      <div class="brand-copy">
-        <div class="brand-mark">InPmnt</div>
-        <div class="brand-sub">by InvcPay</div>
-      </div>
-    </a>
-    <div class="nav-actions">
-      <a href="#pricing">Pricing</a>
-      <a href="#how">How it works</a>
-      <a class="btn secondary sm" href="/login">Log in</a>
-      <a class="btn sm" href="/signup">Start free trial</a>
-    </div>
-  </nav>
+<?php require __DIR__ . '/_nav.php'; ?>
 
   <header class="landing-hero">
     <div>
@@ -246,6 +233,7 @@
       <a href="/refunds">Refund and cancellation</a>
     </div>
     <div class="footer-meta">
+      <p class="site-version" id="site-version">InPmnt v<?= Http::e(Http::VERSION) ?></p>
       <p>© 2026 Robert Foster</p>
       <p>Support: <a href="mailto:support@invcpay.com">support@invcpay.com</a></p>
       <?php if (!empty($show_demo_login)): ?>

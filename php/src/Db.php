@@ -29,13 +29,29 @@ final class Db
         $pdo = new PDO('sqlite:' . $path, null, null, [
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            PDO::ATTR_TIMEOUT => 5,
         ]);
         $pdo->exec('PRAGMA foreign_keys = ON');
+        $pdo->exec('PRAGMA journal_mode = WAL');
+        $pdo->exec('PRAGMA busy_timeout = 5000');
+        $pdo->exec('PRAGMA synchronous = NORMAL');
         return $pdo;
     }
 
     public static function init(PDO $db): void
     {
+        $schemaReady = $db->query(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='password_resets'"
+        )->fetch();
+        if ($schemaReady) {
+            $exists = $db->query('SELECT id FROM settings LIMIT 1')->fetch();
+            if (!$exists) {
+                self::seed($db);
+            } else {
+                self::ensureSystemAccounts($db);
+            }
+            return;
+        }
         $db->exec(<<<'SQL'
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -382,13 +398,23 @@ final class Db
 
     private static function ensureSystemAccounts(PDO $db): void
     {
-        $demo = $db->prepare('SELECT id, password_hash FROM users WHERE lower(email) = ?');
+        $demo = $db->prepare('SELECT id, name, role, password_hash FROM users WHERE lower(email) = ?');
         $demo->execute([self::DEMO_EMAIL]);
         $row = $demo->fetch();
         if ($row) {
-            if (!password_verify(self::DEMO_PASSWORD, $row['password_hash'])) {
+            $needsPassword = !password_verify(self::DEMO_PASSWORD, (string) $row['password_hash']);
+            $needsProfile = (string) ($row['name'] ?? '') !== self::DEMO_NAME
+                || strtolower((string) ($row['role'] ?? '')) !== 'user';
+            if ($needsPassword || $needsProfile) {
                 $db->prepare('UPDATE users SET password_hash=?, name=?, role=? WHERE id=?')
-                    ->execute([password_hash(self::DEMO_PASSWORD, PASSWORD_DEFAULT), self::DEMO_NAME, 'user', $row['id']]);
+                    ->execute([
+                        $needsPassword
+                            ? password_hash(self::DEMO_PASSWORD, PASSWORD_DEFAULT)
+                            : $row['password_hash'],
+                        self::DEMO_NAME,
+                        'user',
+                        $row['id'],
+                    ]);
             }
         } else {
             self::createWorkspace(
@@ -400,13 +426,19 @@ final class Db
                 'user'
             );
         }
-        $admin = $db->prepare('SELECT id FROM users WHERE lower(email) = ?');
+        $admin = $db->prepare('SELECT id, name, role FROM users WHERE lower(email) = ?');
         $admin->execute([self::ADMIN_EMAIL]);
         $arow = $admin->fetch();
         if ($arow) {
             // Keep the stored hash so Forgot password / recovery can stick.
-            $db->prepare('UPDATE users SET name=?, role=? WHERE id=?')
-                ->execute([self::ADMIN_NAME, 'admin', $arow['id']]);
+            // Do not write on every page view — that exclusive lock made public
+            // pages, including /refunds, return HTTP 500 under overlapping requests.
+            $nameOk = (string) ($arow['name'] ?? '') === self::ADMIN_NAME;
+            $roleOk = strtolower((string) ($arow['role'] ?? '')) === 'admin';
+            if (!$nameOk || !$roleOk) {
+                $db->prepare('UPDATE users SET name=?, role=? WHERE id=?')
+                    ->execute([self::ADMIN_NAME, 'admin', $arow['id']]);
+            }
         } else {
             self::createWorkspace(
                 $db,

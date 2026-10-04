@@ -3,23 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>{{ title }} · InPmnt</title>
+  {% set meta_title = title ~ " · InPmnt" %}
+  {% set meta_description = title ~ " for InPmnt by InvcPay." %}
+  {% include "_meta.html" %}
   <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/inpmnt-icon.png') }}" />
   <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v={{ app_version }}" />
 </head>
 <body class="landing">
-  <nav class="landing-nav">
-    <a class="brand" href="{{ url_for('main.landing') }}">
-      <div class="brand-logo img" aria-hidden="true"><img src="{{ url_for('static', filename='img/inpmnt-icon.png') }}" alt="" /></div>
-      <div class="brand-copy">
-        <div class="brand-mark">InPmnt</div>
-        <div class="brand-sub">by InvcPay</div>
-      </div>
-    </a>
-    <div class="nav-actions">
-      <a class="btn sm" href="{{ url_for('main.signup') }}">Start free trial</a>
-    </div>
-  </nav>
+  {% include "_nav.html" %}
   <article class="legal-page">
     <h1>{{ title }}</h1>
     {% if slug == 'privacy' %}
@@ -46,6 +37,7 @@
     {% endif %}
     <p><a href="{{ url_for('main.landing') }}">Back to home</a></p>
   </article>
+  <footer class="page-version" id="site-version">InPmnt v{{ app_version }}</footer>
   {% include "_help_chat.html" %}
 </body>
 </html>

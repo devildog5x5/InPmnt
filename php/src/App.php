@@ -13,7 +13,11 @@ final class App
         $method = Http::method();
         $path = Http::path();
 
-        if ($method === 'GET' && $path === '/') {
+        if ($method === 'GET' && $path === '/robots.txt') {
+            $this->robots();
+        } elseif ($method === 'GET' && $path === '/sitemap.xml') {
+            $this->sitemap();
+        } elseif ($method === 'GET' && $path === '/') {
             $this->landing();
         } elseif ($method === 'GET' && isset(self::LEGAL[$path])) {
             $this->legal($path);
@@ -234,6 +238,68 @@ final class App
             'slug' => $page['slug'],
             'support_email' => HelpChat::supportEmail(),
         ]);
+    }
+
+    /** @return list<array{0:string,1:string,2:string}> */
+    private function marketingPages(): array
+    {
+        return [
+            ['/', 'weekly', '1.0'],
+            ['/signup', 'monthly', '0.6'],
+            ['/support', 'monthly', '0.5'],
+            ['/contact', 'monthly', '0.5'],
+            ['/privacy', 'yearly', '0.3'],
+            ['/terms', 'yearly', '0.3'],
+            ['/security', 'yearly', '0.3'],
+            ['/refunds', 'yearly', '0.3'],
+        ];
+    }
+
+    private function robots(): never
+    {
+        $base = rtrim(Http::publicBase(), '/');
+        header('Content-Type: text/plain; charset=utf-8');
+        header('Cache-Control: public, max-age=3600');
+        header_remove('X-Powered-By');
+        echo "User-agent: *\n";
+        echo "Allow: /\n";
+        echo "Allow: /signup\n";
+        echo "Allow: /login\n";
+        echo "Allow: /forgot-password\n";
+        echo "Allow: /support\n";
+        echo "Allow: /contact\n";
+        echo "Allow: /privacy\n";
+        echo "Allow: /terms\n";
+        echo "Allow: /security\n";
+        echo "Allow: /refunds\n";
+        echo "Disallow: /app\n";
+        echo "Disallow: /app/\n";
+        echo "Disallow: /admin\n";
+        echo "Disallow: /dashboard\n";
+        echo "Disallow: /api/\n";
+        echo "Disallow: /billing/\n";
+        echo "Disallow: /logout\n";
+        echo "Disallow: /support/chat\n";
+        echo "\n";
+        echo "Sitemap: {$base}/sitemap.xml\n";
+        exit;
+    }
+
+    private function sitemap(): never
+    {
+        $base = rtrim(Http::publicBase(), '/');
+        header('Content-Type: application/xml; charset=utf-8');
+        header('Cache-Control: public, max-age=3600');
+        header_remove('X-Powered-By');
+        echo "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
+        echo "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n";
+        foreach ($this->marketingPages() as [$path, $freq, $priority]) {
+            $loc = $base . ($path === '/' ? '/' : $path);
+            echo '  <url><loc>' . htmlspecialchars($loc, ENT_QUOTES | ENT_XML1, 'UTF-8')
+                . '</loc><changefreq>' . $freq . '</changefreq><priority>' . $priority . "</priority></url>\n";
+        }
+        echo "</urlset>\n";
+        exit;
     }
 
     private function landing(): void
