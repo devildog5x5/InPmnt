@@ -29,9 +29,9 @@
   --shadow-lg: 0 24px 48px rgba(21, 32, 43, 0.14);
   --radius: 14px;
   --radius-sm: 10px;
-  --font-display: "Source Serif 4", "Iowan Old Style", Georgia, serif;
-  --font-body: "IBM Plex Sans", "Segoe UI", sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --font-display: Georgia, "Iowan Old Style", "Palatino Linotype", serif;
+  --font-body: "Segoe UI", system-ui, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
 }
 
 html[data-theme="dark"] {
@@ -915,9 +915,63 @@ html[data-theme="dark"] body.landing {
 .landing-footer .brand-mark { color: var(--ink); font-size: 1.28rem; }
 .landing-nav .brand-sub,
 .landing-footer .brand-sub { color: var(--accent); font-weight: 600; }
-.landing-nav .nav-actions { display: flex; gap: 12px 14px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.landing-nav .nav-actions,
+.landing-nav .nav-cta { display: flex; gap: 12px 14px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
 .landing-nav .nav-actions a:not(.btn) { color: var(--ink); font-weight: 600; text-decoration: none; font-size: 0.92rem; }
-.landing-nav .nav-actions a[aria-current="page"] { color: var(--brand); }
+.landing-nav .nav-actions a[aria-current="page"] { color: var(--brand); text-decoration: underline; text-underline-offset: 3px; }
+.hero-sample {
+  margin: 0;
+  padding: 8px 14px 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+.hero-price { margin: 0 0 16px; font-size: 1.05rem; color: var(--ink); }
+.hero-cta .text-link, a.text-link { color: var(--brand-dark); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+.faq-list { margin: 0; }
+.faq-list dt { font-weight: 700; color: var(--ink); margin-top: 16px; }
+.faq-list dd { margin: 6px 0 0; line-height: 1.55; }
+.guide-wide { max-width: 1120px; }
+.signup-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 420px);
+  gap: 28px;
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 8px 20px 40px;
+  align-items: start;
+}
+.signup-offer h1 {
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 4vw, 2.8rem);
+  letter-spacing: -0.03em;
+  margin: 0 0 12px;
+  color: var(--ink);
+}
+.signup-offer ul { padding-left: 18px; line-height: 1.6; }
+.field-hint { margin: 6px 0 0; color: var(--muted); font-size: 0.82rem; }
+.signup-layout .auth-card h2 {
+  font-family: var(--font-display);
+  margin: 0 0 6px;
+  font-size: 1.45rem;
+}
+@media (max-width: 800px) {
+  .signup-layout { grid-template-columns: 1fr; }
+  .landing-nav { padding: 12px 16px; align-items: flex-start; }
+  .landing-nav .nav-cta { margin-left: auto; flex-wrap: nowrap; }
+  .landing-nav .nav-actions {
+    order: 3;
+    flex: 1 0 100%;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+  .landing-nav .nav-actions a { white-space: nowrap; }
+}
 body.landing .auth-page {
   min-height: auto;
   background: transparent;

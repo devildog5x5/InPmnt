@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 final class Http
 {
-    public const VERSION = '1.5.06';
+    public const VERSION = '1.5.07';
 
     public static function theme(): string
     {
@@ -99,13 +99,104 @@ final class Http
 
     public static function publicBase(): string
     {
-        $base = rtrim(Env::get('BASE_URL'), '/');
-        if ($base !== '') {
-            return $base;
+        return self::canonicalBase();
+    }
+
+    /**
+     * One origin for canonical tags, the sitemap, and redirects.
+     * invcpay.com and www.invcpay.com always collapse to https://invcpay.com.
+     */
+    public static function canonicalBase(): string
+    {
+        $host = self::hostOnly();
+        if ($host === 'invcpay.com' || $host === 'www.invcpay.com') {
+            return 'https://invcpay.com';
         }
-        $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
-            || (($_SERVER['SERVER_PORT'] ?? '') === '443');
+        if ($host === '127.0.0.1' || $host === 'localhost') {
+            return self::requestOrigin();
+        }
+        $configured = rtrim(Env::get('BASE_URL'), '/');
+        if ($configured !== '') {
+            return $configured;
+        }
+        return self::requestOrigin();
+    }
+
+    public static function hostOnly(): string
+    {
+        $host = strtolower((string) ($_SERVER['HTTP_HOST'] ?? ''));
+        return (string) preg_replace('/:\d+$/', '', $host);
+    }
+
+    public static function isHttps(): bool
+    {
+        if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
+            return true;
+        }
+        if ((string) ($_SERVER['SERVER_PORT'] ?? '') === '443') {
+            return true;
+        }
+        $fwd = strtolower((string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? ''));
+        return $fwd === 'https';
+    }
+
+    public static function requestOrigin(): string
+    {
         $host = $_SERVER['HTTP_HOST'] ?? '127.0.0.1';
-        return ($https ? 'https' : 'http') . '://' . $host;
+        return (self::isHttps() ? 'https' : 'http') . '://' . $host;
+    }
+
+    public static function rawPath(): string
+    {
+        $uri = $_SERVER['REQUEST_URI'] ?? '/';
+        $path = parse_url($uri, PHP_URL_PATH);
+        if (!is_string($path) || $path === '') {
+            $path = '/';
+        }
+        return '/' . ltrim($path, '/');
+    }
+
+    /**
+     * 301 http/www/trailing-slash/index.php variants onto one URL so Search
+     * Console is not left with duplicates and no chosen canonical.
+     */
+    public static function enforceCanonicalUrl(): void
+    {
+        $verb = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
+        if ($verb !== 'GET' && $verb !== 'HEAD') {
+            return;
+        }
+        $raw = self::rawPath();
+        $path = $raw;
+        if (preg_match('#/index\.php$#', $path)) {
+            $path = substr($path, 0, -strlen('index.php'));
+            $path = rtrim($path, '/');
+            if ($path === '') {
+                $path = '/';
+            }
+        }
+        if ($path !== '/' && str_ends_with($path, '/')) {
+            $path = rtrim($path, '/') ?: '/';
+        }
+        $query = (string) ($_SERVER['QUERY_STRING'] ?? '');
+        $qs = $query !== '' ? '?' . $query : '';
+        $host = self::hostOnly();
+        $local = $host === '127.0.0.1' || $host === 'localhost';
+        if ($local) {
+            if ($path !== $raw) {
+                self::redirect($path . $qs, 301);
+            }
+            return;
+        }
+        $targetHost = strtolower((string) (parse_url(self::canonicalBase(), PHP_URL_HOST) ?: ''));
+        $hostMismatch = $targetHost !== '' && $host !== $targetHost;
+        $fwd = strtolower((string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? ''));
+        // Only upgrade scheme when a proxy says the visitor used http.
+        // A bare HTTPS=off behind Hostinger's CDN would otherwise redirect forever.
+        $schemeMismatch = $fwd === 'http';
+        if ($hostMismatch || $schemeMismatch || $path !== $raw) {
+            $target = self::canonicalBase() . ($path === '/' ? '/' : $path) . $qs;
+            self::redirect($target, 301);
+        }
     }
 }

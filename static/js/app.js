@@ -155,7 +155,7 @@ async function renderDashboard() {
                       .join("")}
                   </tbody>
                 </table>`
-              : empty("No open invoices. Nice work.")
+              : empty("No open invoices yet. Add one, then set a reminder schedule.")
           }
         </div>
       </div>
@@ -520,7 +520,7 @@ async function renderClients() {
               </tr>`
             )
             .join("")}</tbody></table>`
-      : empty("No clients yet.");
+      : empty("No clients yet. Add a client, then create their invoice.");
   };
   paint(clients);
   appEl.querySelector("#client-q").oninput = (e) => {

@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 /**
- * InPmnt v1.5.06
+ * InPmnt v1.5.07
  *
  * Hostinger entry point. The version string above stays in lockstep with
  * Http::VERSION and the root VERSION file so a text search of index.php finds it.
@@ -15,6 +15,7 @@ register_shutdown_function(static function (): void {
 });
 
 $db = require __DIR__ . '/bootstrap.php';
+Http::enforceCanonicalUrl();
 
 $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
 if (str_starts_with($path, '/static/')) {
@@ -33,7 +34,7 @@ if (str_starts_with($path, '/static/')) {
                 'webp' => 'image/webp',
             ];
             header('Content-Type: ' . ($types[$ext] ?? 'application/octet-stream'));
-            header('Cache-Control: public, max-age=86400');
+            header('Cache-Control: public, max-age=31536000, immutable');
             readfile($file);
             exit;
         }
