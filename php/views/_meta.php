@@ -1,10 +1,10 @@
 <?php
-$metaTitle = $meta_title ?? 'InPmnt';
-$metaDesc = $meta_description ?? 'InPmnt by InvcPay sends automated invoice reminders so small businesses collect overdue payments without awkward follow-up.';
+$metaTitle = $meta_title ?? 'InvcPay';
+$metaDesc = $meta_description ?? 'InvcPay sends invoice reminders so small businesses get paid without chasing clients. 14-day trial, no credit card. Then $10 or $20 a month, or $100 a year.';
 $metaRobots = $meta_robots ?? '';
 $metaPath = Http::path();
-$canonical = rtrim(Http::publicBase(), '/') . ($metaPath === '/' ? '/' : $metaPath);
-$ogImage = rtrim(Http::publicBase(), '/') . '/static/img/og-image.png';
+$canonical = rtrim(Http::canonicalBase(), '/') . ($metaPath === '/' ? '/' : $metaPath);
+$ogImage = rtrim(Http::canonicalBase(), '/') . '/static/img/og-image.png';
 $googleVerify = Env::get('GOOGLE_SITE_VERIFICATION');
 $msVerify = Env::get('MSVALIDATE_01');
 ?>
@@ -12,7 +12,7 @@ $msVerify = Env::get('MSVALIDATE_01');
   <meta name="description" content="<?= Http::e($metaDesc) ?>" />
   <link rel="canonical" href="<?= Http::e($canonical) ?>" />
   <meta property="og:type" content="website" />
-  <meta property="og:site_name" content="InPmnt" />
+  <meta property="og:site_name" content="InvcPay" />
   <meta property="og:title" content="<?= Http::e($metaTitle) ?>" />
   <meta property="og:description" content="<?= Http::e($metaDesc) ?>" />
   <meta property="og:url" content="<?= Http::e($canonical) ?>" />
@@ -28,3 +28,6 @@ $msVerify = Env::get('MSVALIDATE_01');
 <?php endif; ?>
   <meta name="google-site-verification" content="<?= Http::e($googleVerify) ?>" />
   <meta name="msvalidate.01" content="<?= Http::e($msVerify) ?>" />
+<?php if (!empty($json_ld)): ?>
+  <script type="application/ld+json"><?= json_encode($json_ld, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?></script>
+<?php endif; ?>

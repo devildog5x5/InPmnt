@@ -5,14 +5,48 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="csrf-token" content="<?= Http::e(Http::csrfToken()) ?>" />
   <?php
-    $meta_title = 'InPmnt — Get paid without the chase';
-    $meta_description = 'InPmnt by InvcPay sends automated, professional invoice reminders so small businesses collect overdue payments without awkward follow-up.';
+    $meta_title = 'InvcPay — Invoice reminders for small businesses';
+    $meta_description = 'Get paid without chasing clients. InvcPay sends invoice reminders for contractors and other service businesses. 14-day trial, no credit card. Then $10 or $20 a month, or $100 a year.';
+    $faqItems = require __DIR__ . '/_faq_data.php';
+    $base = rtrim(Http::canonicalBase(), '/');
+    $json_ld = [
+        '@context' => 'https://schema.org',
+        '@graph' => [
+            [
+                '@type' => 'Organization',
+                'name' => 'InvcPay',
+                'url' => $base . '/',
+                'email' => 'support@invcpay.com',
+                'logo' => $base . '/static/img/inpmnt-icon.png',
+            ],
+            [
+                '@type' => 'SoftwareApplication',
+                'name' => 'InvcPay',
+                'applicationCategory' => 'BusinessApplication',
+                'operatingSystem' => 'Web',
+                'url' => $base . '/',
+                'description' => 'Invoice reminders for small service businesses. 14-day trial, no credit card required.',
+                'offers' => [
+                    ['@type' => 'Offer', 'name' => 'Starter', 'price' => '10', 'priceCurrency' => 'USD', 'description' => 'Per month after a 14-day trial. Up to 40 open invoices and email reminders.'],
+                    ['@type' => 'Offer', 'name' => 'Pro', 'price' => '20', 'priceCurrency' => 'USD', 'description' => 'Per month after a 14-day trial. Unlimited open invoices, email and SMS.'],
+                    ['@type' => 'Offer', 'name' => 'Starter Annual', 'price' => '100', 'priceCurrency' => 'USD', 'description' => 'Per year for Starter features. $20 less than twelve months at $10.'],
+                ],
+            ],
+            [
+                '@type' => 'FAQPage',
+                'mainEntity' => array_map(static function (array $item): array {
+                    return [
+                        '@type' => 'Question',
+                        'name' => $item['q'],
+                        'acceptedAnswer' => ['@type' => 'Answer', 'text' => $item['a']],
+                    ];
+                }, $faqItems),
+            ],
+        ],
+    ];
     require __DIR__ . '/_meta.php';
   ?>
   <link rel="icon" type="image/png" href="/static/img/inpmnt-icon.png" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/css/app.css?v=<?= rawurlencode(Http::VERSION) ?>" />
 </head>
 <body class="landing">
@@ -20,14 +54,15 @@
 
   <header class="landing-hero">
     <div>
-      <h1>Get paid without the chase.</h1>
-      <p class="sub">Automated, professional invoice reminders that help small businesses collect overdue payments without awkward follow-up.</p>
-      <p class="audience">Built for contractors, consultants, photographers, landscapers and other service businesses.</p>
+      <h1>Get paid without chasing the invoice.</h1>
+      <p class="sub">InvcPay sends the reminder for you. Polite, on a schedule, and stopped when the invoice is paid.</p>
+      <p class="audience">For contractors, consultants, photographers, landscapers, and other service businesses.</p>
+      <p class="hero-price">14-day trial, no credit card. Then <strong>$10/mo</strong>, <strong>$20/mo</strong>, or <strong>$100/yr</strong>.</p>
       <div class="hero-cta">
         <a class="btn" href="/signup">Start free trial</a>
-        <a class="btn secondary" href="#pricing">See pricing</a>
+        <a class="text-link" href="/pricing">See what is included</a>
       </div>
-      <p class="hero-note">14-day trial. No credit card required to start.</p>
+      <p class="hero-note">No card to start. Cancel anytime after you subscribe.</p>
     </div>
     <div class="hero-visual">
       <div class="browser-frame">
@@ -35,6 +70,7 @@
           <span></span><span></span><span></span>
           <div class="browser-url">app.invcpay.com</div>
         </div>
+        <p class="hero-sample">Example workspace. The amounts are a sample, not live results.</p>
         <div class="dash-shot">
           <div class="dash-top">
             <strong>Outstanding</strong>
@@ -67,10 +103,10 @@
 
   <section class="trust-strip" aria-label="Security and trial">
     <ul>
-      <li>Secure checkout through Stripe</li>
-      <li>Your customers’ card details are not stored by InPmnt</li>
+      <li>14-day trial, no credit card</li>
+      <li>$10/mo, $20/mo, or $100/yr</li>
+      <li>Stripe checkout. We do not store your customers’ cards</li>
       <li>Cancel anytime</li>
-      <li>14-day trial</li>
     </ul>
   </section>
 
@@ -85,14 +121,14 @@
           <div class="mini-row"></div>
         </div>
         <h3>1. Add your unpaid invoices</h3>
-        <p>Enter them manually or import your existing list.</p>
+        <p>Type in the unpaid invoices you already have.</p>
       </article>
       <article class="step">
         <div class="step-art" aria-hidden="true">
           <div class="mini-cal"><b>Due</b><b class="on">+3</b><b>+7</b></div>
         </div>
         <h3>2. Choose your reminder schedule</h3>
-        <p>Select when email or SMS reminders should be sent.</p>
+        <p>Pick the days. Email is on every plan. SMS is on Pro.</p>
       </article>
       <article class="step">
         <div class="step-art" aria-hidden="true">
@@ -155,73 +191,37 @@
 
   <section class="landing-section" id="pricing">
     <h2>Simple pricing</h2>
-    <p class="sub">Start on a 14-day trial. No credit card required until you choose a paid plan. You can change plans later from Billing.</p>
-    <div class="pricing-grid">
-      <article class="price-card">
-        <h3>Starter</h3>
-        <div class="price">$10<span>/mo</span></div>
-        <p class="plan-save">Billed monthly.</p>
-        <ul>
-          <li>Up to 40 open invoices</li>
-          <li>Email reminders</li>
-          <li>Dashboard &amp; aging</li>
-          <li>1 workspace user</li>
-        </ul>
-        <a class="btn secondary" href="/signup">Start free trial</a>
-      </article>
-      <article class="price-card featured">
-        <div class="popular">Most Popular</div>
-        <h3>Pro</h3>
-        <div class="price">$20<span>/mo</span></div>
-        <p class="plan-save">Billed monthly.</p>
-        <ul>
-          <li>Unlimited invoices</li>
-          <li>Email + SMS reminders</li>
-          <li>Custom templates</li>
-          <li>Final notice workflows</li>
-        </ul>
-        <a class="btn" href="/signup">Start free trial</a>
-      </article>
-      <article class="price-card">
-        <h3>Starter Annual</h3>
-        <div class="price">$100<span>/yr</span></div>
-        <p class="plan-save">Save $20 — 2 months free versus monthly Starter.</p>
-        <ul>
-          <li>Starter features</li>
-          <li>Up to 40 open invoices</li>
-          <li>Email reminders</li>
-          <li>Best for solo operators</li>
-        </ul>
-        <a class="btn secondary" href="/signup">Start free trial</a>
-      </article>
-    </div>
-    <p class="sub pricing-note">
-      <?php if (!empty($stripe_enabled)): ?>
-      Paid plans use secure checkout through Stripe. InPmnt does not store your customers’ card details.
-      <?php else: ?>
-      Stripe keys are not configured yet — the trial still opens without a card. Add keys from <code>.env.example</code> before charging cards.
-      <?php endif; ?>
-      Cancel anytime. Starter Annual is $100/year (Starter features): save $20, which is 2 months free versus $10 × 12.
-    </p>
+    <p class="sub">14 days free. No credit card. You can change plans later from Billing.</p>
+    <?php require __DIR__ . '/_pricing_cards.php'; ?>
+  </section>
+
+  <section class="landing-section" id="faq">
+    <h2>Questions before you start</h2>
+    <?php require __DIR__ . '/_faq_list.php'; ?>
+    <p><a class="text-link" href="/faq">Read the full FAQ</a></p>
   </section>
 
   <footer class="landing-footer">
     <div class="footer-brand">
       <div class="brand">
         <div class="brand-logo img" aria-hidden="true">
-          <img src="/static/img/inpmnt-icon.png" alt="" />
+          <picture>
+            <source srcset="/static/img/inpmnt-icon.webp" type="image/webp" />
+            <img src="/static/img/inpmnt-icon.png" width="42" height="42" alt="" loading="lazy" decoding="async" />
+          </picture>
         </div>
         <div class="brand-copy">
-          <div class="brand-mark">InPmnt</div>
-          <div class="brand-sub">by InvcPay</div>
+          <div class="brand-mark">InvcPay</div>
+          <div class="brand-sub">InPmnt reminders</div>
         </div>
       </div>
-      <p>Automated invoice reminders that help service businesses get paid without the chase.</p>
+      <p>Invoice reminders for service businesses. The product inside the app is InPmnt.</p>
     </div>
     <div class="footer-col">
       <h2>Product</h2>
-      <a href="#pricing">Pricing</a>
+      <a href="/pricing">Pricing</a>
       <a href="#how">How it works</a>
+      <a href="/faq">FAQ</a>
       <a href="/support">Help</a>
       <a href="/contact">Contact</a>
     </div>

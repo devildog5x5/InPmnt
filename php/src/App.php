@@ -19,6 +19,8 @@ final class App
             $this->sitemap();
         } elseif ($method === 'GET' && $path === '/') {
             $this->landing();
+        } elseif ($method === 'GET' && isset(self::GUIDES[$path])) {
+            $this->guide($path);
         } elseif ($method === 'GET' && isset(self::LEGAL[$path])) {
             $this->legal($path);
         } elseif ($method === 'POST' && $path === '/support/chat') {
@@ -221,6 +223,45 @@ final class App
         exit;
     }
 
+    private const GUIDES = [
+        '/pricing' => [
+            'title' => 'Pricing',
+            'slug' => 'pricing',
+            'description' => 'InvcPay is $10 or $20 a month, or $100 a year, after a 14-day trial. No credit card to start.',
+        ],
+        '/invoice-reminders' => [
+            'title' => 'Invoice reminders',
+            'slug' => 'invoice-reminders',
+            'description' => 'How to remind clients about unpaid invoices without sounding rude, and how InvcPay schedules those notes.',
+        ],
+        '/overdue-invoices' => [
+            'title' => 'Overdue invoices',
+            'slug' => 'overdue-invoices',
+            'description' => 'What to do when an invoice is past due: check the bill, send a calm reminder, record partial payments, then one final notice.',
+        ],
+        '/for-contractors' => [
+            'title' => 'Invoice reminders for contractors',
+            'slug' => 'for-contractors',
+            'description' => 'InvcPay helps contractors, landscapers, consultants, and photographers collect unpaid invoices. 14-day trial, no credit card.',
+        ],
+        '/faq' => [
+            'title' => 'FAQ',
+            'slug' => 'faq',
+            'description' => 'Trial length, $10 and $20 monthly plans, the $100 yearly plan, cancellation, and what InvcPay stores.',
+        ],
+    ];
+
+    private function guide(string $path): void
+    {
+        $page = self::GUIDES[$path];
+        $this->view('guide', [
+            'title' => $page['title'],
+            'slug' => $page['slug'],
+            'description' => $page['description'],
+            'support_email' => HelpChat::supportEmail(),
+        ]);
+    }
+
     private const LEGAL = [
         '/privacy' => ['title' => 'Privacy Policy', 'slug' => 'privacy'],
         '/terms' => ['title' => 'Terms of Service', 'slug' => 'terms'],
@@ -245,7 +286,12 @@ final class App
     {
         return [
             ['/', 'weekly', '1.0'],
-            ['/signup', 'monthly', '0.6'],
+            ['/pricing', 'weekly', '0.9'],
+            ['/signup', 'monthly', '0.8'],
+            ['/invoice-reminders', 'monthly', '0.7'],
+            ['/overdue-invoices', 'monthly', '0.7'],
+            ['/for-contractors', 'monthly', '0.7'],
+            ['/faq', 'monthly', '0.6'],
             ['/support', 'monthly', '0.5'],
             ['/contact', 'monthly', '0.5'],
             ['/privacy', 'yearly', '0.3'],
@@ -257,13 +303,18 @@ final class App
 
     private function robots(): never
     {
-        $base = rtrim(Http::publicBase(), '/');
+        $base = rtrim(Http::canonicalBase(), '/');
         header('Content-Type: text/plain; charset=utf-8');
         header('Cache-Control: public, max-age=3600');
         header_remove('X-Powered-By');
         echo "User-agent: *\n";
         echo "Allow: /\n";
+        echo "Allow: /pricing\n";
         echo "Allow: /signup\n";
+        echo "Allow: /invoice-reminders\n";
+        echo "Allow: /overdue-invoices\n";
+        echo "Allow: /for-contractors\n";
+        echo "Allow: /faq\n";
         echo "Allow: /login\n";
         echo "Allow: /forgot-password\n";
         echo "Allow: /support\n";
@@ -292,11 +343,14 @@ final class App
         header('Cache-Control: public, max-age=3600');
         header_remove('X-Powered-By');
         echo "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
+        $stamp = @filemtime(dirname(__DIR__) . '/VERSION') ?: time();
+        $lastmod = gmdate('Y-m-d', $stamp);
         echo "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n";
         foreach ($this->marketingPages() as [$path, $freq, $priority]) {
             $loc = $base . ($path === '/' ? '/' : $path);
             echo '  <url><loc>' . htmlspecialchars($loc, ENT_QUOTES | ENT_XML1, 'UTF-8')
-                . '</loc><changefreq>' . $freq . '</changefreq><priority>' . $priority . "</priority></url>\n";
+                . '</loc><lastmod>' . $lastmod . '</lastmod><changefreq>' . $freq
+                . '</changefreq><priority>' . $priority . "</priority></url>\n";
         }
         echo "</urlset>\n";
         exit;

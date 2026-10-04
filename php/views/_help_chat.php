@@ -19,5 +19,5 @@ $helpEmail = HelpChat::supportEmail();
     <p class="inp-chat-mail">Email <a href="mailto:<?= Http::e($helpEmail) ?>"><?= Http::e($helpEmail) ?></a></p>
   </div>
 </div>
-<script src="/static/js/help-chat.js?v=<?= rawurlencode(Http::VERSION) ?>"></script>
-<script src="/static/js/password-toggle.js?v=<?= rawurlencode(Http::VERSION) ?>"></script>
+<script src="/static/js/help-chat.js?v=<?= rawurlencode(Http::VERSION) ?>" defer></script>
+<script src="/static/js/password-toggle.js?v=<?= rawurlencode(Http::VERSION) ?>" defer></script>
