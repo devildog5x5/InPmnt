@@ -3,23 +3,17 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title><?= Http::e($title) ?> · InPmnt</title>
+  <meta name="csrf-token" content="<?= Http::e(Http::csrfToken()) ?>" />
+  <?php
+    $meta_title = $title . ' · InPmnt';
+    $meta_description = $title . ' for InPmnt by InvcPay.';
+    require __DIR__ . '/_meta.php';
+  ?>
   <link rel="icon" type="image/png" href="/static/img/inpmnt-icon.png" />
   <link rel="stylesheet" href="/static/css/app.css?v=<?= rawurlencode(Http::VERSION) ?>" />
 </head>
 <body class="landing">
-  <nav class="landing-nav">
-    <a class="brand" href="/">
-      <div class="brand-logo img" aria-hidden="true"><img src="/static/img/inpmnt-icon.png" alt="" /></div>
-      <div class="brand-copy">
-        <div class="brand-mark">InPmnt</div>
-        <div class="brand-sub">by InvcPay</div>
-      </div>
-    </a>
-    <div class="nav-actions">
-      <a class="btn sm" href="/signup">Start free trial</a>
-    </div>
-  </nav>
+<?php require __DIR__ . '/_nav.php'; ?>
   <article class="legal-page">
     <h1><?= Http::e($title) ?></h1>
     <?php if ($slug === 'privacy'): ?>
@@ -46,6 +40,7 @@
     <?php endif; ?>
     <p><a href="/">Back to home</a></p>
   </article>
+<?php require __DIR__ . '/_version.php'; ?>
 <?php require __DIR__ . '/_help_chat.php'; ?>
 </body>
 </html>

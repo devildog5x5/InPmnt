@@ -880,6 +880,7 @@ html[data-theme="dark"] .landing {
   justify-content: space-between;
   align-items: center;
   gap: 16px;
+  flex-wrap: wrap;
 }
 body.landing {
   --ink: #102A43;
@@ -914,8 +915,23 @@ html[data-theme="dark"] body.landing {
 .landing-footer .brand-mark { color: var(--ink); font-size: 1.28rem; }
 .landing-nav .brand-sub,
 .landing-footer .brand-sub { color: var(--accent); font-weight: 600; }
-.landing-nav .nav-actions { display: flex; gap: 14px; align-items: center; }
+.landing-nav .nav-actions { display: flex; gap: 12px 14px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
 .landing-nav .nav-actions a:not(.btn) { color: var(--ink); font-weight: 600; text-decoration: none; font-size: 0.92rem; }
+.landing-nav .nav-actions a[aria-current="page"] { color: var(--brand); }
+body.landing .auth-page {
+  min-height: auto;
+  background: transparent;
+  padding-top: 8px;
+}
+body.app-body .site-nav,
+body.admin-body .site-nav {
+  max-width: none;
+  width: 100%;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  padding: 10px 16px;
+}
+body.app-body .sidebar { height: auto; min-height: calc(100vh - 64px); }
 .landing-hero {
   max-width: 1120px;
   margin: 0 auto;

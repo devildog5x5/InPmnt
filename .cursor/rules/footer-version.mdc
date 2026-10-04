@@ -1,15 +1,17 @@
 ---
-description: Always show the software version in searchable plain text on landing, app home, and index.php.
+description: Show the software version in the footer only. Keep it out of titles and headings.
 alwaysApply: true
 ---
 
 # Footer version (InPmnt)
 
-Every shippable build must show the current software version as **plain searchable text**:
+Every shippable build must show the current software version as **plain searchable text in the footer only**:
 
-1. **`php/index.php`** — comment line `InPmnt vX.Y.Z` (so a file text search finds it)
-2. **Landing `/`** — footer `InPmnt vX.Y.Z` and in `<title>`
-3. **App shell `/app`** — bottom bar `InPmnt vX.Y.Z` and in `<title>`
+1. **`php/index.php`** — comment line `InPmnt vX.Y.Z` (source text search; not rendered)
+2. **Landing `/`** — footer `InPmnt vX.Y.Z`
+3. **App shell `/app`** — bottom bar `InPmnt vX.Y.Z`
 4. Keep `VERSION`, `php/VERSION`, and `Http::VERSION` in lockstep
+
+Do **not** put the version in `<title>` or in any heading. Search results should stay readable.
 
 Never rely only on a buried sidebar label or a CSS `?v=` query string.

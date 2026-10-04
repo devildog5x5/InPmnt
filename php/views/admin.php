@@ -19,10 +19,13 @@ $csrf = Admin::csrfToken();
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="robots" content="noindex, nofollow">
   <meta name="csrf-token" content="<?= Http::e(Http::csrfToken()) ?>">
-  <title>Admin · InPmnt <?= Http::e($ver) ?></title>
-  <meta name="description" content="Owner console to browse InPmnt accounts, invoices, payment reminders, and billing records.">
+  <?php
+    $meta_title = 'Admin · InPmnt';
+    $meta_description = 'Owner console to browse InPmnt accounts, invoices, payment reminders, and billing records.';
+    $meta_robots = 'noindex, nofollow';
+    require __DIR__ . '/_meta.php';
+  ?>
   <link rel="stylesheet" href="/static/css/app.css?v=<?= rawurlencode(Http::VERSION) ?>">
   <script>
   (function () {
@@ -92,11 +95,11 @@ $csrf = Admin::csrfToken();
     .foot { margin-top: 18px; color: var(--muted); font-size: 12px; display: flex; justify-content: space-between; }
   </style>
 </head>
-<body>
+<body class="admin-body">
+<?php require __DIR__ . '/_nav.php'; ?>
   <header class="top">
     <div>
       <a class="brand" href="<?= Http::e($base) ?>">InPmnt Admin</a>
-      <span class="muted"> · <?= Http::e($ver) ?></span>
     </div>
     <div class="toolbar" style="margin:0">
       <button type="button" data-admin-theme="light">Light</button>
@@ -256,7 +259,7 @@ $csrf = Admin::csrfToken();
       </main>
     </div>
     <footer class="foot">
-      <span>InPmnt <?= Http::e($ver) ?></span>
+      <span id="site-version">InPmnt v<?= Http::e($ver) ?></span>
       <span>© 2026 Robert Foster</span>
     </footer>
   </div>

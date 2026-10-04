@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 final class Http
 {
-    public const VERSION = '1.5.05';
+    public const VERSION = '1.5.06';
 
     public static function theme(): string
     {
@@ -63,7 +63,10 @@ final class Http
 
     public static function method(): string
     {
-        return strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
+        $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
+        // Shared hosts often pass HEAD through. Treat it as a body-less GET
+        // so public pages, robots.txt, and the sitemap do not 404.
+        return $method === 'HEAD' ? 'GET' : $method;
     }
 
     public static function path(): string
