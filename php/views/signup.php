@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="csrf-token" content="<?= Http::e(Http::csrfToken()) ?>" />
   <?php
-    $meta_title = 'Start a free InvcPay trial';
+    $meta_title = 'Start a free 14-day InvcPay trial, no card';
     $meta_description = 'Open an InvcPay trial in a minute. No credit card. 14 days of invoice reminders, then $10 or $20 a month, or $100 a year.';
     require __DIR__ . '/_meta.php';
   ?>

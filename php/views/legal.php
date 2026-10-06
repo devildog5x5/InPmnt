@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="csrf-token" content="<?= Http::e(Http::csrfToken()) ?>" />
   <?php
-    $meta_title = $title . ' · InvcPay';
-    $meta_description = $title . ' for InvcPay, the invoice reminder service at invcpay.com. InPmnt is the product inside your account.';
+    $meta_title = $meta_title ?? ($title . ' · InvcPay');
+    $meta_description = $meta_description ?? ($title . ' for InvcPay, the invoice reminder service at invcpay.com. InPmnt is the product inside your account.');
     require __DIR__ . '/_meta.php';
   ?>
   <link rel="icon" type="image/png" href="/static/img/inpmnt-icon.png" />

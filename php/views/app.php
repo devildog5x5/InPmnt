@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="csrf-token" content="<?= Http::e(Http::csrfToken()) ?>" />
   <?php
-    $meta_title = 'InvcPay';
-    $meta_description = 'InvcPay workspace for invoices and client payment reminders.';
+    $meta_title = 'InvcPay workspace for open invoice reminders';
+    $meta_description = 'Your InvcPay workspace for open invoices, reminder schedules, clients, and recorded payments.';
     $meta_robots = 'noindex, nofollow';
     require __DIR__ . '/_meta.php';
   ?>
@@ -18,8 +18,8 @@
   <div class="app-shell">
     <aside class="sidebar">
       <div class="brand">
-        <div class="brand-logo img" aria-hidden="true">
-          <img src="/static/img/inpmnt-icon.png" alt="" />
+        <div class="brand-logo img">
+          <img src="/static/img/inpmnt-icon.png" width="42" height="42" alt="InvcPay logo" />
         </div>
         <div class="brand-copy">
           <div class="brand-mark">InPmnt</div>

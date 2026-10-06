@@ -21,8 +21,8 @@ $csrf = Admin::csrfToken();
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="csrf-token" content="<?= Http::e(Http::csrfToken()) ?>">
   <?php
-    $meta_title = 'Admin · InvcPay';
-    $meta_description = 'Owner console to browse InPmnt accounts, invoices, payment reminders, and billing records.';
+    $meta_title = 'InvcPay admin console for accounts and billing';
+    $meta_description = 'Owner console to browse InvcPay accounts, invoices, payment reminders, and billing records.';
     $meta_robots = 'noindex, nofollow';
     require __DIR__ . '/_meta.php';
   ?>

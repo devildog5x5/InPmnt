@@ -40,10 +40,10 @@ $navHome = $navLoggedIn ? '/app' : '/';
 ?>
 <nav class="landing-nav site-nav" aria-label="Main">
   <a class="brand" href="<?= Http::e($navHome) ?>">
-    <div class="brand-logo img" aria-hidden="true">
+    <div class="brand-logo img">
       <picture>
         <source srcset="/static/img/inpmnt-icon.webp" type="image/webp" />
-        <img src="/static/img/inpmnt-icon.png" width="42" height="42" alt="" />
+        <img src="/static/img/inpmnt-icon.png" width="42" height="42" alt="InvcPay logo" />
       </picture>
     </div>
     <div class="brand-copy">

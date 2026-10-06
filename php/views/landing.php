@@ -204,10 +204,10 @@
   <footer class="landing-footer">
     <div class="footer-brand">
       <div class="brand">
-        <div class="brand-logo img" aria-hidden="true">
+        <div class="brand-logo img">
           <picture>
             <source srcset="/static/img/inpmnt-icon.webp" type="image/webp" />
-            <img src="/static/img/inpmnt-icon.png" width="42" height="42" alt="" loading="lazy" decoding="async" />
+            <img src="/static/img/inpmnt-icon.png" width="42" height="42" alt="InvcPay logo" loading="lazy" decoding="async" />
           </picture>
         </div>
         <div class="brand-copy">
