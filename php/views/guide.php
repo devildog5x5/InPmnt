@@ -1,6 +1,6 @@
 <?php
 $faqItems = require __DIR__ . '/_faq_data.php';
-$pageTitle = $title . ' · InvcPay';
+$meta_title = $meta_title ?? ($title . ' · InvcPay');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -9,7 +9,6 @@ $pageTitle = $title . ' · InvcPay';
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="csrf-token" content="<?= Http::e(Http::csrfToken()) ?>" />
   <?php
-    $meta_title = $pageTitle;
     $meta_description = $description;
     if ($slug === 'faq') {
         $json_ld = [

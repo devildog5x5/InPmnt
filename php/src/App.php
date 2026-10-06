@@ -227,26 +227,31 @@ final class App
         '/pricing' => [
             'title' => 'Pricing',
             'slug' => 'pricing',
+            'meta_title' => 'InvcPay pricing: $10, $20 a month, or $100/yr',
             'description' => 'InvcPay is $10 or $20 a month, or $100 a year, after a 14-day trial. No credit card to start.',
         ],
         '/invoice-reminders' => [
             'title' => 'Invoice reminders',
             'slug' => 'invoice-reminders',
+            'meta_title' => 'How InvcPay schedules polite invoice reminders',
             'description' => 'How to remind clients about unpaid invoices without sounding rude, and how InvcPay schedules those notes.',
         ],
         '/overdue-invoices' => [
             'title' => 'Overdue invoices',
             'slug' => 'overdue-invoices',
+            'meta_title' => 'What to do when an InvcPay invoice is overdue',
             'description' => 'What to do when an invoice is past due: check the bill, send a calm reminder, record partial payments, then one final notice.',
         ],
         '/for-contractors' => [
             'title' => 'Invoice reminders for contractors',
             'slug' => 'for-contractors',
+            'meta_title' => 'Invoice reminders for contractors on InvcPay',
             'description' => 'InvcPay helps contractors, landscapers, consultants, and photographers collect unpaid invoices. 14-day trial, no credit card.',
         ],
         '/faq' => [
             'title' => 'FAQ',
             'slug' => 'faq',
+            'meta_title' => 'InvcPay FAQ: trial, prices, and cancellation',
             'description' => 'Trial length, $10 and $20 monthly plans, the $100 yearly plan, cancellation, and what InvcPay stores.',
         ],
     ];
@@ -257,18 +262,49 @@ final class App
         $this->view('guide', [
             'title' => $page['title'],
             'slug' => $page['slug'],
+            'meta_title' => $page['meta_title'],
             'description' => $page['description'],
             'support_email' => HelpChat::supportEmail(),
         ]);
     }
 
     private const LEGAL = [
-        '/privacy' => ['title' => 'Privacy Policy', 'slug' => 'privacy'],
-        '/terms' => ['title' => 'Terms of Service', 'slug' => 'terms'],
-        '/contact' => ['title' => 'Contact', 'slug' => 'contact'],
-        '/support' => ['title' => 'Support', 'slug' => 'support'],
-        '/security' => ['title' => 'Data Security', 'slug' => 'security'],
-        '/refunds' => ['title' => 'Refund and cancellation policy', 'slug' => 'refunds'],
+        '/privacy' => [
+            'title' => 'Privacy Policy',
+            'slug' => 'privacy',
+            'meta_title' => 'InvcPay privacy policy for account and invoice data',
+            'description' => 'InvcPay stores the account, client, and invoice details you enter so reminders can be sent. Card numbers stay with Stripe.',
+        ],
+        '/terms' => [
+            'title' => 'Terms of Service',
+            'slug' => 'terms',
+            'meta_title' => 'InvcPay terms of service for reminder subscriptions',
+            'description' => 'The InvcPay trial is 14 days with no card. Starter is $10 a month, Pro is $20 a month, and Starter Annual is $100 a year.',
+        ],
+        '/contact' => [
+            'title' => 'Contact',
+            'slug' => 'contact',
+            'meta_title' => 'Contact InvcPay about billing or your account',
+            'description' => 'Email support@invcpay.com for InvcPay sales, billing, or account questions. InPmnt is the product name inside the app.',
+        ],
+        '/support' => [
+            'title' => 'Support',
+            'slug' => 'support',
+            'meta_title' => 'InvcPay help for reminders, billing, and sign-in',
+            'description' => 'Get InvcPay help from the on-page button or support@invcpay.com. Include your account email and plan name for billing questions.',
+        ],
+        '/security' => [
+            'title' => 'Data Security',
+            'slug' => 'security',
+            'meta_title' => 'How InvcPay protects passwords and invoice data',
+            'description' => 'InvcPay stores passwords as hashes and sends checkout through Stripe. Customer card numbers are not stored in InvcPay.',
+        ],
+        '/refunds' => [
+            'title' => 'Refund and cancellation policy',
+            'slug' => 'refunds',
+            'meta_title' => 'InvcPay refund and cancellation policy details',
+            'description' => 'The InvcPay trial needs no card. After you subscribe you can cancel anytime, and access lasts through the period already paid.',
+        ],
     ];
 
     private function legal(string $path): void
@@ -277,6 +313,8 @@ final class App
         $this->view('legal', [
             'title' => $page['title'],
             'slug' => $page['slug'],
+            'meta_title' => $page['meta_title'],
+            'meta_description' => $page['description'],
             'support_email' => HelpChat::supportEmail(),
         ]);
     }

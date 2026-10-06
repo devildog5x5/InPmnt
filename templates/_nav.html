@@ -1,6 +1,6 @@
 <nav class="landing-nav site-nav" aria-label="Main">
   <a class="brand" href="{{ url_for('main.app_home') if nav_logged_in else url_for('main.landing') }}">
-    <div class="brand-logo img" aria-hidden="true"><img src="{{ url_for('static', filename='img/inpmnt-icon.png') }}" alt="" /></div>
+    <div class="brand-logo img"><img src="{{ url_for('static', filename='img/inpmnt-icon.png') }}" width="42" height="42" alt="InvcPay logo" /></div>
     <div class="brand-copy">
       <div class="brand-mark">InPmnt</div>
       <div class="brand-sub">by InvcPay</div>

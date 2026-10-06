@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="csrf-token" content="<?= Http::e(Http::csrfToken()) ?>" />
   <?php
-    $meta_title = 'Choose a new password · InvcPay';
-    $meta_description = 'Choose a new password for your InvcPay account and return to your invoices and reminders.';
+    $meta_title = 'Choose a new password for your InvcPay account';
+    $meta_description = 'Set a new InvcPay password and go back to the invoices and reminders already in your account.';
     $meta_robots = 'noindex, nofollow';
     require __DIR__ . '/_meta.php';
   ?>
@@ -18,8 +18,8 @@
   <div class="auth-page">
     <div class="auth-card">
       <div class="auth-brand">
-        <div class="brand-logo img" aria-hidden="true">
-          <img src="/static/img/inpmnt-icon.png" alt="" />
+        <div class="brand-logo img">
+          <img src="/static/img/inpmnt-icon.png" width="42" height="42" alt="InvcPay logo" />
         </div>
         <div>
           <div class="brand-mark" style="color:var(--ink);font-size:1.35rem">InPmnt</div>
