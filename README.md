@@ -8,16 +8,14 @@ ReceiptGrid helps plumbers, landscapers, photographers, and consultants stop los
 
 ## Downloads
 
-Build the four archives locally with `powershell -File .\build_release.ps1`. They land in `installers\` (not committed). The GitHub repo name stays `InPmnt` until Robert renames it.
+Packages for **v1.6.0** are on the [v1.6.0 release](https://github.com/devildog5x5/InPmnt/releases/tag/v1.6.0). The GitHub repo name stays `InPmnt` until Robert renames it. Rebuild locally with `powershell -File .\build_release.ps1` → `installers\`.
 
-| Package | What you get | File |
+| Package | What you get | Download |
 |---------|----------------|----------|
-| **PHP (Hostinger)** | Unzip into `public_html` — no VPS | `ReceiptGrid-PHP.v1.6.0.zip` |
-| **Portable** | Runnable Windows app — `install.ps1` or `start.ps1` | `ReceiptGrid-Portable.v1.6.0.zip` |
-| **Source** | Full source (Python + PHP + Docker) | `ReceiptGrid-Source.v1.6.0.zip` |
-| **Icon** | Brand icon assets (blue / teal / violet) | `ReceiptGrid-Icon.v1.6.0.zip` |
-
-- Release index (existing repo): [GitHub Releases](https://github.com/devildog5x5/InPmnt/releases)
+| **PHP (Hostinger)** | Unzip into `public_html` — no VPS | [ReceiptGrid-PHP.v1.6.0.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.6.0/ReceiptGrid-PHP.v1.6.0.zip) |
+| **Portable** | Runnable Windows app — `install.ps1` or `start.ps1` | [ReceiptGrid-Portable.v1.6.0.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.6.0/ReceiptGrid-Portable.v1.6.0.zip) |
+| **Source** | Full source (Python + PHP + Docker) | [ReceiptGrid-Source.v1.6.0.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.6.0/ReceiptGrid-Source.v1.6.0.zip) |
+| **Icon** | Brand icon assets (blue / teal / violet) | [ReceiptGrid-Icon.v1.6.0.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.6.0/ReceiptGrid-Icon.v1.6.0.zip) |
 - Sign up: `/signup` · Local demo (optional): set `SHOW_DEMO_LOGIN=1` then `demouser@inpmnt.app` / `Demo`
 - App URL (local): `https://127.0.0.1:5055` (self-signed cert; accept the browser warning)
 - Rebuild locally: `powershell -File .\build_release.ps1` → `installers\*.zip`
@@ -112,7 +110,7 @@ Production TLS (Let's Encrypt / IIS) is handled by nginx or IIS in front of the 
 
 ReceiptGrid now ships a **PHP** build you can drop on Hostinger Web/Cloud (no VPS).
 
-1. Unzip `ReceiptGrid-PHP.v1.6.0.zip` (from `installers\` after `build_release.ps1`, or from the GitHub release once it is published).
+1. Download [ReceiptGrid-PHP.v1.6.0.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.6.0/ReceiptGrid-PHP.v1.6.0.zip).
 2. In hPanel → **Files → File Manager** (or FTP), unzip **all files into `public_html`**.
 3. Copy `.env.example` → `.env`. Set `APP_SECRET` (long random string) and `BASE_URL=https://yourdomain.com`.
 4. hPanel → **Advanced → PHP Configuration**: PHP **8.2+**, enable **pdo_sqlite**.
