@@ -5,6 +5,20 @@ from dataclasses import dataclass
 from typing import Any
 
 PLANS = {
+    "monthly": {
+        "name": "Monthly",
+        "amount_label": "$5.00/mo",
+        "env_price": "STRIPE_PRICE_MONTHLY",
+    },
+    "yearly": {
+        "name": "Yearly",
+        "amount_label": "$50.00/yr",
+        "env_price": "STRIPE_PRICE_YEARLY",
+    },
+}
+
+# Older subscriptions stored as starter / pro / annual. Not offered at checkout.
+LEGACY_PLANS = {
     "starter": {
         "name": "Starter",
         "amount_label": "$10/mo",
@@ -40,11 +54,13 @@ class StripeConfig:
     webhook_secret: str
     base_url: str
     prices: dict[str, str]
+    legacy_prices: dict[str, str]
 
     @property
     def enabled(self) -> bool:
         return (
             _configured(self.secret_key, prefix="sk_", min_len=20)
+            and bool(self.prices)
             and all(_configured(pid, prefix="price_", min_len=20) for pid in self.prices.values())
         )
 
@@ -54,12 +70,17 @@ def load_stripe_config() -> StripeConfig:
         key: (os.environ.get(meta["env_price"]) or "").strip()
         for key, meta in PLANS.items()
     }
+    legacy = {
+        key: (os.environ.get(meta["env_price"]) or "").strip()
+        for key, meta in LEGACY_PLANS.items()
+    }
     return StripeConfig(
         secret_key=(os.environ.get("STRIPE_SECRET_KEY") or "").strip(),
         publishable_key=(os.environ.get("STRIPE_PUBLISHABLE_KEY") or "").strip(),
         webhook_secret=(os.environ.get("STRIPE_WEBHOOK_SECRET") or "").strip(),
         base_url=(os.environ.get("BASE_URL") or "http://127.0.0.1:5055").rstrip("/"),
         prices=prices,
+        legacy_prices=legacy,
     )
 
 
@@ -77,7 +98,7 @@ def plan_from_price_id(price_id: str | None) -> str | None:
     if not price_id:
         return None
     cfg = load_stripe_config()
-    for plan, pid in cfg.prices.items():
+    for plan, pid in {**cfg.legacy_prices, **cfg.prices}.items():
         if pid and pid == price_id:
             return plan
     return None
@@ -110,7 +131,10 @@ def checkout_session_payload(
         "client_reference_id": client_reference_id,
         "metadata": meta,
         "allow_promotion_codes": True,
-        "subscription_data": {"metadata": dict(meta)},
+        "subscription_data": {
+            "metadata": dict(meta),
+            "description": "ReceiptGrid Invoicing",
+        },
     }
     if customer_id:
         params["customer"] = customer_id

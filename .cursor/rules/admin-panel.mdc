@@ -1,11 +1,11 @@
 ---
-description: Keep an admin-only /admin SQLite console on InPmnt.
+description: Keep an admin-only /admin SQLite console on ReceiptGrid.
 alwaysApply: true
 ---
 
 # Admin panel (`/admin`)
 
-InPmnt PHP always exposes `/admin` for users with `role = admin`:
+ReceiptGrid PHP always exposes `/admin` for users with `role = admin`:
 
 - Browse every SQLite table; create / edit / delete rows
 - Run SQL (writes need confirm)

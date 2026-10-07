@@ -3,7 +3,18 @@ declare(strict_types=1);
 
 final class Billing
 {
+    /** Plans a new customer can buy. Charges use the Stripe price IDs in env. */
     public const PLANS = [
+        'monthly' => ['name' => 'Monthly', 'amount_label' => '$5.00/mo', 'env_price' => 'STRIPE_PRICE_MONTHLY'],
+        'yearly' => ['name' => 'Yearly', 'amount_label' => '$50.00/yr', 'env_price' => 'STRIPE_PRICE_YEARLY'],
+    ];
+
+    /**
+     * Older subscriptions already stored as starter / pro / annual.
+     * These env keys stay so webhooks can still map those price IDs.
+     * They are not offered at checkout.
+     */
+    public const LEGACY_PLANS = [
         'starter' => ['name' => 'Starter', 'amount_label' => '$10/mo', 'env_price' => 'STRIPE_PRICE_STARTER'],
         'pro' => ['name' => 'Pro', 'amount_label' => '$20/mo', 'env_price' => 'STRIPE_PRICE_PRO'],
         'annual' => ['name' => 'Starter Annual', 'amount_label' => '$100/yr', 'env_price' => 'STRIPE_PRICE_ANNUAL'],
@@ -27,6 +38,10 @@ final class Billing
         foreach (self::PLANS as $key => $meta) {
             $prices[$key] = trim(Env::get($meta['env_price']));
         }
+        $legacy = [];
+        foreach (self::LEGACY_PLANS as $key => $meta) {
+            $legacy[$key] = trim(Env::get($meta['env_price']));
+        }
         $secret = trim(Env::get('STRIPE_SECRET_KEY'));
         $enabled = self::configuredValue($secret, 'sk_', 20);
         foreach ($prices as $pid) {
@@ -38,6 +53,7 @@ final class Billing
             'webhook_secret' => trim(Env::get('STRIPE_WEBHOOK_SECRET')),
             'base_url' => rtrim(Env::get('BASE_URL', 'http://127.0.0.1:5055'), '/'),
             'prices' => $prices,
+            'legacy_prices' => $legacy,
             'enabled' => $enabled,
         ];
     }
@@ -47,9 +63,12 @@ final class Billing
         if (!$priceId) {
             return null;
         }
-        foreach (self::config()['prices'] as $plan => $pid) {
-            if ($pid !== '' && $pid === $priceId) {
-                return $plan;
+        $cfg = self::config();
+        foreach ([$cfg['prices'], $cfg['legacy_prices']] as $map) {
+            foreach ($map as $plan => $pid) {
+                if ($pid !== '' && $pid === $priceId) {
+                    return $plan;
+                }
             }
         }
         return null;
@@ -112,7 +131,10 @@ final class Billing
             'client_reference_id' => (string) $args['client_reference_id'],
             'metadata' => $meta,
             'allow_promotion_codes' => 'true',
-            'subscription_data' => ['metadata' => $meta],
+            'subscription_data' => [
+                'metadata' => $meta,
+                'description' => 'ReceiptGrid Invoicing',
+            ],
         ];
         if (!empty($args['customer_id'])) {
             $params['customer'] = $args['customer_id'];

@@ -498,7 +498,7 @@ def _ensure_system_accounts(conn: sqlite3.Connection) -> None:
             email=ADMIN_EMAIL,
             name=ADMIN_NAME,
             password_hash=generate_password_hash(ADMIN_PASSWORD),
-            business_name="InPmnt Admin",
+            business_name="ReceiptGrid Admin",
             role="admin",
         )
 
@@ -570,7 +570,7 @@ def _seed(conn: sqlite3.Connection) -> None:
         email=ADMIN_EMAIL,
         name=ADMIN_NAME,
         password_hash=generate_password_hash(ADMIN_PASSWORD),
-        business_name="InPmnt Admin",
+        business_name="ReceiptGrid Admin",
         role="admin",
     )
 
@@ -586,7 +586,7 @@ def _seed(conn: sqlite3.Connection) -> None:
         """
         UPDATE settings SET phone=?, website=? WHERE id=?
         """,
-        ("(555) 014-2200", "https://inpmnt.app", wid),
+        ("(555) 014-2200", "https://invcpay.com", wid),
     )
 
     clients = [

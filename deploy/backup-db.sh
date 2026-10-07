@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Backup InPmnt SQLite DB (native or Docker volume).
+# Backup ReceiptGrid SQLite DB (native or Docker volume).
 set -euo pipefail
 
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"

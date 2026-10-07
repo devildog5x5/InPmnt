@@ -214,8 +214,8 @@ def support_chat():
     email = "support@invcpay.com"
     if any(w in msg for w in ("price", "plan", "annual", "billing", "cost")):
         reply = (
-            "InPmnt by InvcPay: Starter $10/mo, Pro $20/mo, or Starter Annual $100/yr "
-            "(save $20, 2 months free). The 14-day trial does not need a card. "
+            "ReceiptGrid Invoicing is $5.00/month or $50/year. You pick either one. "
+            "The 14-day trial does not need a card. "
             f"You can change plans later from Billing. Email {email}."
         )
     else:
@@ -315,7 +315,7 @@ def _public_base_url() -> str:
 
 def _deliver_reset(email: str, url: str) -> None:
     body = (
-        "Reset your InPmnt password\n\n"
+        "Reset your ReceiptGrid password\n\n"
         "We received a request to reset the password for this account.\n\n"
         f"Open this link within 1 hour:\n{url}\n\n"
         "If you didn't request this, you can ignore this message.\n"
@@ -323,7 +323,7 @@ def _deliver_reset(email: str, url: str) -> None:
     sent = False
     if mail_configured():
         try:
-            send_email(to=email, subject="Reset your InPmnt password", body=body)
+            send_email(to=email, subject="Reset your ReceiptGrid password", body=body)
             sent = True
         except Exception:  # noqa: BLE001
             sent = False
@@ -1241,7 +1241,7 @@ def api_send_reminder(reminder_id: int):
 
         if channel == "sms":
             if not plan_allows_sms(effective_plan(settings)):
-                return jsonify({"error": "SMS reminders require the Pro plan."}), 403
+                return jsonify({"error": "SMS reminders are included on the paid ReceiptGrid plan ($5.00/month or $50/year)."}), 403
             log_activity(
                 conn,
                 "reminder",
@@ -1384,7 +1384,7 @@ def api_final_notice(invoice_id: int):
             "amount_due": money(invoice_balance(dict(inv))),
             "due_date": inv["due_date"],
             "status": inv["status"],
-            "business_name": settings["business_name"] if settings else "InPmnt",
+            "business_name": settings["business_name"] if settings else "ReceiptGrid",
         }
         subject = render_template_vars(tmpl["subject"] if tmpl else "Final notice", ctx)
         body = render_template_vars(tmpl["body"] if tmpl else "Final notice", ctx)
@@ -1565,7 +1565,7 @@ def api_billing_checkout():
     data = request.get_json(force=True) or {}
     plan = (data.get("plan") or "").strip().lower()
     if plan not in PLANS:
-        return jsonify({"error": "Unknown plan. Use starter, pro, or annual."}), 400
+        return jsonify({"error": "Unknown plan. Use monthly or yearly."}), 400
     cfg = load_stripe_config()
     if not cfg.enabled:
         return jsonify(

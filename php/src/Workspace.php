@@ -38,16 +38,16 @@ final class Workspace
 
     public static function allowsSms(string $plan): bool
     {
-        return $plan === 'pro';
+        return in_array($plan, ['monthly', 'yearly', 'pro'], true);
     }
 
     public static function openInvoiceLimit(string $plan): ?int
     {
+        if (in_array($plan, ['monthly', 'yearly', 'pro'], true)) {
+            return null;
+        }
         if (in_array($plan, ['starter', 'annual', 'trial'], true)) {
             return self::STARTER_OPEN_INVOICE_LIMIT;
-        }
-        if ($plan === 'pro') {
-            return null;
         }
         if ($plan === 'expired') {
             return 0;
@@ -75,7 +75,7 @@ final class Workspace
             return null;
         }
         if (self::countOpen($db, $wid) >= $limit) {
-            return "Open invoice limit reached ({$limit}). Upgrade to Pro for unlimited open invoices.";
+            return "Open invoice limit reached ({$limit}). Subscribe to ReceiptGrid ($5.00/month or $50/year) for unlimited open invoices.";
         }
         return null;
     }

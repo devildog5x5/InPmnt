@@ -1,6 +1,6 @@
 <?php
 $faqItems = require __DIR__ . '/_faq_data.php';
-$meta_title = $meta_title ?? ($title . ' · InvcPay');
+$meta_title = $meta_title ?? ($title . ' · ReceiptGrid Invoicing');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -36,8 +36,8 @@ $meta_title = $meta_title ?? ($title . ' · InvcPay');
     <p>Start with a 14-day trial. No credit card. When the trial ends, pick a plan only if the reminders are paying for themselves.</p>
     <?php require __DIR__ . '/_pricing_cards.php'; ?>
     <h2>What you are paying for</h2>
-    <p>InvcPay runs InPmnt, a small app for unpaid invoices. You add the invoice, pick when reminders go out, and record the payment when it arrives. Reminders that are still queued stop once the invoice is paid.</p>
-    <p>Starter at $10 a month fits a solo operator with up to 40 open invoices and email reminders. Pro at $20 a month removes that cap and adds SMS. Starter Annual is $100 once a year for the same limits as Starter.</p>
+    <p>ReceiptGrid Invoicing is a small app for unpaid invoices. You add the invoice, pick when reminders go out, and record the payment when it arrives. Reminders that are still queued stop once the invoice is paid.</p>
+    <p>After the trial, the price is $5.00 a month or $50 a year. Both include unlimited open invoices, email reminders, and SMS. The trial itself includes email reminders and up to 40 open invoices.</p>
     <p><a class="btn" href="/signup">Start free trial</a></p>
     <?php elseif ($slug === 'invoice-reminders'): ?>
     <p>An invoice reminder is a short, specific note that an invoice is coming due or is already late. The useful ones name the invoice, the amount still open, and the due date. They do not apologize for asking, and they do not threaten a client you hope to work with again.</p>
@@ -51,7 +51,7 @@ $meta_title = $meta_title ?? ($title . ' · InvcPay');
     <p>Stop the series when you record a payment. Sending another reminder after the money has landed is how a polite system starts to feel careless.</p>
     <h2>What to put in the message</h2>
     <p>Use the client’s name, the invoice number, the amount still due, and the original due date. Offer one plain way to reply if something is wrong with the bill. Leave the late-fee speech out of the first two notes. A final notice can be firmer, and it should still say what is owed and that you are willing to look at the invoice with them.</p>
-    <p>InvcPay’s InPmnt workspace stores those messages as templates and queues them from the due date you enter. Email is on every plan. SMS is on Pro, at $20 a month. The 14-day trial does not need a card.</p>
+    <p>ReceiptGrid Invoicing stores those messages as templates and queues them from the due date you enter. Email is included in the trial. SMS is included once you subscribe at $5.00 a month or $50 a year. The 14-day trial does not need a card.</p>
     <p><a class="btn" href="/signup">Start free trial</a></p>
     <?php elseif ($slug === 'overdue-invoices'): ?>
     <p>An overdue invoice is one that is still unpaid after the due date. Before you send a sharper note, check three things: the client received it, the amount matches the work, and you have not already been paid by another channel.</p>
@@ -61,21 +61,21 @@ $meta_title = $meta_title ?? ($title . ' · InvcPay');
       <li>Send a short reminder that assumes they meant to pay. Include only the open balance, not the whole project history.</li>
       <li>If part of the money arrived, record that payment so the next note shows the real remaining balance.</li>
       <li>If there is still silence, send one final notice that states the amount and asks them to reply or pay.</li>
-      <li>Then decide, outside the software, whether you want to call, pause new work, or use whatever collection step your own contract allows. InvcPay does not invent that policy for you.</li>
+      <li>Then decide, outside the software, whether you want to call, pause new work, or use whatever collection step your own contract allows. ReceiptGrid Invoicing does not invent that policy for you.</li>
     </ol>
     <p>The point of software here is to make the first steps happen on time, and to keep a record of what was sent. It is not a substitute for a conversation when a job went badly.</p>
-    <p>InPmnt marks an open invoice overdue once the due date has passed and a balance remains. You can see 1–30, 31–60, and 60+ day totals on the dashboard. Starter is $10 a month after a 14-day trial with no card. Pro is $20 a month. Starter Annual is $100 a year.</p>
+    <p>ReceiptGrid marks an open invoice overdue once the due date has passed and a balance remains. You can see 1–30, 31–60, and 60+ day totals on the dashboard. After a 14-day trial with no card, the price is $5.00 a month or $50 a year.</p>
     <p><a class="btn" href="/signup">Start free trial</a></p>
     <?php elseif ($slug === 'for-contractors'): ?>
     <p>Contractors, landscapers, consultants, and photographers often finish the work and then wait on the invoice. The client is also someone you may want to hire you again, so a generic collections blast feels wrong, and a sticky note on the desk gets ignored.</p>
     <h2>Keep the ask specific</h2>
-    <p>You do not need a full accounting suite to collect a handful of open invoices. You need the invoice number, what is still unpaid, when it was due, and a reminder that sounds like you. InPmnt is that list, plus a schedule. InvcPay is the site and the company name in front of it.</p>
+    <p>You do not need a full accounting suite to collect a handful of open invoices. You need the invoice number, what is still unpaid, when it was due, and a reminder that sounds like you. ReceiptGrid Invoicing is that list, plus a schedule. The site stays at invcpay.com.</p>
     <p>Add the unpaid invoices you already have. Choose the days the reminders should go out. When a client pays, record the amount. Queued reminders for that invoice stop. You can still see what was sent.</p>
-    <p>The trial is 14 days and does not ask for a credit card. After that, Starter is $10 a month for up to 40 open invoices and email reminders. Pro is $20 a month if you want SMS and no cap on open invoices. Starter Annual is $100 for the year.</p>
+    <p>The trial is 14 days and does not ask for a credit card. After that, ReceiptGrid Invoicing is $5.00 a month or $50 a year, with unlimited open invoices plus email and SMS reminders.</p>
     <p>Built by Robert Foster. Questions go to <a href="mailto:<?= Http::e($support_email) ?>"><?= Http::e($support_email) ?></a>.</p>
     <p><a class="btn" href="/signup">Start free trial</a></p>
     <?php else: ?>
-    <p>Straight answers about the trial, the prices, and what InvcPay stores. For a person, email <a href="mailto:<?= Http::e($support_email) ?>"><?= Http::e($support_email) ?></a>.</p>
+    <p>Straight answers about the trial, the prices, and what ReceiptGrid stores. For a person, email <a href="mailto:<?= Http::e($support_email) ?>"><?= Http::e($support_email) ?></a>.</p>
     <?php require __DIR__ . '/_faq_list.php'; ?>
     <p><a class="btn" href="/signup">Start free trial</a></p>
     <?php endif; ?>

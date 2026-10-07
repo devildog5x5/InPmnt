@@ -1,4 +1,4 @@
-# Install InPmnt to a local app folder (default: %LOCALAPPDATA%\InPmnt).
+# Install ReceiptGrid to a local app folder (default: %LOCALAPPDATA%\InPmnt).
 # If an older install is present, prompts to uninstall it before installing this version.
 #
 # Usage:
@@ -33,7 +33,7 @@ function Get-InPmntInstallDir {
     if ($Override) { return $Override }
     $reg = Get-ItemProperty -Path "HKCU:\Software\InPmnt" -ErrorAction SilentlyContinue
     if ($reg -and $reg.InstallPath) { return [string]$reg.InstallPath }
-    return (Join-Path $env:LOCALAPPDATA "InPmnt")
+    return (Join-Path $env:LOCALAPPDATA "ReceiptGrid")
 }
 
 function Test-InPmntInstall {
@@ -71,7 +71,7 @@ function Stop-InPmntProcesses {
     )
     $killPids = @($listenPids + $runPids | Where-Object { $_ -and $_ -gt 0 } | Select-Object -Unique)
     if ($killPids.Count -eq 0) { return }
-    Write-Host "WARNING: InPmnt is running. Stopping PID(s): $($killPids -join ', ')" -ForegroundColor Yellow
+    Write-Host "WARNING: ReceiptGrid is running. Stopping PID(s): $($killPids -join ', ')" -ForegroundColor Yellow
     foreach ($procId in $killPids) {
         Stop-Process -Id $procId -Force -ErrorAction SilentlyContinue
     }
@@ -109,7 +109,7 @@ function Write-InstallMarker {
         [string]$Version
     )
     $obj = [ordered]@{
-        product     = "InPmnt"
+        product     = "ReceiptGrid"
         version     = $Version
         installPath = $Path
         installedAt = (Get-Date).ToUniversalTime().ToString("o")
@@ -135,7 +135,7 @@ function Register-InPmntInstall {
     $sc.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$(Join-Path $Path 'start.ps1')`""
     $sc.WorkingDirectory = $Path
     $sc.WindowStyle = 1
-    $sc.Description = "Start InPmnt"
+    $sc.Description = "Start ReceiptGrid"
     $icon = Join-Path $Path "static\img\inpmnt-icon.png"
     if (Test-Path $icon) { $sc.IconLocation = $icon }
     $sc.Save()
@@ -146,14 +146,14 @@ $InstallDir = Get-InPmntInstallDir -Override $InstallDir
 $sourceFull = [System.IO.Path]::GetFullPath($SourceRoot)
 $installFull = [System.IO.Path]::GetFullPath($InstallDir)
 
-Write-Host "InPmnt installer"
+Write-Host "ReceiptGrid installer"
 Write-Host "  Source : $sourceFull"
 Write-Host "  Target : $installFull"
 Write-Host "  Version: $newVersion"
 Write-Host ""
 
 if (-not (Test-Path (Join-Path $SourceRoot "run.py"))) {
-    throw "This folder does not look like an InPmnt package (run.py missing)."
+    throw "This folder does not look like an ReceiptGrid package (run.py missing)."
 }
 
 $alreadyInstalled = Test-InPmntInstall -Path $InstallDir
@@ -161,7 +161,7 @@ $choice = $null
 
 if ($alreadyInstalled) {
     $oldVersion = Get-InstalledVersion -Path $InstallDir
-    Write-Host "InPmnt is already installed:" -ForegroundColor Yellow
+    Write-Host "ReceiptGrid is already installed:" -ForegroundColor Yellow
     Write-Host "  Path   : $installFull"
     Write-Host "  Version: $oldVersion"
     Write-Host ""
@@ -194,7 +194,7 @@ if ($alreadyInstalled) {
             throw "uninstall.ps1 not found next to install.ps1."
         }
         Write-Host ""
-        Write-Host "Uninstalling existing InPmnt $oldVersion..." -ForegroundColor Yellow
+        Write-Host "Uninstalling existing ReceiptGrid $oldVersion..." -ForegroundColor Yellow
         $uninstallArgs = @{
             InstallDir = $InstallDir
             Yes        = $true
@@ -237,7 +237,7 @@ if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
 $startCmd = 'powershell -File "' + (Join-Path $installFull 'start.ps1') + '"'
 $uninstallCmd = 'powershell -File "' + (Join-Path $installFull 'uninstall.ps1') + '"'
 Write-Host ""
-Write-Host ("Installed InPmnt {0} to:" -f $newVersion) -ForegroundColor Green
+Write-Host ("Installed ReceiptGrid {0} to:" -f $newVersion) -ForegroundColor Green
 Write-Host ("  {0}" -f $installFull)
 Write-Host ("Start:  {0}" -f $startCmd)
 Write-Host "Or use the Start Menu shortcut: InPmnt"
@@ -245,6 +245,6 @@ Write-Host ("Uninstall: {0}" -f $uninstallCmd)
 
 if ($StartAfter) {
     Write-Host ""
-    Write-Host "Starting InPmnt..."
+    Write-Host "Starting ReceiptGrid..."
     & (Join-Path $InstallDir "start.ps1")
 }

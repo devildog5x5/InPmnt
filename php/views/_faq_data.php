@@ -2,11 +2,11 @@
 return [
     [
         'q' => 'Do I need a credit card to start?',
-        'a' => 'No. The 14-day trial opens with your name, email, and a password. A card is required only when you choose Starter, Pro, or Starter Annual.',
+        'a' => 'No. The 14-day trial opens with your name, email, and a password. A card is required only when you choose monthly or yearly billing.',
     ],
     [
-        'q' => 'What does InvcPay cost after the trial?',
-        'a' => 'Starter is $10 a month (up to 40 open invoices and email reminders). Pro is $20 a month (unlimited open invoices, email and SMS). Starter Annual is $100 a year for the Starter features, which is $20 less than twelve months at $10.',
+        'q' => 'What does ReceiptGrid cost after the trial?',
+        'a' => 'ReceiptGrid Invoicing is $5.00 a month or $50 a year. You pick either one. Both include unlimited open invoices plus email and SMS reminders. The yearly price is $10 less than twelve months at $5.00.',
     ],
     [
         'q' => 'What happens if I cancel?',
@@ -14,14 +14,14 @@ return [
     ],
     [
         'q' => 'Do you store my customers’ card numbers?',
-        'a' => 'No. InvcPay records the invoices and reminder messages you enter. When you subscribe, Stripe handles the checkout. InvcPay does not store your customers’ card numbers.',
+        'a' => 'No. ReceiptGrid records the invoices and reminder messages you enter. When you subscribe, Stripe handles the checkout. ReceiptGrid does not store your customers’ card numbers.',
     ],
     [
         'q' => 'Who is this for?',
-        'a' => 'Service businesses that invoice after the work is done: contractors, landscapers, consultants, photographers, and similar shops. InPmnt is the reminder product. InvcPay is the name on this site.',
+        'a' => 'Service businesses that invoice after the work is done: contractors, landscapers, consultants, photographers, and similar shops. This site is ReceiptGrid Invoicing, at invcpay.com.',
     ],
     [
-        'q' => 'Can I change plans later?',
-        'a' => 'Yes. Billing inside the app is where you move between Starter, Pro, and Starter Annual after the trial.',
+        'q' => 'Can I switch between monthly and yearly later?',
+        'a' => 'Yes. Billing inside the app is where you move between $5.00 a month and $50 a year after the trial.',
     ],
 ];

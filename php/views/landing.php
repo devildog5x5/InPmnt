@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="csrf-token" content="<?= Http::e(Http::csrfToken()) ?>" />
   <?php
-    $meta_title = 'InvcPay — Invoice reminders for small businesses';
-    $meta_description = 'Get paid without chasing clients. InvcPay sends invoice reminders for contractors and other service businesses. 14-day trial, no credit card. Then $10 or $20 a month, or $100 a year.';
+    $meta_title = 'ReceiptGrid Invoicing — reminders for small businesses';
+    $meta_description = 'Get paid without chasing clients. ReceiptGrid Invoicing sends invoice reminders for contractors and other service businesses. 14-day trial, no credit card. Then $5.00 a month or $50 a year.';
     $faqItems = require __DIR__ . '/_faq_data.php';
     $base = rtrim(Http::canonicalBase(), '/');
     $json_ld = [
@@ -14,22 +14,21 @@
         '@graph' => [
             [
                 '@type' => 'Organization',
-                'name' => 'InvcPay',
+                'name' => 'ReceiptGrid',
                 'url' => $base . '/',
                 'email' => 'support@invcpay.com',
                 'logo' => $base . '/static/img/inpmnt-icon.png',
             ],
             [
                 '@type' => 'SoftwareApplication',
-                'name' => 'InvcPay',
+                'name' => 'ReceiptGrid Invoicing',
                 'applicationCategory' => 'BusinessApplication',
                 'operatingSystem' => 'Web',
                 'url' => $base . '/',
-                'description' => 'Invoice reminders for small service businesses. 14-day trial, no credit card required.',
+                'description' => 'Invoice reminders for small service businesses. 14-day trial, no credit card required. Then $5.00 a month or $50 a year.',
                 'offers' => [
-                    ['@type' => 'Offer', 'name' => 'Starter', 'price' => '10', 'priceCurrency' => 'USD', 'description' => 'Per month after a 14-day trial. Up to 40 open invoices and email reminders.'],
-                    ['@type' => 'Offer', 'name' => 'Pro', 'price' => '20', 'priceCurrency' => 'USD', 'description' => 'Per month after a 14-day trial. Unlimited open invoices, email and SMS.'],
-                    ['@type' => 'Offer', 'name' => 'Starter Annual', 'price' => '100', 'priceCurrency' => 'USD', 'description' => 'Per year for Starter features. $20 less than twelve months at $10.'],
+                    ['@type' => 'Offer', 'name' => 'Monthly', 'price' => '5.00', 'priceCurrency' => 'USD', 'description' => 'Per month after a 14-day trial. Unlimited open invoices, email and SMS reminders.'],
+                    ['@type' => 'Offer', 'name' => 'Yearly', 'price' => '50.00', 'priceCurrency' => 'USD', 'description' => 'Per year. Same features as monthly. $10 less than twelve months at $5.00.'],
                 ],
             ],
             [
@@ -55,9 +54,9 @@
   <header class="landing-hero">
     <div>
       <h1>Get paid without chasing the invoice.</h1>
-      <p class="sub">InvcPay sends the reminder for you. Polite, on a schedule, and stopped when the invoice is paid.</p>
+      <p class="sub">ReceiptGrid Invoicing sends the reminder for you. Polite, on a schedule, and stopped when the invoice is paid.</p>
       <p class="audience">For contractors, consultants, photographers, landscapers, and other service businesses.</p>
-      <p class="hero-price">14-day trial, no credit card. Then <strong>$10/mo</strong>, <strong>$20/mo</strong>, or <strong>$100/yr</strong>.</p>
+      <p class="hero-price">14-day trial, no credit card. Then <strong>$5.00/month</strong> or <strong>$50/year</strong>.</p>
       <div class="hero-cta">
         <a class="btn" href="/signup">Start free trial</a>
         <a class="text-link" href="/pricing">See what is included</a>
@@ -104,7 +103,7 @@
   <section class="trust-strip" aria-label="Security and trial">
     <ul>
       <li>14-day trial, no credit card</li>
-      <li>$10/mo, $20/mo, or $100/yr</li>
+      <li>$5.00/month or $50/year</li>
       <li>Stripe checkout. We do not store your customers’ cards</li>
       <li>Cancel anytime</li>
     </ul>
@@ -128,7 +127,7 @@
           <div class="mini-cal"><b>Due</b><b class="on">+3</b><b>+7</b></div>
         </div>
         <h3>2. Choose your reminder schedule</h3>
-        <p>Pick the days. Email is on every plan. SMS is on Pro.</p>
+        <p>Pick the days. Email is in the trial. SMS is included once you subscribe.</p>
       </article>
       <article class="step">
         <div class="step-art" aria-hidden="true">
@@ -207,15 +206,15 @@
         <div class="brand-logo img">
           <picture>
             <source srcset="/static/img/inpmnt-icon.webp" type="image/webp" />
-            <img src="/static/img/inpmnt-icon.png" width="42" height="42" alt="InvcPay logo" loading="lazy" decoding="async" />
+            <img src="/static/img/inpmnt-icon.png" width="42" height="42" alt="ReceiptGrid logo" loading="lazy" decoding="async" />
           </picture>
         </div>
         <div class="brand-copy">
-          <div class="brand-mark">InvcPay</div>
-          <div class="brand-sub">InPmnt reminders</div>
+          <div class="brand-mark">ReceiptGrid</div>
+          <div class="brand-sub">Invoicing</div>
         </div>
       </div>
-      <p>Invoice reminders for service businesses. The product inside the app is InPmnt.</p>
+      <p>ReceiptGrid Invoicing for service businesses. This site stays at invcpay.com.</p>
     </div>
     <div class="footer-col">
       <h2>Product</h2>
@@ -233,7 +232,7 @@
       <a href="/refunds">Refund and cancellation</a>
     </div>
     <div class="footer-meta">
-      <p class="site-version" id="site-version">InPmnt v<?= Http::e(Http::VERSION) ?></p>
+      <p class="site-version" id="site-version">ReceiptGrid v<?= Http::e(Http::VERSION) ?></p>
       <p>© 2026 Robert Foster</p>
       <p>Support: <a href="mailto:support@invcpay.com">support@invcpay.com</a></p>
       <?php if (!empty($show_demo_login)): ?>

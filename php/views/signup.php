@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="csrf-token" content="<?= Http::e(Http::csrfToken()) ?>" />
   <?php
-    $meta_title = 'Start a free 14-day InvcPay trial, no card';
-    $meta_description = 'Open an InvcPay trial in a minute. No credit card. 14 days of invoice reminders, then $10 or $20 a month, or $100 a year.';
+    $meta_title = 'Start a free 14-day ReceiptGrid Invoicing trial, no card';
+    $meta_description = 'Open a ReceiptGrid Invoicing trial in a minute. No credit card. 14 days of invoice reminders, then $5.00 a month or $50 a year.';
     require __DIR__ . '/_meta.php';
   ?>
   <link rel="icon" type="image/png" href="/static/img/inpmnt-icon.png" />
@@ -17,11 +17,11 @@
   <div class="signup-layout">
     <section class="signup-offer">
       <h1>Start the 14-day trial</h1>
-      <p>No credit card. You get the InPmnt workspace: unpaid invoices, a reminder schedule, and a place to record the payment.</p>
+      <p>No credit card. You get the ReceiptGrid Invoicing workspace: unpaid invoices, a reminder schedule, and a place to record the payment.</p>
       <ul>
-        <li>Starter is $10 a month after the trial</li>
-        <li>Pro is $20 a month if you want SMS</li>
-        <li>Starter Annual is $100 for the year</li>
+        <li>$5.00 a month after the trial, or $50 for the year</li>
+        <li>Email reminders during the trial</li>
+        <li>SMS and unlimited open invoices once you subscribe</li>
       </ul>
       <p>You can look at <a href="/pricing">pricing</a> or the <a href="/faq">FAQ</a> first. Questions: <a href="mailto:support@invcpay.com">support@invcpay.com</a>.</p>
     </section>

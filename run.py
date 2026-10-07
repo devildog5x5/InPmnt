@@ -1,4 +1,4 @@
-"""Run InPmnt locally (HTTPS by default with a self-signed cert)."""
+"""Run ReceiptGrid locally (HTTPS by default with a self-signed cert)."""
 import os
 from pathlib import Path
 

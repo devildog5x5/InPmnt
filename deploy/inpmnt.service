@@ -1,5 +1,5 @@
 [Unit]
-Description=InPmnt (Gunicorn)
+Description=ReceiptGrid (Gunicorn)
 After=network.target
 
 [Service]

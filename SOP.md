@@ -1,17 +1,18 @@
-# InPmnt owner SOP
+# ReceiptGrid owner SOP
 
 Rules for the live site (https://invcpay.com/, PHP on Hostinger shared hosting). Deploy by unzipping the PHP zip into `public_html` with File Manager. There is no SSH.
 
 ## Version
 
-- Show the software version as plain text in the **footer only**: `InPmnt vX.Y.Z`.
+- Show the software version as plain text in the **footer only**: `ReceiptGrid vX.Y.Z`.
 - Do not put the version in the page `<title>` or in any heading (`h1`–`h6`). Search results should read as the page name, not a build number.
 - Keep `VERSION`, `php/VERSION`, `Http::VERSION`, and the comment at the top of `php/index.php` in lockstep. That comment is for a source text search, not a page heading.
 
 ## Brand
 
-- **InvcPay** is the customer-facing name. It matches the domain invcpay.com, so titles, the menu, and search results use InvcPay.
-- **InPmnt** is the product inside the account (the reminder workspace). The footer version stays `InPmnt vX.Y.Z`.
+- **ReceiptGrid** is the customer-facing name. Use **ReceiptGrid Invoicing** when a page needs to distinguish this product from the receipts app.
+- The public origin stays `https://invcpay.com`. Do not change canonical URLs to another domain.
+- The footer version stays `ReceiptGrid vX.Y.Z`.
 
 ## Canonical URL
 

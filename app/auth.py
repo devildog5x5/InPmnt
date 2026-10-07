@@ -35,7 +35,7 @@ def write_reset_file(db_path: str, url: str) -> Path:
     path = reset_file_path(db_path)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
-        "InPmnt password reset\n"
+        "ReceiptGrid password reset\n"
         f"Generated: {_now()}\n\n"
         "Open this link in your browser (expires in 1 hour):\n\n"
         f"{url}\n\n"

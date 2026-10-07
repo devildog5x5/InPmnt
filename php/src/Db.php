@@ -327,7 +327,7 @@ final class Db
         if (!is_dir($dir)) {
             mkdir($dir, 0775, true);
         }
-        $body = "InPmnt password reset\nGenerated: " . self::now() . "\n\n"
+        $body = "ReceiptGrid password reset\nGenerated: " . self::now() . "\n\n"
             . "Open this link in your browser (expires in 1 hour):\n\n"
             . $url . "\n\n"
             . "If you did not request this, delete this file.\n";
@@ -445,7 +445,7 @@ final class Db
                 self::ADMIN_EMAIL,
                 self::ADMIN_NAME,
                 password_hash(self::ADMIN_PASSWORD, PASSWORD_DEFAULT),
-                'InPmnt Admin',
+                'ReceiptGrid Admin',
                 'admin'
             );
         }
@@ -460,7 +460,7 @@ final class Db
             self::ADMIN_EMAIL,
             self::ADMIN_NAME,
             password_hash(self::ADMIN_PASSWORD, PASSWORD_DEFAULT),
-            'InPmnt Admin',
+            'ReceiptGrid Admin',
             'admin'
         );
         [, $wid] = self::createWorkspace(
@@ -472,7 +472,7 @@ final class Db
             'user'
         );
         $db->prepare('UPDATE settings SET phone=?, website=? WHERE id=?')
-            ->execute(['(555) 014-2200', 'https://inpmnt.app', $wid]);
+            ->execute(['(555) 014-2200', 'https://invcpay.com', $wid]);
 
         $clients = [
             ['Maya Chen', 'Chen Landscape Co.', 'maya@chenlandscape.com', '(555) 201-8841', 'Prefers email'],

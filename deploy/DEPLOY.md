@@ -1,8 +1,8 @@
-# Deploy InPmnt
+# Deploy ReceiptGrid
 
 **Direct doc:** https://github.com/devildog5x5/InPmnt/blob/main/deploy/DEPLOY.md
 
-InPmnt is a **Python (Flask)** app for Windows/VPS, and a **PHP** app for Hostinger shared hosting (FTP into `public_html`).
+ReceiptGrid is a **Python (Flask)** app for Windows/VPS, and a **PHP** app for Hostinger shared hosting (FTP into `public_html`).
 
 | Platform | Recommended stack |
 |----------|-------------------|
@@ -12,7 +12,7 @@ InPmnt is a **Python (Flask)** app for Windows/VPS, and a **PHP** app for Hostin
 | **Windows Server** | Waitress + Windows Service (NSSM) + IIS reverse proxy → [Windows](#windows-server) |
 
 Download zips: [latest release](https://github.com/devildog5x5/InPmnt/releases/latest)  
-(`InPmnt-PHP.vX.Y.Z.zip` → Hostinger `public_html`; `InPmnt-Portable.vX.Y.Z.zip` for native Windows; Docker uses the repo `Dockerfile`.)
+(`ReceiptGrid-PHP.vX.Y.Z.zip` → Hostinger `public_html`; `ReceiptGrid-Portable.vX.Y.Z.zip` for native Windows; Docker uses the repo `Dockerfile`.)
 
 ---
 
@@ -20,7 +20,7 @@ Download zips: [latest release](https://github.com/devildog5x5/InPmnt/releases/l
 
 No VPS. Uses the PHP rewrite in `php/`.
 
-1. Download **[InPmnt-PHP.vX.Y.Z.zip](https://github.com/devildog5x5/InPmnt/releases/latest)**.
+1. Download **[ReceiptGrid-PHP.vX.Y.Z.zip](https://github.com/devildog5x5/InPmnt/releases/latest)**.
 2. hPanel → **Files → File Manager** (or FTP). Unzip **every file into `public_html`** (not a subfolder).
 3. Copy `.env.example` to `.env`. Set:
    - `APP_SECRET` — long random string
@@ -38,7 +38,7 @@ Leave `SHOW_DEMO_LOGIN=0` on a public site. Point the domain at this Web hosting
 
 ## Docker (Linux VM)
 
-Easiest way to keep InPmnt “just running” on a VM.
+Easiest way to keep ReceiptGrid “just running” on a VM.
 
 ### Hostinger (recommended)
 
@@ -105,7 +105,7 @@ This is the closest thing to “upload files via FTP” for **Python**. Hostinge
 ### Do not
 
 - FTP into `public_html` / `www` / `htdocs` like a PHP site. Apache will not execute this app.
-- Expect a zip drop alone to start InPmnt. Python packages must be installed in the host’s virtualenv.
+- Expect a zip drop alone to start ReceiptGrid. Python packages must be installed in the host’s virtualenv.
 
 ### Steps
 
@@ -115,7 +115,7 @@ This is the closest thing to “upload files via FTP” for **Python**. Hostinge
    - Application URL: your domain
    - Startup file: `passenger_wsgi.py`
    - Entry point: `application`
-2. Download [InPmnt-Source.zip](https://github.com/devildog5x5/InPmnt/releases/latest) and FTP/SFTP (or File Manager) extract it into that application root.
+2. Download [ReceiptGrid-Source.zip](https://github.com/devildog5x5/InPmnt/releases/latest) and FTP/SFTP (or File Manager) extract it into that application root.
 3. Copy `.env.example` → `.env` and set `FLASK_SECRET_KEY`, `BASE_URL=https://yourdomain.com`, Stripe / email keys. Set `USE_HTTPS=0`.
 4. In Setup Python App, **Run Pip Install** on `requirements.txt` (or activate the venv they show and `pip install -r requirements.txt`).
 5. Click **Restart**. Open `https://yourdomain.com`.
@@ -197,7 +197,7 @@ cd /var/www/inpmnt && sudo -u www-data git pull && sudo systemctl restart inpmnt
 3. Open **PowerShell as Administrator** and run:
 
 ```powershell
-# From a clone or extracted InPmnt-Portable.vX.Y.Z.zip
+# From a clone or extracted ReceiptGrid-Portable.vX.Y.Z.zip
 cd C:\inetpub\inpmnt   # or wherever you placed the app
 powershell -ExecutionPolicy Bypass -File .\deploy\setup-windows.ps1 -Domain yourdomain.com
 ```
@@ -275,6 +275,10 @@ FLASK_SECRET_KEY=long-random-string
 BASE_URL=https://yourdomain.com
 STRIPE_SECRET_KEY=sk_live_...
 STRIPE_PUBLISHABLE_KEY=pk_live_...
+# $5.00 USD monthly and $50.00 USD yearly on product "ReceiptGrid Invoicing"
+STRIPE_PRICE_MONTHLY=price_...
+STRIPE_PRICE_YEARLY=price_...
+# Optional. Keep only for subscribers still on the old $10 / $20 / $100 prices.
 STRIPE_PRICE_STARTER=price_...
 STRIPE_PRICE_PRO=price_...
 STRIPE_PRICE_ANNUAL=price_...

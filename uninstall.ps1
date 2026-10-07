@@ -1,4 +1,4 @@
-# Uninstall InPmnt from the local install directory.
+# Uninstall ReceiptGrid from the local install directory.
 # Usage:
 #   powershell -ExecutionPolicy Bypass -File .\uninstall.ps1
 #   powershell -ExecutionPolicy Bypass -File .\uninstall.ps1 -RemoveData
@@ -16,7 +16,7 @@ function Get-InPmntInstallDir {
     if ($Override) { return $Override }
     $reg = Get-ItemProperty -Path "HKCU:\Software\InPmnt" -ErrorAction SilentlyContinue
     if ($reg -and $reg.InstallPath) { return [string]$reg.InstallPath }
-    return (Join-Path $env:LOCALAPPDATA "InPmnt")
+    return (Join-Path $env:LOCALAPPDATA "ReceiptGrid")
 }
 
 function Test-InPmntInstall {
@@ -42,7 +42,7 @@ function Stop-InPmntProcesses {
     )
     $killPids = @($listenPids + $runPids | Where-Object { $_ -and $_ -gt 0 } | Select-Object -Unique)
     if ($killPids.Count -eq 0) { return }
-    Write-Host "WARNING: InPmnt is running. Stopping PID(s): $($killPids -join ', ')" -ForegroundColor Yellow
+    Write-Host "WARNING: ReceiptGrid is running. Stopping PID(s): $($killPids -join ', ')" -ForegroundColor Yellow
     foreach ($procId in $killPids) {
         Stop-Process -Id $procId -Force -ErrorAction SilentlyContinue
     }
@@ -53,7 +53,7 @@ $InstallDir = Get-InPmntInstallDir -Override $InstallDir
 Write-Host "Install location: $InstallDir"
 
 if (-not (Test-InPmntInstall -Path $InstallDir)) {
-    Write-Host "No InPmnt installation found at that path."
+    Write-Host "No ReceiptGrid installation found at that path."
     exit 0
 }
 
@@ -68,7 +68,7 @@ if (Test-Path $marker) {
 
 if (-not $Yes) {
     Write-Host ""
-    Write-Host "Uninstall InPmnt $version from:" -ForegroundColor Yellow
+    Write-Host "Uninstall ReceiptGrid $version from:" -ForegroundColor Yellow
     Write-Host "  $InstallDir"
     if ($RemoveData) {
         Write-Host "  Data will be REMOVED (.env, database, certs)." -ForegroundColor Yellow
@@ -85,7 +85,7 @@ if (-not $Yes) {
 Stop-InPmntProcesses
 
 $dataNames = @(".env", "certs", "data", "inpmnt.db")
-$backupRoot = Join-Path $env:TEMP ("InPmnt-data-" + [guid]::NewGuid().ToString("N"))
+$backupRoot = Join-Path $env:TEMP ("ReceiptGrid-data-" + [guid]::NewGuid().ToString("N"))
 $saved = @()
 if (-not $RemoveData) {
     New-Item -ItemType Directory -Force -Path $backupRoot | Out-Null
@@ -126,4 +126,4 @@ if (Test-Path $backupRoot) {
     Remove-Item -LiteralPath $backupRoot -Recurse -Force -ErrorAction SilentlyContinue
 }
 
-Write-Host "InPmnt uninstalled."
+Write-Host "ReceiptGrid uninstalled."
