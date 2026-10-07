@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   {% set meta_title = "ReceiptGrid Invoicing — Get paid without the chase" %}
-  {% set meta_description = "ReceiptGrid Invoicing sends automated invoice reminders so small businesses collect overdue payments. 14-day trial, no credit card. Then $5.00 a month or $50 a year." %}
+  {% set meta_description = "ReceiptGrid Invoicing sends automated invoice reminders so small businesses collect overdue payments. 14-day trial, no credit card. Then $4.99 a month or $49.99 a year." %}
   {% include "_meta.html" %}
   <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/inpmnt-icon.png') }}" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -156,7 +156,7 @@
     <div class="pricing-grid">
       <article class="price-card">
         <h3>Monthly</h3>
-        <div class="price">$5.00<span>/mo</span></div>
+        <div class="price">$4.99<span>/mo</span></div>
         <p class="plan-save">After the 14-day trial. Billed every month.</p>
         <ul>
           <li>Unlimited open invoices</li>
@@ -167,10 +167,10 @@
         <a class="btn secondary" href="{{ url_for('main.signup') }}">Start free trial</a>
       </article>
       <article class="price-card featured">
-        <div class="popular">Save $10 a year</div>
+        <div class="popular">Save $9.89 a year</div>
         <h3>Yearly</h3>
-        <div class="price">$50<span>/yr</span></div>
-        <p class="plan-save">Save $10 versus twelve months at $5.00.</p>
+        <div class="price">$49.99<span>/yr</span></div>
+        <p class="plan-save">Save $9.89 versus twelve months at $4.99.</p>
         <ul>
           <li>Same features as monthly</li>
           <li>Unlimited open invoices</li>
@@ -186,7 +186,7 @@
       {% else %}
       Stripe keys are not configured yet — the trial still opens without a card. Add keys from <code>.env.example</code> before charging cards.
       {% endif %}
-      Cancel anytime. Yearly is $50 (same features as monthly): save $10 versus $5.00 × 12.
+      Cancel anytime. Yearly is $49.99 (same features as monthly): save $9.89 versus $4.99 × 12.
     </p>
   </section>
 

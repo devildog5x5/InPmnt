@@ -6,7 +6,7 @@
   <meta name="csrf-token" content="<?= Http::e(Http::csrfToken()) ?>" />
   <?php
     $meta_title = 'Start a free 14-day ReceiptGrid Invoicing trial, no card';
-    $meta_description = 'Open a ReceiptGrid Invoicing trial in a minute. No credit card. 14 days of invoice reminders, then $5.00 a month or $50 a year.';
+    $meta_description = 'Open a ReceiptGrid Invoicing trial in a minute. No credit card. 14 days of invoice reminders, then $4.99 a month or $49.99 a year.';
     require __DIR__ . '/_meta.php';
   ?>
   <link rel="icon" type="image/png" href="/static/img/inpmnt-icon.png" />
@@ -19,7 +19,7 @@
       <h1>Start the 14-day trial</h1>
       <p>No credit card. You get the ReceiptGrid Invoicing workspace: unpaid invoices, a reminder schedule, and a place to record the payment.</p>
       <ul>
-        <li>$5.00 a month after the trial, or $50 for the year</li>
+        <li>$4.99 a month after the trial, or $49.99 for the year</li>
         <li>Email reminders during the trial</li>
         <li>SMS and unlimited open invoices once you subscribe</li>
       </ul>

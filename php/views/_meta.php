@@ -1,6 +1,6 @@
 <?php
 $metaTitle = $meta_title ?? 'ReceiptGrid Invoicing';
-$metaDesc = $meta_description ?? 'ReceiptGrid Invoicing sends invoice reminders so small businesses get paid without chasing clients. 14-day trial, no credit card. Then $5.00 a month or $50 a year.';
+$metaDesc = $meta_description ?? 'ReceiptGrid Invoicing sends invoice reminders so small businesses get paid without chasing clients. 14-day trial, no credit card. Then $4.99 a month or $49.99 a year.';
 $metaRobots = $meta_robots ?? '';
 $metaPath = Http::path();
 $canonical = rtrim(Http::canonicalBase(), '/') . ($metaPath === '/' ? '/' : $metaPath);

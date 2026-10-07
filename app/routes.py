@@ -214,7 +214,7 @@ def support_chat():
     email = "support@invcpay.com"
     if any(w in msg for w in ("price", "plan", "annual", "billing", "cost")):
         reply = (
-            "ReceiptGrid Invoicing is $5.00/month or $50/year. You pick either one. "
+            "ReceiptGrid Invoicing is $4.99/month or $49.99/year. You pick either one. "
             "The 14-day trial does not need a card. "
             f"You can change plans later from Billing. Email {email}."
         )
@@ -1241,7 +1241,7 @@ def api_send_reminder(reminder_id: int):
 
         if channel == "sms":
             if not plan_allows_sms(effective_plan(settings)):
-                return jsonify({"error": "SMS reminders are included on the paid ReceiptGrid plan ($5.00/month or $50/year)."}), 403
+                return jsonify({"error": "SMS reminders are included on the paid ReceiptGrid plan ($4.99/month or $49.99/year)."}), 403
             log_activity(
                 conn,
                 "reminder",

@@ -22,8 +22,8 @@ Pitch in one line: *“Pays for itself after one recovered invoice.”*
 
 | Plan | Price | Hook |
 |------|-------|------|
-| Monthly | $5.00/mo | Unlimited open invoices, email and SMS |
-| Yearly | $50/yr | Same features. Save $10 versus $5.00 × 12. |
+| Monthly | $4.99/mo | Unlimited open invoices, email and SMS |
+| Yearly | $49.99/yr | Same features. Save $9.89 versus $4.99 × 12. |
 
 Offer a **14-day trial** (already seeded in the app). No card is required to start. A card is required only when the customer subscribes.
 
@@ -37,7 +37,7 @@ Offer a **14-day trial** (already seeded in the app). No card is required to sta
 - [ ] Deploy to Hostinger VPS + point domain
 
 ### Day 3 — Payments & real sends
-- [x] Stripe Checkout for $5.00/month or $50/year (wired — paste price IDs into `.env`)
+- [x] Stripe Checkout for $4.99/month or $49.99/year (wired — paste price IDs into `.env`)
 - [x] Stripe Customer Portal + webhook (`/api/billing/webhook`)
 - [x] Email reminders (Resend or SMTP — add keys to `.env`)
 - [ ] Twilio for SMS (included on the paid plan)
@@ -62,13 +62,13 @@ Offer a **14-day trial** (already seeded in the app). No card is required to sta
 - [ ] $20–50/day Facebook/Nextdoor ads targeting “plumber / landscaper / photographer” + city
 - [ ] 20 cold DMs/day: “Curious if late invoices are a pain — built a tiny tool that auto-nudges clients”
 - [ ] Post in 5 local trade / freelancer groups (value first, link in comments)
-- [ ] Public price is $5.00/month or $50/year
+- [ ] Public price is $4.99/month or $49.99/year
 
 ## Ad angles that convert
 
 1. **Money left on the table** — “How much are you owed right now?”
 2. **Awkward texts** — “Stop writing ‘just checking in on that invoice…’”
-3. **One recovered invoice** — “$5/month vs one $640 job paid late”
+3. **One recovered invoice** — “$4.99/month vs one $640 job paid late”
 4. **Not another QuickBooks** — “Reminders only. Takes 2 minutes to set up.”
 
 ## Demo script (under 60 seconds)
@@ -86,7 +86,7 @@ Offer a **14-day trial** (already seeded in the app). No card is required to sta
 | Auth | Email signup + password reset (or Clerk/Auth0) |
 | Billing | Stripe Customer Portal |
 | Email | Resend API; map `api_send_reminder` to real send |
-| SMS | Twilio; included after subscribe ($5.00/month or $50/year) |
+| SMS | Twilio; included after subscribe ($4.99/month or $49.99/year) |
 | Imports | CSV upload + later QuickBooks/Stripe sync |
 | Multi-tenant | `workspace_id` on all tables before selling beyond yourself |
 

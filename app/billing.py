@@ -7,12 +7,12 @@ from typing import Any
 PLANS = {
     "monthly": {
         "name": "Monthly",
-        "amount_label": "$5.00/mo",
+        "amount_label": "$4.99/mo",
         "env_price": "STRIPE_PRICE_MONTHLY",
     },
     "yearly": {
         "name": "Yearly",
-        "amount_label": "$50.00/yr",
+        "amount_label": "$49.99/yr",
         "env_price": "STRIPE_PRICE_YEARLY",
     },
 }

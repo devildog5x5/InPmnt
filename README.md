@@ -171,7 +171,7 @@ powershell -ExecutionPolicy Bypass -File .\deploy\setup-windows.ps1 -Domain your
 
 ## Stripe billing
 
-ReceiptGrid Invoicing uses **Stripe Checkout** and the Customer Portal. The customer picks **$5.00/month** or **$50/year** (same features; yearly saves $10 versus $5.00 × 12). The 14-day trial does not require a card. Email reminders are in the trial. SMS and unlimited open invoices are included after you subscribe.
+ReceiptGrid Invoicing uses **Stripe Checkout** and the Customer Portal. The customer picks **$4.99/month** or **$49.99/year** (same features; yearly saves $9.89 versus $4.99 × 12). The 14-day trial does not require a card. Email reminders are in the trial. SMS and unlimited open invoices are included after you subscribe.
 
 Create one product in the [Stripe Dashboard](https://dashboard.stripe.com/products):
 
@@ -184,12 +184,12 @@ Then create two **recurring** prices on that product and paste the price IDs int
 
 | Env variable | Amount | Interval |
 |---|---|---|
-| `STRIPE_PRICE_MONTHLY` | $5.00 USD | Every month |
-| `STRIPE_PRICE_YEARLY` | $50.00 USD | Every year |
+| `STRIPE_PRICE_MONTHLY` | $4.99 USD | Every month |
+| `STRIPE_PRICE_YEARLY` | $49.99 USD | Every year |
 
 Also set `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET` (endpoint: `POST /api/billing/webhook`), and `BASE_URL` (live site: `https://invcpay.com`). Checkout stays disabled until the secret key and both new price IDs are real Stripe IDs, not the `price_...` placeholders.
 
-Leave `STRIPE_PRICE_STARTER`, `STRIPE_PRICE_PRO`, and `STRIPE_PRICE_ANNUAL` only if existing subscribers are still billed on the old prices ($10/month, $20/month, $100/year). Those keys are not shown as purchase options. Do not point them at the new $5 or $50 prices.
+Leave `STRIPE_PRICE_STARTER`, `STRIPE_PRICE_PRO`, and `STRIPE_PRICE_ANNUAL` only if existing subscribers are still billed on the old prices ($10/month, $20/month, $100/year). Those keys are not shown as purchase options. Do not point them at the new $4.99 or $49.99 prices.
 
 Set `MAIL_FROM_NAME=ReceiptGrid` so password-reset mail uses the new name. The env key name itself does not change.
 
