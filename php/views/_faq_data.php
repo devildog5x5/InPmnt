@@ -6,7 +6,7 @@ return [
     ],
     [
         'q' => 'What does ReceiptGrid cost after the trial?',
-        'a' => 'ReceiptGrid Invoicing is $5.00 a month or $50 a year. You pick either one. Both include unlimited open invoices plus email and SMS reminders. The yearly price is $10 less than twelve months at $5.00.',
+        'a' => 'ReceiptGrid Invoicing is $4.99 a month or $49.99 a year. You pick either one. Both include unlimited open invoices plus email and SMS reminders. The yearly price is $9.89 less than twelve months at $4.99.',
     ],
     [
         'q' => 'What happens if I cancel?',
@@ -22,6 +22,6 @@ return [
     ],
     [
         'q' => 'Can I switch between monthly and yearly later?',
-        'a' => 'Yes. Billing inside the app is where you move between $5.00 a month and $50 a year after the trial.',
+        'a' => 'Yes. Billing inside the app is where you move between $4.99 a month and $49.99 a year after the trial.',
     ],
 ];

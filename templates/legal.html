@@ -19,7 +19,7 @@
     <p>To ask for a copy of your workspace data or to close an account, email <a href="mailto:{{ support_email }}">{{ support_email }}</a>.</p>
     {% elif slug == 'terms' %}
     <p>ReceiptGrid Invoicing sends the invoice reminders you configure. You are responsible for the accuracy of invoice amounts, the permission to email or text your clients, and the content of those messages.</p>
-    <p>The 14-day trial does not require a credit card. After that, the price is $5.00 per month or $50 per year. You can switch between those two from Billing. Cancel anytime; access continues through the period already paid.</p>
+    <p>The 14-day trial does not require a credit card. After that, the price is $4.99 per month or $49.99 per year. You can switch between those two from Billing. Cancel anytime; access continues through the period already paid.</p>
     <p>The service is provided by Robert Foster. Questions: <a href="mailto:{{ support_email }}">{{ support_email }}</a>.</p>
     {% elif slug == 'contact' %}
     <p>Email <a href="mailto:{{ support_email }}">{{ support_email }}</a> for sales, billing, or account questions.</p>
@@ -32,7 +32,7 @@
     <p>Sign-in is required for the workspace and the admin console. Report a security issue to <a href="mailto:{{ support_email }}">{{ support_email }}</a>.</p>
     {% else %}
     <p>The 14-day trial does not require a credit card, so there is nothing to refund before you subscribe.</p>
-    <p>After you subscribe, you can cancel anytime from Billing. The plan stays active through the end of the period you already paid. Yearly billing is $50, which is $10 less than twelve months at $5.00.</p>
+    <p>After you subscribe, you can cancel anytime from Billing. The plan stays active through the end of the period you already paid. Yearly billing is $49.99, which is $9.89 less than twelve months at $4.99.</p>
     <p>If a charge looks wrong, email <a href="mailto:{{ support_email }}">{{ support_email }}</a> and we will look at that invoice with you.</p>
     {% endif %}
     <p><a href="{{ url_for('main.landing') }}">Back to home</a></p>

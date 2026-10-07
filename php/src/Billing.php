@@ -5,8 +5,8 @@ final class Billing
 {
     /** Plans a new customer can buy. Charges use the Stripe price IDs in env. */
     public const PLANS = [
-        'monthly' => ['name' => 'Monthly', 'amount_label' => '$5.00/mo', 'env_price' => 'STRIPE_PRICE_MONTHLY'],
-        'yearly' => ['name' => 'Yearly', 'amount_label' => '$50.00/yr', 'env_price' => 'STRIPE_PRICE_YEARLY'],
+        'monthly' => ['name' => 'Monthly', 'amount_label' => '$4.99/mo', 'env_price' => 'STRIPE_PRICE_MONTHLY'],
+        'yearly' => ['name' => 'Yearly', 'amount_label' => '$49.99/yr', 'env_price' => 'STRIPE_PRICE_YEARLY'],
     ];
 
     /**

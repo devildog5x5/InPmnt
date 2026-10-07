@@ -6,7 +6,7 @@
   <meta name="csrf-token" content="<?= Http::e(Http::csrfToken()) ?>" />
   <?php
     $meta_title = 'ReceiptGrid Invoicing — reminders for small businesses';
-    $meta_description = 'Get paid without chasing clients. ReceiptGrid Invoicing sends invoice reminders for contractors and other service businesses. 14-day trial, no credit card. Then $5.00 a month or $50 a year.';
+    $meta_description = 'Get paid without chasing clients. ReceiptGrid Invoicing sends invoice reminders for contractors and other service businesses. 14-day trial, no credit card. Then $4.99 a month or $49.99 a year.';
     $faqItems = require __DIR__ . '/_faq_data.php';
     $base = rtrim(Http::canonicalBase(), '/');
     $json_ld = [
@@ -25,10 +25,10 @@
                 'applicationCategory' => 'BusinessApplication',
                 'operatingSystem' => 'Web',
                 'url' => $base . '/',
-                'description' => 'Invoice reminders for small service businesses. 14-day trial, no credit card required. Then $5.00 a month or $50 a year.',
+                'description' => 'Invoice reminders for small service businesses. 14-day trial, no credit card required. Then $4.99 a month or $49.99 a year.',
                 'offers' => [
-                    ['@type' => 'Offer', 'name' => 'Monthly', 'price' => '5.00', 'priceCurrency' => 'USD', 'description' => 'Per month after a 14-day trial. Unlimited open invoices, email and SMS reminders.'],
-                    ['@type' => 'Offer', 'name' => 'Yearly', 'price' => '50.00', 'priceCurrency' => 'USD', 'description' => 'Per year. Same features as monthly. $10 less than twelve months at $5.00.'],
+                    ['@type' => 'Offer', 'name' => 'Monthly', 'price' => '4.99', 'priceCurrency' => 'USD', 'description' => 'Per month after a 14-day trial. Unlimited open invoices, email and SMS reminders.'],
+                    ['@type' => 'Offer', 'name' => 'Yearly', 'price' => '49.99', 'priceCurrency' => 'USD', 'description' => 'Per year. Same features as monthly. $9.89 less than twelve months at $4.99.'],
                 ],
             ],
             [
@@ -56,7 +56,7 @@
       <h1>Get paid without chasing the invoice.</h1>
       <p class="sub">ReceiptGrid Invoicing sends the reminder for you. Polite, on a schedule, and stopped when the invoice is paid.</p>
       <p class="audience">For contractors, consultants, photographers, landscapers, and other service businesses.</p>
-      <p class="hero-price">14-day trial, no credit card. Then <strong>$5.00/month</strong> or <strong>$50/year</strong>.</p>
+      <p class="hero-price">14-day trial, no credit card. Then <strong>$4.99/month</strong> or <strong>$49.99/year</strong>.</p>
       <div class="hero-cta">
         <a class="btn" href="/signup">Start free trial</a>
         <a class="text-link" href="/pricing">See what is included</a>
@@ -103,7 +103,7 @@
   <section class="trust-strip" aria-label="Security and trial">
     <ul>
       <li>14-day trial, no credit card</li>
-      <li>$5.00/month or $50/year</li>
+      <li>$4.99/month or $49.99/year</li>
       <li>Stripe checkout. We do not store your customers’ cards</li>
       <li>Cancel anytime</li>
     </ul>

@@ -75,6 +75,6 @@ def assert_can_add_open_invoice(conn, wid: int, settings) -> str | None:
     if count_open_invoices(conn, wid) >= limit:
         return (
             f"Open invoice limit reached ({limit}). "
-            "Subscribe to ReceiptGrid ($5.00/month or $50/year) for unlimited open invoices."
+            "Subscribe to ReceiptGrid ($4.99/month or $49.99/year) for unlimited open invoices."
         )
     return None

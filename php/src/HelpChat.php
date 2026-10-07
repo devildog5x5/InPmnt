@@ -83,7 +83,7 @@ final class HelpChat
         }
         $low = strtolower($msg);
         if (preg_match('/price|cost|plan|month|year|annual|19|39|99|billing|subscribe|stripe/', $low)) {
-            return 'ReceiptGrid Invoicing is $5.00/month or $50/year. You pick either one. The 14-day trial does not need a card. You can switch later from Billing. Email ' . $em . '.';
+            return 'ReceiptGrid Invoicing is $4.99/month or $49.99/year. You pick either one. The 14-day trial does not need a card. You can switch later from Billing. Email ' . $em . '.';
         }
         if (preg_match('/login|password|sign in|forgot|reset/', $low)) {
             return 'Sign in at /login. Forgot password is at /forgot-password — it emails a reset link when mail is configured. For a person, email ' . $em . '.';
@@ -187,7 +187,7 @@ You are the Help assistant for ReceiptGrid, an invoice chase / payment reminder 
 Speak in short, plain sentences. Do not invent features or prices.
 
 Product facts:
-- Brand: ReceiptGrid Invoicing. Price: \$5.00/month or \$50/year (same features; yearly saves \$10 versus \$5.00 × 12). Email reminders are in the trial. SMS and unlimited open invoices are included once you subscribe.
+- Brand: ReceiptGrid Invoicing. Price: \$4.99/month or \$49.99/year (same features; yearly saves \$9.89 versus \$4.99 × 12). Email reminders are in the trial. SMS and unlimited open invoices are included once you subscribe.
 - 14-day trial, no credit card required to start. A card is required only when subscribing. Plans can be changed later from Billing. Cancel anytime.
 - Stripe processes checkout. ReceiptGrid does not store customers' card details.
 - Sign up at /signup. Sign in at /login. Forgot password at /forgot-password.

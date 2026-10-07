@@ -227,8 +227,8 @@ final class App
         '/pricing' => [
             'title' => 'Pricing',
             'slug' => 'pricing',
-            'meta_title' => 'ReceiptGrid pricing: $5.00 a month or $50 a year',
-            'description' => 'ReceiptGrid Invoicing is $5.00 a month or $50 a year, after a 14-day trial. No credit card to start.',
+            'meta_title' => 'ReceiptGrid pricing: $4.99 a month or $49.99 a year',
+            'description' => 'ReceiptGrid Invoicing is $4.99 a month or $49.99 a year, after a 14-day trial. No credit card to start.',
         ],
         '/invoice-reminders' => [
             'title' => 'Invoice reminders',
@@ -252,7 +252,7 @@ final class App
             'title' => 'FAQ',
             'slug' => 'faq',
             'meta_title' => 'ReceiptGrid FAQ: trial, prices, and cancellation',
-            'description' => 'Trial length, the $5.00 monthly price, the $50 yearly price, cancellation, and what ReceiptGrid stores.',
+            'description' => 'Trial length, the $4.99 monthly price, the $49.99 yearly price, cancellation, and what ReceiptGrid stores.',
         ],
     ];
 
@@ -279,7 +279,7 @@ final class App
             'title' => 'Terms of Service',
             'slug' => 'terms',
             'meta_title' => 'ReceiptGrid terms of service for reminder subscriptions',
-            'description' => 'The ReceiptGrid Invoicing trial is 14 days with no card. After that the price is $5.00 a month or $50 a year.',
+            'description' => 'The ReceiptGrid Invoicing trial is 14 days with no card. After that the price is $4.99 a month or $49.99 a year.',
         ],
         '/contact' => [
             'title' => 'Contact',
@@ -1218,7 +1218,7 @@ final class App
         $now = Db::now();
         if ($channel === 'sms') {
             if (!Workspace::allowsSms(Workspace::effectivePlan($settings))) {
-                Http::json(['error' => 'SMS reminders are included on the paid ReceiptGrid plan ($5.00/month or $50/year).'], 403);
+                Http::json(['error' => 'SMS reminders are included on the paid ReceiptGrid plan ($4.99/month or $49.99/year).'], 403);
             }
             Db::log($this->db, 'reminder', "SMS stub (not wired yet) for {$r['number']} to " . ($r['phone'] ?: $r['client_name']), 'reminder', $id, $wid);
             $this->db->prepare('UPDATE reminders SET status=?, sent_at=? WHERE id=?')->execute(['sent', $now, $id]);
