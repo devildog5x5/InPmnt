@@ -718,9 +718,7 @@ async function renderSettings() {
         ${billing.enabled ? "Stripe Checkout is configured." : "Stripe keys missing — add them to .env (see .env.example)."}
       </p>
       <div class="actions">
-        <button class="btn secondary sm" data-plan="starter">Starter $10</button>
-        <button class="btn sm" data-plan="pro">Pro $20</button>
-        <button class="btn secondary sm" data-plan="annual">Annual $100</button>
+        ${Object.entries(billing.plans || { monthly: { name: "Monthly", amount_label: "$5.00/mo" }, yearly: { name: "Yearly", amount_label: "$50.00/yr" } }).map(([key, meta], i, all) => `<button class="${i === all.length - 1 ? "btn sm" : "btn secondary sm"}" data-plan="${key}">${meta.name} ${meta.amount_label}</button>`).join("")}
         ${billing.has_customer ? `<button class="btn ghost sm" id="btn-portal">Manage billing</button>` : ""}
       </div>
     </div>

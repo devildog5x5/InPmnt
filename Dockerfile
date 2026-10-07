@@ -1,4 +1,4 @@
-# InPmnt — Linux container (Gunicorn)
+# ReceiptGrid — Linux container (Gunicorn)
 FROM python:3.12-slim-bookworm
 
 ENV PYTHONDONTWRITEBYTECODE=1 \

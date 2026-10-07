@@ -78,7 +78,7 @@ export PORT="${PORT:-5055}"
 # Prefer values from .env over empty Compose placeholders.
 unset FLASK_SECRET_KEY || true
 
-echo "Starting InPmnt (Gunicorn) on 0.0.0.0:${PORT}"
+echo "Starting ReceiptGrid (Gunicorn) on 0.0.0.0:${PORT}"
 echo "Demo login: demouser@inpmnt.app / Demo"
 
 # SQLite + multi-worker is unsafe; default to 1 unless overridden carefully.

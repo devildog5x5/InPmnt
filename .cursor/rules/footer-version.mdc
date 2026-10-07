@@ -3,13 +3,13 @@ description: Show the software version in the footer only. Keep it out of titles
 alwaysApply: true
 ---
 
-# Footer version (InPmnt)
+# Footer version (ReceiptGrid)
 
 Every shippable build must show the current software version as **plain searchable text in the footer only**:
 
-1. **`php/index.php`** — comment line `InPmnt vX.Y.Z` (source text search; not rendered)
-2. **Landing `/`** — footer `InPmnt vX.Y.Z`
-3. **App shell `/app`** — bottom bar `InPmnt vX.Y.Z`
+1. **`php/index.php`** — comment line `ReceiptGrid vX.Y.Z` (source text search; not rendered)
+2. **Landing `/`** — footer `ReceiptGrid vX.Y.Z`
+3. **App shell `/app`** — bottom bar `ReceiptGrid vX.Y.Z`
 4. Keep `VERSION`, `php/VERSION`, and `Http::VERSION` in lockstep
 
 Do **not** put the version in `<title>` or in any heading. Search results should stay readable.

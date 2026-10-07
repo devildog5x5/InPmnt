@@ -1,6 +1,6 @@
 <?php
-$metaTitle = $meta_title ?? 'InvcPay';
-$metaDesc = $meta_description ?? 'InvcPay sends invoice reminders so small businesses get paid without chasing clients. 14-day trial, no credit card. Then $10 or $20 a month, or $100 a year.';
+$metaTitle = $meta_title ?? 'ReceiptGrid Invoicing';
+$metaDesc = $meta_description ?? 'ReceiptGrid Invoicing sends invoice reminders so small businesses get paid without chasing clients. 14-day trial, no credit card. Then $5.00 a month or $50 a year.';
 $metaRobots = $meta_robots ?? '';
 $metaPath = Http::path();
 $canonical = rtrim(Http::canonicalBase(), '/') . ($metaPath === '/' ? '/' : $metaPath);
@@ -12,7 +12,7 @@ $msVerify = Env::get('MSVALIDATE_01');
   <meta name="description" content="<?= Http::e($metaDesc) ?>" />
   <link rel="canonical" href="<?= Http::e($canonical) ?>" />
   <meta property="og:type" content="website" />
-  <meta property="og:site_name" content="InvcPay" />
+  <meta property="og:site_name" content="ReceiptGrid Invoicing" />
   <meta property="og:title" content="<?= Http::e($metaTitle) ?>" />
   <meta property="og:description" content="<?= Http::e($metaDesc) ?>" />
   <meta property="og:url" content="<?= Http::e($canonical) ?>" />

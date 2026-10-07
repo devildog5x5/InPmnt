@@ -1,23 +1,23 @@
-# InPmnt
+# ReceiptGrid
 
 **Get paid without the chase.**
 
 Invoice chase + payment reminders for solo trades and freelancers. Built by **Robert Foster**.
 
-InPmnt helps plumbers, landscapers, photographers, and consultants stop losing cash to late invoices: track open balances, auto-queue polite reminders, send final notices, and record payments — without a full accounting suite.
+ReceiptGrid helps plumbers, landscapers, photographers, and consultants stop losing cash to late invoices: track open balances, auto-queue polite reminders, send final notices, and record payments — without a full accounting suite.
 
 ## Downloads
 
-Packages are published on the [GitHub Releases](https://github.com/devildog5x5/InPmnt/releases) page. Each release ships **all four** archives.
+Build the four archives locally with `powershell -File .\build_release.ps1`. They land in `installers\` (not committed). The GitHub repo name stays `InPmnt` until Robert renames it.
 
-| Package | What you get | Download |
+| Package | What you get | File |
 |---------|----------------|----------|
-| **PHP (Hostinger)** | Unzip into `public_html` — no VPS | [InPmnt-PHP.v1.5.05.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.5.05/InPmnt-PHP.v1.5.05.zip) |
-| **Portable** | Runnable Windows app — `install.ps1` or `start.ps1` | [InPmnt-Portable.v1.5.05.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.5.05/InPmnt-Portable.v1.5.05.zip) |
-| **Source** | Full source (Python + PHP + Docker) | [InPmnt-Source.v1.5.05.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.5.05/InPmnt-Source.v1.5.05.zip) |
-| **Icon** | Brand icon assets (blue / teal / violet) | [InPmnt-Icon.v1.5.05.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.5.05/InPmnt-Icon.v1.5.05.zip) |
+| **PHP (Hostinger)** | Unzip into `public_html` — no VPS | `ReceiptGrid-PHP.v1.6.0.zip` |
+| **Portable** | Runnable Windows app — `install.ps1` or `start.ps1` | `ReceiptGrid-Portable.v1.6.0.zip` |
+| **Source** | Full source (Python + PHP + Docker) | `ReceiptGrid-Source.v1.6.0.zip` |
+| **Icon** | Brand icon assets (blue / teal / violet) | `ReceiptGrid-Icon.v1.6.0.zip` |
 
-- Latest release: [v1.5.05](https://github.com/devildog5x5/InPmnt/releases/tag/v1.5.05)
+- Release index (existing repo): [GitHub Releases](https://github.com/devildog5x5/InPmnt/releases)
 - Sign up: `/signup` · Local demo (optional): set `SHOW_DEMO_LOGIN=1` then `demouser@inpmnt.app` / `Demo`
 - App URL (local): `https://127.0.0.1:5055` (self-signed cert; accept the browser warning)
 - Rebuild locally: `powershell -File .\build_release.ps1` → `installers\*.zip`
@@ -110,9 +110,9 @@ Production TLS (Let's Encrypt / IIS) is handled by nginx or IIS in front of the 
 
 ## Hostinger (PHP — shared hosting)
 
-InPmnt now ships a **PHP** build you can drop on Hostinger Web/Cloud (no VPS).
+ReceiptGrid now ships a **PHP** build you can drop on Hostinger Web/Cloud (no VPS).
 
-1. Download [InPmnt-PHP.v1.5.05.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.5.05/InPmnt-PHP.v1.5.05.zip).
+1. Unzip `ReceiptGrid-PHP.v1.6.0.zip` (from `installers\` after `build_release.ps1`, or from the GitHub release once it is published).
 2. In hPanel → **Files → File Manager** (or FTP), unzip **all files into `public_html`**.
 3. Copy `.env.example` → `.env`. Set `APP_SECRET` (long random string) and `BASE_URL=https://yourdomain.com`.
 4. hPanel → **Advanced → PHP Configuration**: PHP **8.2+**, enable **pdo_sqlite**.
@@ -125,16 +125,16 @@ The Windows portable app is still Python (`start.ps1`). Use PHP only on shared h
 
 ## FTP / shared hosting
 
-Use **InPmnt-PHP.vX.Y.Z.zip** on Hostinger Web/Cloud (unzip into `public_html`). The Python app still will not run from `public_html`.
+Use **ReceiptGrid-PHP.vX.Y.Z.zip** on Hostinger Web/Cloud (unzip into `public_html`). The Python app still will not run from `public_html`.
 
 | Host | What to do |
 |------|------------|
-| **Hostinger Web / Cloud** | Download **InPmnt-PHP.vX.Y.Z.zip** and unzip into `public_html`. See [Hostinger PHP](#hostinger-php--shared-hosting). |
+| **Hostinger Web / Cloud** | Download **ReceiptGrid-PHP.vX.Y.Z.zip** and unzip into `public_html`. See [Hostinger PHP](#hostinger-php--shared-hosting). |
 | **cPanel with Setup Python App** | Optional Python path: FTP source into the app root; startup file `passenger_wsgi.py`. See [deploy/DEPLOY.md](deploy/DEPLOY.md#ftp--cpanel-python-app). |
 
 ## Docker (Linux container)
 
-Runs InPmnt with **Gunicorn** on Linux inside Docker — good for a VPS/VM.
+Runs ReceiptGrid with **Gunicorn** on Linux inside Docker — good for a VPS/VM.
 
 ```bash
 # On a machine with Docker installed:
@@ -173,15 +173,27 @@ powershell -ExecutionPolicy Bypass -File .\deploy\setup-windows.ps1 -Domain your
 
 ## Stripe billing
 
-InPmnt ships with **Stripe Checkout** (Starter $10/mo, Pro $20/mo, Starter Annual $100/yr — save $20, 2 months free) and the Customer Portal. The 14-day trial does not require a card.
+ReceiptGrid Invoicing uses **Stripe Checkout** and the Customer Portal. The customer picks **$5.00/month** or **$50/year** (same features; yearly saves $10 versus $5.00 × 12). The 14-day trial does not require a card. Email reminders are in the trial. SMS and unlimited open invoices are included after you subscribe.
 
-1. Create products + recurring prices in the [Stripe Dashboard](https://dashboard.stripe.com/products).
-2. Copy `.env.example` → `.env` and set:
-   - `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`
-   - `STRIPE_PRICE_STARTER`, `STRIPE_PRICE_PRO`, `STRIPE_PRICE_ANNUAL`
-   - `STRIPE_WEBHOOK_SECRET` (endpoint: `POST /api/billing/webhook`)
-   - `BASE_URL` (e.g. `https://your-domain.com`)
-3. Subscribe from the landing page or **Settings → Billing**.
+Create one product in the [Stripe Dashboard](https://dashboard.stripe.com/products):
+
+| Field | Value |
+|---|---|
+| Product name | `ReceiptGrid Invoicing` |
+| Statement descriptor | `RECEIPTGRID` (5–22 characters; set on the product, not in this repo) |
+
+Then create two **recurring** prices on that product and paste the price IDs into `.env` (Hostinger: `public_html/.env`):
+
+| Env variable | Amount | Interval |
+|---|---|---|
+| `STRIPE_PRICE_MONTHLY` | $5.00 USD | Every month |
+| `STRIPE_PRICE_YEARLY` | $50.00 USD | Every year |
+
+Also set `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET` (endpoint: `POST /api/billing/webhook`), and `BASE_URL` (live site: `https://invcpay.com`). Checkout stays disabled until the secret key and both new price IDs are real Stripe IDs, not the `price_...` placeholders.
+
+Leave `STRIPE_PRICE_STARTER`, `STRIPE_PRICE_PRO`, and `STRIPE_PRICE_ANNUAL` only if existing subscribers are still billed on the old prices ($10/month, $20/month, $100/year). Those keys are not shown as purchase options. Do not point them at the new $5 or $50 prices.
+
+Set `MAIL_FROM_NAME=ReceiptGrid` so password-reset mail uses the new name. The env key name itself does not change.
 
 Without keys, the app still runs in demo/trial mode.
 
@@ -199,11 +211,11 @@ Without keys, the app still runs in demo/trial mode.
 
 ## Product
 
-**Official product name: InPmnt** (locked). Tagline only — not the brand: *Get paid without the chase.*
+**Official product name: ReceiptGrid Invoicing.** The shared brand is ReceiptGrid. Tagline: *Get paid without the chase.* The live site stays at invcpay.com.
 
 | | |
 |---|---|
-| Brand | **InPmnt** |
+| Brand | **ReceiptGrid** |
 | Tagline | Get paid without the chase |
 | Author | Robert Foster |
 | Icon | `static/img/inpmnt-icon.png` |

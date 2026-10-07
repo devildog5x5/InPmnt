@@ -1,4 +1,4 @@
-# Prepare InPmnt on Windows Server (Waitress). Run as Administrator preferred.
+# Prepare ReceiptGrid on Windows Server (Waitress). Run as Administrator preferred.
 # Usage: powershell -ExecutionPolicy Bypass -File .\deploy\setup-windows.ps1 -Domain yourdomain.com
 param(
     [Parameter(Mandatory = $true)]

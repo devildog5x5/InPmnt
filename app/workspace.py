@@ -40,14 +40,14 @@ def effective_plan(settings) -> str:
 
 
 def plan_allows_sms(plan: str) -> bool:
-    return plan in ("pro",)
+    return plan in ("monthly", "yearly", "pro")
 
 
 def plan_open_invoice_limit(plan: str) -> int | None:
+    if plan in ("monthly", "yearly", "pro"):
+        return None
     if plan in ("starter", "annual", "trial"):
         return STARTER_OPEN_INVOICE_LIMIT
-    if plan == "pro":
-        return None
     if plan == "expired":
         return 0
     return STARTER_OPEN_INVOICE_LIMIT
@@ -75,6 +75,6 @@ def assert_can_add_open_invoice(conn, wid: int, settings) -> str | None:
     if count_open_invoices(conn, wid) >= limit:
         return (
             f"Open invoice limit reached ({limit}). "
-            "Upgrade to Pro for unlimited open invoices."
+            "Subscribe to ReceiptGrid ($5.00/month or $50/year) for unlimited open invoices."
         )
     return None

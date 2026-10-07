@@ -1,4 +1,4 @@
-"""Factory-reset the InPmnt SQLite database (users, passwords, and all app data)."""
+"""Factory-reset the ReceiptGrid SQLite database (users, passwords, and all app data)."""
 from __future__ import annotations
 
 import argparse
@@ -14,7 +14,7 @@ def main(argv: list[str] | None = None) -> int:
     root = Path(__file__).resolve().parent.parent
     load_dotenv(root / ".env")
     parser = argparse.ArgumentParser(
-        description="Wipe InPmnt SQLite data and re-seed the default admin and demo accounts."
+        description="Wipe ReceiptGrid SQLite data and re-seed the default admin and demo accounts."
     )
     parser.add_argument("--yes", "-y", action="store_true", help="Skip the confirmation prompt")
     parser.add_argument(

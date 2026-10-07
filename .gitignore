@@ -20,4 +20,6 @@ php/.env
 php/data/*.db
 password-reset.txt
 php/data/password-reset.txt
+php/data/help-chat.txt
+php/data/help-rate.json
 

@@ -3,7 +3,7 @@ description: Always fix defects as soon as they are found; do not leave known bu
 alwaysApply: true
 ---
 
-# Fix errors as you find them (InPmnt)
+# Fix errors as you find them (ReceiptGrid)
 
 When testing, reviewing, or shipping, **fix every clear defect in the same turn** — do not only report it and ask whether to fix.
 

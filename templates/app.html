@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  {% set meta_title = "InPmnt" %}
-  {% set meta_description = "InPmnt workspace for invoices, client payment reminders, and getting paid without chasing unpaid bills." %}
+  {% set meta_title = "ReceiptGrid" %}
+  {% set meta_description = "ReceiptGrid workspace for invoices, client payment reminders, and getting paid without chasing unpaid bills." %}
   {% set meta_robots = "noindex, nofollow" %}
   {% include "_meta.html" %}
   <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/inpmnt-icon.png') }}" />
@@ -19,11 +19,11 @@
     <aside class="sidebar">
       <div class="brand">
         <div class="brand-logo img">
-          <img src="{{ url_for('static', filename='img/inpmnt-icon.png') }}" width="42" height="42" alt="InvcPay logo" />
+          <img src="{{ url_for('static', filename='img/inpmnt-icon.png') }}" width="42" height="42" alt="ReceiptGrid logo" />
         </div>
         <div class="brand-copy">
-          <div class="brand-mark">InPmnt</div>
-          <div class="brand-sub">Get paid without the chase</div>
+          <div class="brand-mark">ReceiptGrid</div>
+          <div class="brand-sub">Invoicing</div>
         </div>
       </div>
 
@@ -84,7 +84,7 @@
     <main class="main" id="app"></main>
   </div>
 
-  <footer class="page-version" id="site-version">InPmnt v{{ app_version }}</footer>
+  <footer class="page-version" id="site-version">ReceiptGrid v{{ app_version }}</footer>
 
   <div id="toast-host" class="toast-host"></div>
   <div id="modal-root" class="modal-backdrop"></div>

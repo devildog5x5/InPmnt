@@ -41,7 +41,7 @@ if ($dbPath === '') {
 if (!extension_loaded('pdo_sqlite')) {
     http_response_code(500);
     header('Content-Type: text/plain; charset=utf-8');
-    echo "InPmnt needs the PHP PDO SQLite extension. Enable it in hPanel → PHP Configuration, or ask Hostinger support to turn on pdo_sqlite.";
+    echo "ReceiptGrid needs the PHP PDO SQLite extension. Enable it in hPanel → PHP Configuration, or ask Hostinger support to turn on pdo_sqlite.";
     exit;
 }
 
@@ -58,7 +58,7 @@ while (true) {
             http_response_code(500);
             header('Content-Type: text/plain; charset=utf-8');
             header_remove('X-Powered-By');
-            echo "InPmnt could not open its database. Reload the page in a moment.";
+            echo "ReceiptGrid could not open its database. Reload the page in a moment.";
             exit;
         }
         usleep(150000 * $attempts);

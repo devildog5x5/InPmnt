@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="csrf-token" content="<?= Http::e(Http::csrfToken()) ?>" />
   <?php
-    $meta_title = 'InvcPay workspace for open invoice reminders';
-    $meta_description = 'Your InvcPay workspace for open invoices, reminder schedules, clients, and recorded payments.';
+    $meta_title = 'ReceiptGrid workspace for open invoice reminders';
+    $meta_description = 'Your ReceiptGrid workspace for open invoices, reminder schedules, clients, and recorded payments.';
     $meta_robots = 'noindex, nofollow';
     require __DIR__ . '/_meta.php';
   ?>
@@ -19,11 +19,11 @@
     <aside class="sidebar">
       <div class="brand">
         <div class="brand-logo img">
-          <img src="/static/img/inpmnt-icon.png" width="42" height="42" alt="InvcPay logo" />
+          <img src="/static/img/inpmnt-icon.png" width="42" height="42" alt="ReceiptGrid logo" />
         </div>
         <div class="brand-copy">
-          <div class="brand-mark">InPmnt</div>
-          <div class="brand-sub">Get paid without the chase</div>
+          <div class="brand-mark">ReceiptGrid</div>
+          <div class="brand-sub">Invoicing</div>
         </div>
       </div>
 
@@ -90,7 +90,7 @@
     <main class="main" id="app"></main>
   </div>
 
-  <footer class="page-version" id="site-version">InPmnt v<?= Http::e(Http::VERSION) ?></footer>
+  <footer class="page-version" id="site-version">ReceiptGrid v<?= Http::e(Http::VERSION) ?></footer>
 
   <div id="toast-host" class="toast-host"></div>
   <div id="modal-root" class="modal-backdrop"></div>

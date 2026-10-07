@@ -1,4 +1,4 @@
-# InPmnt on Linux (Docker)
+# ReceiptGrid on Linux (Docker)
 #   docker compose up -d --build
 #   open http://127.0.0.1:5055
 # Demo: demouser@inpmnt.app / Demo  (admin@inpmnt.app is reserved)

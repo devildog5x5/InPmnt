@@ -227,32 +227,32 @@ final class App
         '/pricing' => [
             'title' => 'Pricing',
             'slug' => 'pricing',
-            'meta_title' => 'InvcPay pricing: $10, $20 a month, or $100/yr',
-            'description' => 'InvcPay is $10 or $20 a month, or $100 a year, after a 14-day trial. No credit card to start.',
+            'meta_title' => 'ReceiptGrid pricing: $5.00 a month or $50 a year',
+            'description' => 'ReceiptGrid Invoicing is $5.00 a month or $50 a year, after a 14-day trial. No credit card to start.',
         ],
         '/invoice-reminders' => [
             'title' => 'Invoice reminders',
             'slug' => 'invoice-reminders',
-            'meta_title' => 'How InvcPay schedules polite invoice reminders',
-            'description' => 'How to remind clients about unpaid invoices without sounding rude, and how InvcPay schedules those notes.',
+            'meta_title' => 'How ReceiptGrid schedules polite invoice reminders',
+            'description' => 'How to remind clients about unpaid invoices without sounding rude, and how ReceiptGrid schedules those notes.',
         ],
         '/overdue-invoices' => [
             'title' => 'Overdue invoices',
             'slug' => 'overdue-invoices',
-            'meta_title' => 'What to do when an InvcPay invoice is overdue',
+            'meta_title' => 'What to do when a ReceiptGrid invoice is overdue',
             'description' => 'What to do when an invoice is past due: check the bill, send a calm reminder, record partial payments, then one final notice.',
         ],
         '/for-contractors' => [
             'title' => 'Invoice reminders for contractors',
             'slug' => 'for-contractors',
-            'meta_title' => 'Invoice reminders for contractors on InvcPay',
-            'description' => 'InvcPay helps contractors, landscapers, consultants, and photographers collect unpaid invoices. 14-day trial, no credit card.',
+            'meta_title' => 'Invoice reminders for contractors on ReceiptGrid',
+            'description' => 'ReceiptGrid helps contractors, landscapers, consultants, and photographers collect unpaid invoices. 14-day trial, no credit card.',
         ],
         '/faq' => [
             'title' => 'FAQ',
             'slug' => 'faq',
-            'meta_title' => 'InvcPay FAQ: trial, prices, and cancellation',
-            'description' => 'Trial length, $10 and $20 monthly plans, the $100 yearly plan, cancellation, and what InvcPay stores.',
+            'meta_title' => 'ReceiptGrid FAQ: trial, prices, and cancellation',
+            'description' => 'Trial length, the $5.00 monthly price, the $50 yearly price, cancellation, and what ReceiptGrid stores.',
         ],
     ];
 
@@ -272,38 +272,38 @@ final class App
         '/privacy' => [
             'title' => 'Privacy Policy',
             'slug' => 'privacy',
-            'meta_title' => 'InvcPay privacy policy for account and invoice data',
-            'description' => 'InvcPay stores the account, client, and invoice details you enter so reminders can be sent. Card numbers stay with Stripe.',
+            'meta_title' => 'ReceiptGrid privacy policy for account and invoice data',
+            'description' => 'ReceiptGrid stores the account, client, and invoice details you enter so reminders can be sent. Card numbers stay with Stripe.',
         ],
         '/terms' => [
             'title' => 'Terms of Service',
             'slug' => 'terms',
-            'meta_title' => 'InvcPay terms of service for reminder subscriptions',
-            'description' => 'The InvcPay trial is 14 days with no card. Starter is $10 a month, Pro is $20 a month, and Starter Annual is $100 a year.',
+            'meta_title' => 'ReceiptGrid terms of service for reminder subscriptions',
+            'description' => 'The ReceiptGrid Invoicing trial is 14 days with no card. After that the price is $5.00 a month or $50 a year.',
         ],
         '/contact' => [
             'title' => 'Contact',
             'slug' => 'contact',
-            'meta_title' => 'Contact InvcPay about billing or your account',
-            'description' => 'Email support@invcpay.com for InvcPay sales, billing, or account questions. InPmnt is the product name inside the app.',
+            'meta_title' => 'Contact ReceiptGrid about billing or your account',
+            'description' => 'Email support@invcpay.com for ReceiptGrid Invoicing sales, billing, or account questions.',
         ],
         '/support' => [
             'title' => 'Support',
             'slug' => 'support',
-            'meta_title' => 'InvcPay help for reminders, billing, and sign-in',
-            'description' => 'Get InvcPay help from the on-page button or support@invcpay.com. Include your account email and plan name for billing questions.',
+            'meta_title' => 'ReceiptGrid help for reminders, billing, and sign-in',
+            'description' => 'Get ReceiptGrid help from the on-page button or support@invcpay.com. Include your account email and plan name for billing questions.',
         ],
         '/security' => [
             'title' => 'Data Security',
             'slug' => 'security',
-            'meta_title' => 'How InvcPay protects passwords and invoice data',
-            'description' => 'InvcPay stores passwords as hashes and sends checkout through Stripe. Customer card numbers are not stored in InvcPay.',
+            'meta_title' => 'How ReceiptGrid protects passwords and invoice data',
+            'description' => 'ReceiptGrid stores passwords as hashes and sends checkout through Stripe. Customer card numbers are not stored in ReceiptGrid.',
         ],
         '/refunds' => [
             'title' => 'Refund and cancellation policy',
             'slug' => 'refunds',
-            'meta_title' => 'InvcPay refund and cancellation policy details',
-            'description' => 'The InvcPay trial needs no card. After you subscribe you can cancel anytime, and access lasts through the period already paid.',
+            'meta_title' => 'ReceiptGrid refund and cancellation policy details',
+            'description' => 'The ReceiptGrid trial needs no card. After you subscribe you can cancel anytime, and access lasts through the period already paid.',
         ],
     ];
 
@@ -493,14 +493,14 @@ final class App
 
     private function deliverReset(string $email, string $url): void
     {
-        $body = "Reset your InPmnt password\n\n"
+        $body = "Reset your ReceiptGrid password\n\n"
             . "We received a request to reset the password for this account.\n\n"
             . "Open this link within 1 hour:\n{$url}\n\n"
             . "If you didn't request this, you can ignore this message.\n";
         $sent = false;
         if (Mailer::configured()) {
             try {
-                Mailer::send($email, 'Reset your InPmnt password', $body);
+                Mailer::send($email, 'Reset your ReceiptGrid password', $body);
                 $sent = true;
             } catch (Throwable $e) {
                 $sent = false;
@@ -920,7 +920,7 @@ final class App
             'amount_due' => Db::money(Db::invoiceBalance($inv)),
             'due_date' => $inv['due_date'],
             'status' => $inv['status'],
-            'business_name' => $settings['business_name'] ?? 'InPmnt',
+            'business_name' => $settings['business_name'] ?? 'ReceiptGrid',
         ];
         $created = 0;
         $ins = $this->db->prepare(
@@ -1218,7 +1218,7 @@ final class App
         $now = Db::now();
         if ($channel === 'sms') {
             if (!Workspace::allowsSms(Workspace::effectivePlan($settings))) {
-                Http::json(['error' => 'SMS reminders require the Pro plan.'], 403);
+                Http::json(['error' => 'SMS reminders are included on the paid ReceiptGrid plan ($5.00/month or $50/year).'], 403);
             }
             Db::log($this->db, 'reminder', "SMS stub (not wired yet) for {$r['number']} to " . ($r['phone'] ?: $r['client_name']), 'reminder', $id, $wid);
             $this->db->prepare('UPDATE reminders SET status=?, sent_at=? WHERE id=?')->execute(['sent', $now, $id]);
@@ -1315,7 +1315,7 @@ final class App
             'amount_due' => Db::money(Db::invoiceBalance($inv)),
             'due_date' => $inv['due_date'],
             'status' => $inv['status'],
-            'business_name' => $settings['business_name'] ?? 'InPmnt',
+            'business_name' => $settings['business_name'] ?? 'ReceiptGrid',
         ];
         $subject = Db::renderVars($tmpl['subject'] ?? 'Final notice', $ctx);
         $body = Db::renderVars($tmpl['body'] ?? 'Final notice', $ctx);
@@ -1422,7 +1422,7 @@ final class App
         $data = Http::bodyJson();
         $plan = strtolower(trim((string) ($data['plan'] ?? '')));
         if (!isset(Billing::PLANS[$plan])) {
-            Http::json(['error' => 'Unknown plan. Use starter, pro, or annual.'], 400);
+            Http::json(['error' => 'Unknown plan. Use monthly or yearly.'], 400);
         }
         $cfg = Billing::config();
         if (!$cfg['enabled']) {
