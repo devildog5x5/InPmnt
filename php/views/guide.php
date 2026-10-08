@@ -72,10 +72,10 @@ $meta_title = $meta_title ?? ($title . ' · InvoicePay');
     <p>You do not need a full accounting suite to collect a handful of open invoices. You need the invoice number, what is still unpaid, when it was due, and a reminder that sounds like you. InvoicePay is that list, plus a schedule. The site stays at invcpay.com.</p>
     <p>Add the unpaid invoices you already have. Choose the days the reminders should go out. When a client pays, record the amount. Queued reminders for that invoice stop. You can still see what was sent.</p>
     <p>The trial is 14 days and does not ask for a credit card. After that, InvoicePay is $4.99 a month or $49.99 a year, with unlimited open invoices plus email and SMS reminders.</p>
-    <p>Built by Robert Foster. Questions go to <a href="mailto:<?= Http::e($support_email) ?>"><?= Http::e($support_email) ?></a>.</p>
+    <p>Built by Robert Foster. <?php require __DIR__ . '/_support_note.php'; ?>.</p>
     <p><a class="btn" href="/signup">Start free trial</a></p>
     <?php else: ?>
-    <p>Straight answers about the trial, the prices, and what InvoicePay stores. For a person, email <a href="mailto:<?= Http::e($support_email) ?>"><?= Http::e($support_email) ?></a>.</p>
+    <p>Straight answers about the trial, the prices, and what InvoicePay stores. <?php require __DIR__ . '/_support_note.php'; ?>.</p>
     <?php require __DIR__ . '/_faq_list.php'; ?>
     <p><a class="btn" href="/signup">Start free trial</a></p>
     <?php endif; ?>

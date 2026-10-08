@@ -11,17 +11,14 @@
   var history = [];
   var ignoreToggleUntil = 0;
   var chatUrl = wrap.getAttribute("data-url") || "/support/chat";
-  var supportEmail = wrap.getAttribute("data-email") || "support@invcpay.com";
+  var supportNote = "Text 801-319-1061 for customer support.";
 
   function linkify(text) {
     var div = document.createElement("div");
     div.textContent = text == null ? "" : String(text);
     var html = div.innerHTML;
     html = html.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1">$1</a>');
-    html = html.replace(
-      /(^|[\s>])([A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,})/g,
-      '$1<a href="mailto:$2">$2</a>'
-    );
+    html = html.replace(/801-319-1061/g, '<a href="sms:+18013191061">801-319-1061</a>');
     return html;
   }
 
@@ -48,7 +45,7 @@
     toggle.setAttribute("aria-expanded", "true");
     try { localStorage.setItem("inp-help", "open"); } catch (e) {}
     if (!log.childNodes.length) {
-      add("assistant", "Hi — I can help with plans, invoices, reminders, and login. For a person, email " + supportEmail + ".");
+      add("assistant", "Hi — I can help with plans, invoices, reminders, and login. " + supportNote);
     }
     input.focus();
   }
@@ -98,12 +95,12 @@
       body: JSON.stringify({ message: msg, history: history.slice(-8) })
     }).then(function (r) { return r.json(); }).then(function (data) {
       wait.remove();
-      var reply = (data && data.reply) ? data.reply : ("Please email " + supportEmail + ".");
+      var reply = (data && data.reply) ? data.reply : supportNote;
       add("assistant", reply);
       history.push({ role: "assistant", content: reply });
     }).catch(function () {
       wait.remove();
-      add("assistant", "The chat could not reach the server. Email " + supportEmail + ".");
+      add("assistant", "The chat could not reach the server. " + supportNote);
     });
   });
 })();

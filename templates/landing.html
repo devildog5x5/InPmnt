@@ -109,7 +109,7 @@
       <article class="feature"><div class="feat-icon blue" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 4h9l3 3v13H8V4zm0 0H5v16h3M11 12h6M11 16h4"/></svg></div><h3>Templates</h3><p>Friendly nudge, due today, overdue, final notice, and a short SMS. Merge fields fill the name, amount, and date.</p></article>
       <article class="feature"><div class="feat-icon violet" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 6h16v12H4z"/><path d="m4 7 8 6 8-6"/></svg></div><h3>Email reminders</h3><p>Included in the trial. They send when Resend or SMTP is connected, and each send is logged.</p></article>
       <article class="feature"><div class="feat-icon teal" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v5h5M9 13h6M9 17h4"/></svg></div><h3>Final notice</h3><p>One action fills the final-notice template and emails it when mail is connected.</p></article>
-      <article class="feature"><div class="feat-icon blue" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 16.5V7.5A3.5 3.5 0 0 1 8.5 4h7A3.5 3.5 0 0 1 19 7.5v5A3.5 3.5 0 0 1 15.5 16H9l-4 3.5z"/></svg></div><h3>Help chat</h3><p>Answers from the facts on this site. You can also email support@invcpay.com.</p></article>
+      <article class="feature"><div class="feat-icon blue" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 16.5V7.5A3.5 3.5 0 0 1 8.5 4h7A3.5 3.5 0 0 1 19 7.5v5A3.5 3.5 0 0 1 15.5 16H9l-4 3.5z"/></svg></div><h3>Help chat</h3><p>Answers from the facts on this site. {% include "_support_note.html" %}.</p></article>
       <article class="feature"><div class="feat-icon violet" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18"/></svg></div><h3>Billing</h3><p>Subscribe monthly or yearly. Stripe Checkout and the customer portal handle the card.</p></article>
     </div>
   </section>
@@ -168,7 +168,7 @@
     <h2>Pricing</h2>
     <p class="sub">14 days free. No card. Then $4.99 a month or $49.99 a year.</p>
     {% if not stripe_enabled %}
-    <p class="pay-setup" role="status">Payments are being set up, please contact support@invcpay.com</p>
+    <p class="pay-setup" role="status">Payments are being set up. {% include "_support_note.html" %}.</p>
     {% endif %}
     <div class="pricing-grid">
       <article class="price-card">
@@ -263,9 +263,6 @@
     </div>
     <div class="footer-meta">
       <p class="page-version" id="site-version">{% include "_version_line.html" %}</p>
-      {% if show_demo_login %}
-      <p class="page-version">Local demo: demouser@inpmnt.app / Demo</p>
-      {% endif %}
     </div>
   </footer>
   <script src="{{ url_for('static', filename='js/landing.js') }}?v={{ app_version }}" defer></script>

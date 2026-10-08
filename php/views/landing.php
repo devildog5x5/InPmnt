@@ -16,7 +16,7 @@
                 '@type' => 'Organization',
                 'name' => 'InvoicePay',
                 'url' => $base . '/',
-                'email' => 'support@invcpay.com',
+                'telephone' => '+1-801-319-1061',
                 'logo' => $base . '/static/img/inpmnt-icon.png',
             ],
             [
@@ -212,7 +212,7 @@
       <article class="feature">
         <div class="feat-icon blue" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 16.5V7.5A3.5 3.5 0 0 1 8.5 4h7A3.5 3.5 0 0 1 19 7.5v5A3.5 3.5 0 0 1 15.5 16H9l-4 3.5z"/></svg></div>
         <h3>Help chat</h3>
-        <p>Answers from the facts on this site. You can also email support@invcpay.com.</p>
+        <p>Answers from the facts on this site. <?php require __DIR__ . '/_support_note.php'; ?>.</p>
       </article>
       <article class="feature">
         <div class="feat-icon violet" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18"/></svg></div>
@@ -357,9 +357,6 @@
     </div>
     <div class="footer-meta">
       <p class="page-version" id="site-version"><?php require __DIR__ . '/_version_line.php'; ?></p>
-      <?php if (!empty($show_demo_login)): ?>
-      <p class="page-version">Local demo: demouser@inpmnt.app / Demo</p>
-      <?php endif; ?>
     </div>
   </footer>
   <script src="/static/js/landing.js?v=<?= rawurlencode(Http::VERSION) ?>" defer></script>

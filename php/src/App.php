@@ -61,7 +61,7 @@ final class App
     private function supportChat(): never
     {
         if (!Http::verifyCsrfHeader()) {
-            Http::json(['reply' => 'That help session expired. Refresh the page, or email ' . HelpChat::supportEmail() . '.'], 403);
+            Http::json(['reply' => 'That help session expired. Refresh the page. ' . HelpChat::SUPPORT_NOTE . '.'], 403);
         }
         $body = Http::bodyJson();
         $msg = trim((string) ($body['message'] ?? ''));
@@ -268,7 +268,6 @@ final class App
             'slug' => $page['slug'],
             'meta_title' => $page['meta_title'],
             'description' => $page['description'],
-            'support_email' => HelpChat::supportEmail(),
         ]);
     }
 
@@ -289,13 +288,13 @@ final class App
             'title' => 'Contact',
             'slug' => 'contact',
             'meta_title' => 'Contact InvoicePay about billing or your account',
-            'description' => 'Email support@invcpay.com for InvoicePay sales, billing, or account questions.',
+            'description' => 'Text 801-319-1061 for customer support. Sales, billing, and account questions.',
         ],
         '/support' => [
             'title' => 'Support',
             'slug' => 'support',
             'meta_title' => 'InvoicePay help for reminders, billing, and sign-in',
-            'description' => 'Get InvoicePay help from the on-page button or support@invcpay.com. Include your account email and plan name for billing questions.',
+            'description' => 'Get InvoicePay help from the on-page button. Text 801-319-1061 for customer support. Include the name on the account and the plan name for billing questions.',
         ],
         '/security' => [
             'title' => 'Data Security',
@@ -319,7 +318,6 @@ final class App
             'slug' => $page['slug'],
             'meta_title' => $page['meta_title'],
             'meta_description' => $page['description'],
-            'support_email' => HelpChat::supportEmail(),
         ]);
     }
 
@@ -1472,7 +1470,7 @@ final class App
             ]);
         } catch (Throwable $e) {
             error_log('[InvoicePay] Stripe checkout failed: ' . $e->getMessage());
-            $out = ['error' => 'We could not start checkout. Please try again, or email support@invcpay.com.'];
+            $out = ['error' => 'We could not start checkout. Please try again. Text 801-319-1061 for customer support.'];
             if ($this->isAdminUser()) {
                 $out['admin_error'] = 'Stripe said: ' . $e->getMessage();
             }
@@ -1481,7 +1479,7 @@ final class App
         $url = (string) ($sess['url'] ?? '');
         if ($url === '') {
             error_log('[InvoicePay] Stripe checkout returned no URL');
-            return ['error' => 'We could not start checkout. Please try again, or email support@invcpay.com.'];
+            return ['error' => 'We could not start checkout. Please try again. Text 801-319-1061 for customer support.'];
         }
         Db::log($this->db, 'billing', "Started Stripe checkout for {$plan}", 'settings', $wid, $wid);
         unset($_SESSION['signup_plan']);
@@ -1579,7 +1577,7 @@ final class App
             Http::json(['url' => $result['url']]);
         }
         $status = isset(Billing::PLANS[$plan]) && !Billing::config()['enabled'] ? 503 : 400;
-        $body = ['error' => $result['error'] ?? 'We could not start checkout. Please try again, or email support@invcpay.com.'];
+        $body = ['error' => $result['error'] ?? 'We could not start checkout. Please try again. Text 801-319-1061 for customer support.'];
         if (!empty($result['admin_error'])) {
             $body['admin_error'] = $result['admin_error'];
         }
@@ -1607,7 +1605,7 @@ final class App
             $sess = Billing::createPortal($settings['stripe_customer_id']);
         } catch (Throwable $e) {
             error_log('[InvoicePay] Stripe portal failed: ' . $e->getMessage());
-            $body = ['error' => 'We could not open billing. Please try again, or email support@invcpay.com.'];
+            $body = ['error' => 'We could not open billing. Please try again. Text 801-319-1061 for customer support.'];
             if ($this->isAdminUser()) {
                 $body['admin_error'] = 'Stripe said: ' . $e->getMessage();
             }

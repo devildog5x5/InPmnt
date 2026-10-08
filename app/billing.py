@@ -66,7 +66,8 @@ class StripeConfig:
         )
 
 
-CUSTOMER_SETUP = "Payments are being set up, please contact support@invcpay.com"
+SUPPORT_NOTE = "Text 801-319-1061 for customer support"
+CUSTOMER_SETUP = "Payments are being set up. " + SUPPORT_NOTE + "."
 PAID_PLANS = {"monthly", "yearly", "starter", "pro", "annual"}
 
 

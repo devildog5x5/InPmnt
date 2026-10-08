@@ -737,9 +737,9 @@ function wireCheckout(root) {
           body: JSON.stringify({ plan: btn.dataset.plan }),
         });
         if (res.url) location.href = res.url;
-        else toast("We could not start checkout. Please try again, or email support@invcpay.com.");
+        else toast("We could not start checkout. Please try again. Text 801-319-1061 for customer support.");
       } catch (err) {
-        toast(err.message || "We could not start checkout. Please try again, or email support@invcpay.com.");
+        toast(err.message || "We could not start checkout. Please try again. Text 801-319-1061 for customer support.");
       } finally {
         btn.disabled = false;
       }
@@ -749,9 +749,9 @@ function wireCheckout(root) {
     try {
       const res = await api("/api/billing/portal", { method: "POST", body: "{}" });
       if (res.url) location.href = res.url;
-      else toast("We could not open billing. Please try again, or email support@invcpay.com.");
+      else toast("We could not open billing. Please try again. Text 801-319-1061 for customer support.");
     } catch (err) {
-      toast(err.message || "We could not open billing. Please try again, or email support@invcpay.com.");
+      toast(err.message || "We could not open billing. Please try again. Text 801-319-1061 for customer support.");
     }
   });
 }

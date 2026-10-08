@@ -26,7 +26,7 @@
         <li>Email reminders during the trial</li>
         <li>SMS and unlimited open invoices once you subscribe</li>
       </ul>
-      <p>You can look at <a href="/pricing">pricing</a> or the <a href="/faq">FAQ</a> first. Questions: <a href="mailto:support@invcpay.com">support@invcpay.com</a>.</p>
+      <p>You can look at <a href="/pricing">pricing</a> or the <a href="/faq">FAQ</a> first. <?php require __DIR__ . '/_support_note.php'; ?>.</p>
     </section>
     <div class="auth-card">
       <h2>Create your account</h2>
