@@ -1,4 +1,4 @@
-# Uninstall ReceiptGrid from the local install directory.
+# Uninstall InvoicePay from the local install directory.
 # Usage:
 #   powershell -ExecutionPolicy Bypass -File .\uninstall.ps1
 #   powershell -ExecutionPolicy Bypass -File .\uninstall.ps1 -RemoveData
@@ -42,7 +42,7 @@ function Stop-InPmntProcesses {
     )
     $killPids = @($listenPids + $runPids | Where-Object { $_ -and $_ -gt 0 } | Select-Object -Unique)
     if ($killPids.Count -eq 0) { return }
-    Write-Host "WARNING: ReceiptGrid is running. Stopping PID(s): $($killPids -join ', ')" -ForegroundColor Yellow
+    Write-Host "WARNING: InvoicePay is running. Stopping PID(s): $($killPids -join ', ')" -ForegroundColor Yellow
     foreach ($procId in $killPids) {
         Stop-Process -Id $procId -Force -ErrorAction SilentlyContinue
     }
@@ -53,7 +53,7 @@ $InstallDir = Get-InPmntInstallDir -Override $InstallDir
 Write-Host "Install location: $InstallDir"
 
 if (-not (Test-InPmntInstall -Path $InstallDir)) {
-    Write-Host "No ReceiptGrid installation found at that path."
+    Write-Host "No InvoicePay installation found at that path."
     exit 0
 }
 
@@ -68,7 +68,7 @@ if (Test-Path $marker) {
 
 if (-not $Yes) {
     Write-Host ""
-    Write-Host "Uninstall ReceiptGrid $version from:" -ForegroundColor Yellow
+    Write-Host "Uninstall InvoicePay $version from:" -ForegroundColor Yellow
     Write-Host "  $InstallDir"
     if ($RemoveData) {
         Write-Host "  Data will be REMOVED (.env, database, certs)." -ForegroundColor Yellow
@@ -126,4 +126,4 @@ if (Test-Path $backupRoot) {
     Remove-Item -LiteralPath $backupRoot -Recurse -Force -ErrorAction SilentlyContinue
 }
 
-Write-Host "ReceiptGrid uninstalled."
+Write-Host "InvoicePay uninstalled."

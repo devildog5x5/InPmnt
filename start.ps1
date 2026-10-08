@@ -1,4 +1,4 @@
-# Launch ReceiptGrid locally over HTTPS (creates .venv + self-signed cert on first run).
+# Launch InvoicePay locally over HTTPS (creates .venv + self-signed cert on first run).
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
 
@@ -50,7 +50,7 @@ $runPids = @(
 $killPids = @($listenPids + $runPids | Where-Object { $_ -and $_ -gt 0 } | Select-Object -Unique)
 if ($killPids.Count -gt 0) {
     Write-Host ""
-    Write-Host "WARNING: ReceiptGrid is already running (port $port / run.py). Killing it so this start can continue." -ForegroundColor Yellow
+    Write-Host "WARNING: InvoicePay is already running (port $port / run.py). Killing it so this start can continue." -ForegroundColor Yellow
     Write-Host "Stopping PID(s): $($killPids -join ', ')" -ForegroundColor Yellow
     Write-Host ""
     foreach ($procId in $killPids) {
@@ -59,7 +59,7 @@ if ($killPids.Count -gt 0) {
     Start-Sleep -Seconds 1
 }
 
-Write-Host "Starting ReceiptGrid at https://127.0.0.1:$port"
+Write-Host "Starting InvoicePay at https://127.0.0.1:$port"
 Write-Host "Sign up: /signup  |  optional demo: set SHOW_DEMO_LOGIN=1 (demouser / Demo)"
 Write-Host "Self-signed cert - accept the browser warning for local use."
 & .\.venv\Scripts\python.exe .\run.py

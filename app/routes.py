@@ -31,9 +31,13 @@ from .auth import (
     write_reset_file,
 )
 from .billing import (
+    CUSTOMER_SETUP,
+    PAID_PLANS,
     PLANS,
+    admin_setup_message,
     create_checkout_session,
     create_portal_session,
+    days_left,
     load_stripe_config,
     plan_from_price_id,
 )
@@ -214,7 +218,7 @@ def support_chat():
     email = "support@invcpay.com"
     if any(w in msg for w in ("price", "plan", "annual", "billing", "cost")):
         reply = (
-            "ReceiptGrid Invoicing is $4.99/month or $49.99/year. You pick either one. "
+            "InvoicePay is $4.99/month or $49.99/year. You pick either one. "
             "The 14-day trial does not need a card. "
             f"You can change plans later from Billing. Email {email}."
         )
@@ -315,7 +319,7 @@ def _public_base_url() -> str:
 
 def _deliver_reset(email: str, url: str) -> None:
     body = (
-        "Reset your ReceiptGrid password\n\n"
+        "Reset your InvoicePay password\n\n"
         "We received a request to reset the password for this account.\n\n"
         f"Open this link within 1 hour:\n{url}\n\n"
         "If you didn't request this, you can ignore this message.\n"
@@ -323,7 +327,7 @@ def _deliver_reset(email: str, url: str) -> None:
     sent = False
     if mail_configured():
         try:
-            send_email(to=email, subject="Reset your ReceiptGrid password", body=body)
+            send_email(to=email, subject="Reset your InvoicePay password", body=body)
             sent = True
         except Exception:  # noqa: BLE001
             sent = False
@@ -389,9 +393,52 @@ def reset_password():
     )
 
 
+def _remember_plan() -> str | None:
+    if "plan" in request.args or "plan" in request.form:
+        raw = (request.values.get("plan") or "").strip().lower()
+        if raw in PLANS:
+            session["signup_plan"] = raw
+        else:
+            session.pop("signup_plan", None)
+    plan = str(session.get("signup_plan") or "").strip().lower()
+    return plan if plan in PLANS else None
+
+
+def _redirect_checkout(plan: str, email: str, user_id: int, workspace_id: int, customer_id: str | None):
+    cfg = load_stripe_config()
+    if not cfg.enabled:
+        session["billing_notice"] = CUSTOMER_SETUP
+        return redirect(url_for("main.app_home") + "#/billing")
+    try:
+        sess = create_checkout_session(
+            plan=plan,
+            customer_email=email,
+            client_reference_id=str(user_id),
+            customer_id=customer_id,
+            workspace_id=workspace_id,
+        )
+    except Exception as exc:  # noqa: BLE001
+        current_app.logger.error("Stripe checkout failed: %s", exc)
+        session["billing_notice"] = (
+            "We could not start checkout. Please try again, or email support@invcpay.com."
+        )
+        return redirect(url_for("main.app_home") + "#/billing")
+    session.pop("signup_plan", None)
+    return redirect(sess.url)
+
+
 @bp.route("/signup", methods=["GET", "POST"])
 def signup():
-    if session.get("user_id"):
+    plan = _remember_plan()
+    if session.get("user_id") and g.user:
+        if plan:
+            return _redirect_checkout(
+                plan,
+                g.user["email"],
+                int(g.user["id"]),
+                int(g.user["workspace_id"]),
+                None,
+            )
         return redirect(url_for("main.app_home"))
     error = None
     if request.method == "POST":
@@ -425,10 +472,17 @@ def signup():
                         )
                         session["user_id"] = uid
                         session["ui_theme"] = "light"
+                        chosen = _remember_plan()
+                        if chosen:
+                            return _redirect_checkout(chosen, email, uid, _wid, None)
                         return redirect(url_for("main.app_home"))
             except Exception as exc:  # noqa: BLE001
                 error = str(exc)
-    return render_template("signup.html", error=error)
+    label = ""
+    if plan:
+        meta = PLANS[plan]
+        label = f"{meta['name']} — {meta['amount_label']}"
+    return render_template("signup.html", error=error, plan=plan or "", plan_label=label)
 
 
 @bp.get("/logout")
@@ -441,7 +495,14 @@ def logout():
 @bp.get("/app/<path:_>")
 @login_required
 def app_home(_=None):
-    return render_template("app.html", user=g.user)
+    notice = session.pop("billing_notice", "") or ""
+    admin_notice = session.pop("billing_admin_notice", "") or ""
+    return render_template(
+        "app.html",
+        user=g.user,
+        billing_notice=notice,
+        billing_admin_notice=admin_notice,
+    )
 
 
 # ---------- Helpers ----------
@@ -1241,7 +1302,7 @@ def api_send_reminder(reminder_id: int):
 
         if channel == "sms":
             if not plan_allows_sms(effective_plan(settings)):
-                return jsonify({"error": "SMS reminders are included on the paid ReceiptGrid plan ($4.99/month or $49.99/year)."}), 403
+                return jsonify({"error": "SMS reminders are included on the paid InvoicePay plan ($4.99/month or $49.99/year)."}), 403
             log_activity(
                 conn,
                 "reminder",
@@ -1384,7 +1445,7 @@ def api_final_notice(invoice_id: int):
             "amount_due": money(invoice_balance(dict(inv))),
             "due_date": inv["due_date"],
             "status": inv["status"],
-            "business_name": settings["business_name"] if settings else "ReceiptGrid",
+            "business_name": settings["business_name"] if settings else "InvoicePay",
         }
         subject = render_template_vars(tmpl["subject"] if tmpl else "Final notice", ctx)
         body = render_template_vars(tmpl["body"] if tmpl else "Final notice", ctx)
@@ -1544,19 +1605,33 @@ def api_billing_status():
     wid = require_workspace_id()
     with db_session(db_path()) as conn:
         settings = row_to_dict(get_settings(conn, wid))
-    return jsonify(
-        {
-            "enabled": cfg.enabled,
-            "publishable_key": cfg.publishable_key,
-            "plan": settings.get("plan") if settings else "trial",
-            "trial_ends_on": settings.get("trial_ends_on") if settings else None,
-            "has_customer": bool(settings and settings.get("stripe_customer_id")),
-            "plans": {
-                key: {"name": meta["name"], "amount_label": meta["amount_label"]}
-                for key, meta in PLANS.items()
-            },
-        }
-    )
+    plan = (settings.get("plan") if settings else None) or "trial"
+    trial_ends = settings.get("trial_ends_on") if settings else None
+    payload = {
+        "enabled": cfg.enabled,
+        "publishable_key": cfg.publishable_key,
+        "plan": plan,
+        "trial_ends_on": trial_ends,
+        "days_left": days_left(trial_ends),
+        "has_customer": bool(settings and settings.get("stripe_customer_id")),
+        "subscribed": plan in PAID_PLANS,
+        "customer_notice": "" if cfg.enabled else CUSTOMER_SETUP,
+        "plans": {
+            key: {
+                "name": meta["name"],
+                "amount_label": meta["amount_label"],
+                "button": (
+                    "Subscribe yearly — $49.99"
+                    if key == "yearly"
+                    else "Subscribe monthly — $4.99"
+                ),
+            }
+            for key, meta in PLANS.items()
+        },
+    }
+    if ((g.user or {}).get("role") or "").strip().lower() == "admin" and not cfg.enabled:
+        payload["admin_notice"] = admin_setup_message()
+    return jsonify(payload)
 
 
 @bp.post("/api/billing/checkout")
@@ -1567,13 +1642,12 @@ def api_billing_checkout():
     if plan not in PLANS:
         return jsonify({"error": "Unknown plan. Use monthly or yearly."}), 400
     cfg = load_stripe_config()
+    admin = ((g.user or {}).get("role") or "").strip().lower() == "admin"
     if not cfg.enabled:
-        return jsonify(
-            {
-                "error": "Stripe is not configured. Add keys and price IDs to .env (see .env.example).",
-                "demo": True,
-            }
-        ), 503
+        body = {"error": CUSTOMER_SETUP, "demo": True}
+        if admin:
+            body["admin_error"] = admin_setup_message()
+        return jsonify(body), 503
 
     wid = require_workspace_id()
     with db_session(db_path()) as conn:
@@ -1588,7 +1662,13 @@ def api_billing_checkout():
                 workspace_id=wid,
             )
         except Exception as exc:  # noqa: BLE001
-            return jsonify({"error": str(exc)}), 400
+            current_app.logger.error("Stripe checkout failed: %s", exc)
+            body = {
+                "error": "We could not start checkout. Please try again, or email support@invcpay.com."
+            }
+            if admin:
+                body["admin_error"] = f"Stripe said: {exc}"
+            return jsonify(body), 400
         log_activity(
             conn, "billing", f"Started Stripe checkout for {plan}", "settings", wid, workspace_id=wid
         )
@@ -1600,7 +1680,10 @@ def api_billing_checkout():
 def api_billing_portal():
     cfg = load_stripe_config()
     if not cfg.enabled:
-        return jsonify({"error": "Stripe is not configured."}), 503
+        body = {"error": CUSTOMER_SETUP}
+        if ((g.user or {}).get("role") or "").strip().lower() == "admin":
+            body["admin_error"] = admin_setup_message()
+        return jsonify(body), 503
     wid = require_workspace_id()
     with db_session(db_path()) as conn:
         settings = get_settings(conn, wid)
@@ -1609,7 +1692,11 @@ def api_billing_portal():
         try:
             sess = create_portal_session(settings["stripe_customer_id"])
         except Exception as exc:  # noqa: BLE001
-            return jsonify({"error": str(exc)}), 400
+            current_app.logger.error("Stripe portal failed: %s", exc)
+            body = {"error": "We could not open billing. Please try again, or email support@invcpay.com."}
+            if ((g.user or {}).get("role") or "").strip().lower() == "admin":
+                body["admin_error"] = f"Stripe said: {exc}"
+            return jsonify(body), 400
     return jsonify({"url": sess.url})
 
 

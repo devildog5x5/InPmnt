@@ -1,6 +1,6 @@
 <?php
-$metaTitle = $meta_title ?? 'ReceiptGrid Invoicing';
-$metaDesc = $meta_description ?? 'ReceiptGrid Invoicing sends invoice reminders so small businesses get paid without chasing clients. 14-day trial, no credit card. Then $4.99 a month or $49.99 a year.';
+$metaTitle = $meta_title ?? 'InvoicePay';
+$metaDesc = $meta_description ?? 'InvoicePay sends invoice reminders so small businesses get paid without chasing clients. 14-day trial, no credit card. Then $4.99 a month or $49.99 a year.';
 $metaRobots = $meta_robots ?? '';
 $metaPath = Http::path();
 $canonical = rtrim(Http::canonicalBase(), '/') . ($metaPath === '/' ? '/' : $metaPath);
@@ -9,10 +9,13 @@ $googleVerify = Env::get('GOOGLE_SITE_VERIFICATION');
 $msVerify = Env::get('MSVALIDATE_01');
 ?>
   <title><?= Http::e($metaTitle) ?></title>
+  <meta name="application-name" content="InvoicePay" />
+  <meta name="apple-mobile-web-app-title" content="InvoicePay" />
+  <link rel="manifest" href="/static/manifest.webmanifest" />
   <meta name="description" content="<?= Http::e($metaDesc) ?>" />
   <link rel="canonical" href="<?= Http::e($canonical) ?>" />
   <meta property="og:type" content="website" />
-  <meta property="og:site_name" content="ReceiptGrid Invoicing" />
+  <meta property="og:site_name" content="InvoicePay" />
   <meta property="og:title" content="<?= Http::e($metaTitle) ?>" />
   <meta property="og:description" content="<?= Http::e($metaDesc) ?>" />
   <meta property="og:url" content="<?= Http::e($canonical) ?>" />

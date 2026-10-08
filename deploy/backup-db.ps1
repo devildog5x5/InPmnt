@@ -1,4 +1,4 @@
-# Backup ReceiptGrid SQLite DB on Windows (native install).
+# Backup InvoicePay SQLite DB on Windows (native install).
 param(
   [string]$OutDir = ".\backups",
   [string]$DbPath = ""

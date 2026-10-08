@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from datetime import date
 from typing import Any
 
 PLANS = {
@@ -65,6 +66,54 @@ class StripeConfig:
         )
 
 
+CUSTOMER_SETUP = "Payments are being set up, please contact support@invcpay.com"
+PAID_PLANS = {"monthly", "yearly", "starter", "pro", "annual"}
+
+
+def config_issues() -> list[str]:
+    issues: list[str] = []
+    if not _configured(os.environ.get("STRIPE_SECRET_KEY") or "", prefix="sk_", min_len=20):
+        issues.append("STRIPE_SECRET_KEY")
+    for meta in PLANS.values():
+        if not _configured(os.environ.get(meta["env_price"]) or "", prefix="price_", min_len=20):
+            issues.append(meta["env_price"])
+    return issues
+
+
+def admin_setup_message() -> str:
+    issues = config_issues()
+    listed = ", ".join(issues) if issues else "STRIPE_SECRET_KEY, STRIPE_PRICE_MONTHLY, STRIPE_PRICE_YEARLY"
+    return (
+        "Stripe checkout is off. These keys in public_html/.env are missing or invalid: "
+        + listed
+        + "."
+    )
+
+
+def days_left(value: str | None) -> int:
+    raw = (value or "")[:10]
+    try:
+        end = date.fromisoformat(raw)
+    except ValueError:
+        return 0
+    return max(0, (end - date.today()).days)
+
+
+def request_base_url() -> str:
+    """Use BASE_URL when it is set. Otherwise use the host on this request."""
+    configured = (os.environ.get("BASE_URL") or "").strip().rstrip("/")
+    if configured:
+        return configured
+    try:
+        from flask import has_request_context, request
+
+        if has_request_context():
+            return request.host_url.rstrip("/")
+    except Exception:
+        pass
+    return "http://127.0.0.1:5055"
+
+
 def load_stripe_config() -> StripeConfig:
     prices = {
         key: (os.environ.get(meta["env_price"]) or "").strip()
@@ -78,7 +127,7 @@ def load_stripe_config() -> StripeConfig:
         secret_key=(os.environ.get("STRIPE_SECRET_KEY") or "").strip(),
         publishable_key=(os.environ.get("STRIPE_PUBLISHABLE_KEY") or "").strip(),
         webhook_secret=(os.environ.get("STRIPE_WEBHOOK_SECRET") or "").strip(),
-        base_url=(os.environ.get("BASE_URL") or "http://127.0.0.1:5055").rstrip("/"),
+        base_url=request_base_url(),
         prices=prices,
         legacy_prices=legacy,
     )
@@ -127,13 +176,13 @@ def checkout_session_payload(
         "mode": "subscription",
         "line_items": [{"price": price, "quantity": 1}],
         "success_url": f"{cfg.base_url}/billing/success?session_id={{CHECKOUT_SESSION_ID}}",
-        "cancel_url": f"{cfg.base_url}/#pricing",
+        "cancel_url": f"{cfg.base_url}/app#/billing",
         "client_reference_id": client_reference_id,
         "metadata": meta,
         "allow_promotion_codes": True,
         "subscription_data": {
             "metadata": dict(meta),
-            "description": "ReceiptGrid Invoicing",
+            "description": "InvoicePay",
         },
     }
     if customer_id:
@@ -152,5 +201,5 @@ def create_portal_session(customer_id: str) -> Any:
     stripe, cfg = get_stripe()
     return stripe.billing_portal.Session.create(
         customer=customer_id,
-        return_url=f"{cfg.base_url}/app#/settings",
+        return_url=f"{cfg.base_url}/app#/billing",
     )

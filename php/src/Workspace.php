@@ -75,7 +75,7 @@ final class Workspace
             return null;
         }
         if (self::countOpen($db, $wid) >= $limit) {
-            return "Open invoice limit reached ({$limit}). Subscribe to ReceiptGrid ($4.99/month or $49.99/year) for unlimited open invoices.";
+            return "Open invoice limit reached ({$limit}). Subscribe to InvoicePay ($4.99/month or $49.99/year) for unlimited open invoices.";
         }
         return null;
     }

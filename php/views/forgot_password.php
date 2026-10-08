@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="csrf-token" content="<?= Http::e(Http::csrfToken()) ?>" />
   <?php
-    $meta_title = 'Reset a forgotten password on your ReceiptGrid account';
-    $meta_description = 'Email yourself a link to reset the password on your ReceiptGrid account, then return to your invoices.';
+    $meta_title = 'Reset a forgotten password on your InvoicePay account';
+    $meta_description = 'Email yourself a link to reset the password on your InvoicePay account, then return to your invoices.';
     $meta_robots = 'noindex, nofollow';
     require __DIR__ . '/_meta.php';
   ?>
@@ -19,11 +19,11 @@
     <div class="auth-card">
       <div class="auth-brand">
         <div class="brand-logo img">
-          <img src="/static/img/inpmnt-icon.png" width="42" height="42" alt="ReceiptGrid logo" />
+          <img src="/static/img/inpmnt-icon.png" width="42" height="42" alt="InvoicePay logo" />
         </div>
         <div>
-          <div class="brand-mark" style="color:var(--ink);font-size:1.35rem">ReceiptGrid</div>
-          <div class="brand-sub" style="color:var(--muted)">Invoicing</div>
+          <div class="brand-mark" style="color:var(--ink);font-size:1.35rem">InvoicePay</div>
+          <div class="brand-sub" style="color:var(--muted)">Get paid</div>
         </div>
       </div>
       <h1>Reset your password</h1>

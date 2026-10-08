@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="csrf-token" content="<?= Http::e(Http::csrfToken()) ?>" />
   <?php
-    $meta_title = 'ReceiptGrid Invoicing — reminders for small businesses';
-    $meta_description = 'Get paid without chasing clients. ReceiptGrid Invoicing sends invoice reminders for contractors and other service businesses. 14-day trial, no credit card. Then $4.99 a month or $49.99 a year.';
+    $meta_title = 'InvoicePay — reminders for small businesses';
+    $meta_description = 'Get paid without chasing clients. InvoicePay sends invoice reminders for contractors and other service businesses. 14-day trial, no credit card. Then $4.99 a month or $49.99 a year.';
     $faqItems = require __DIR__ . '/_faq_data.php';
     $base = rtrim(Http::canonicalBase(), '/');
     $json_ld = [
@@ -14,14 +14,14 @@
         '@graph' => [
             [
                 '@type' => 'Organization',
-                'name' => 'ReceiptGrid',
+                'name' => 'InvoicePay',
                 'url' => $base . '/',
                 'email' => 'support@invcpay.com',
                 'logo' => $base . '/static/img/inpmnt-icon.png',
             ],
             [
                 '@type' => 'SoftwareApplication',
-                'name' => 'ReceiptGrid Invoicing',
+                'name' => 'InvoicePay',
                 'applicationCategory' => 'BusinessApplication',
                 'operatingSystem' => 'Web',
                 'url' => $base . '/',
@@ -54,7 +54,7 @@
   <header class="landing-hero">
     <div>
       <h1>Get paid without chasing the invoice.</h1>
-      <p class="sub">ReceiptGrid Invoicing sends the reminder for you. Polite, on a schedule, and stopped when the invoice is paid.</p>
+      <p class="sub">InvoicePay sends the reminder for you. Polite, on a schedule, and stopped when the invoice is paid.</p>
       <p class="audience">For contractors, consultants, photographers, landscapers, and other service businesses.</p>
       <p class="hero-price">14-day trial, no credit card. Then <strong>$4.99/month</strong> or <strong>$49.99/year</strong>.</p>
       <div class="hero-cta">
@@ -206,15 +206,15 @@
         <div class="brand-logo img">
           <picture>
             <source srcset="/static/img/inpmnt-icon.webp" type="image/webp" />
-            <img src="/static/img/inpmnt-icon.png" width="42" height="42" alt="ReceiptGrid logo" loading="lazy" decoding="async" />
+            <img src="/static/img/inpmnt-icon.png" width="42" height="42" alt="InvoicePay logo" loading="lazy" decoding="async" />
           </picture>
         </div>
         <div class="brand-copy">
-          <div class="brand-mark">ReceiptGrid</div>
-          <div class="brand-sub">Invoicing</div>
+          <div class="brand-mark">InvoicePay</div>
+          <div class="brand-sub">Get paid</div>
         </div>
       </div>
-      <p>ReceiptGrid Invoicing for service businesses. This site stays at invcpay.com.</p>
+      <p>InvoicePay for service businesses. This site stays at invcpay.com.</p>
     </div>
     <div class="footer-col">
       <h2>Product</h2>
@@ -232,7 +232,7 @@
       <a href="/refunds">Refund and cancellation</a>
     </div>
     <div class="footer-meta">
-      <p class="site-version" id="site-version">ReceiptGrid v<?= Http::e(Http::VERSION) ?></p>
+      <p class="site-version" id="site-version">InvoicePay v<?= Http::e(Http::VERSION) ?></p>
       <p>© 2026 Robert Foster</p>
       <p>Support: <a href="mailto:support@invcpay.com">support@invcpay.com</a></p>
       <?php if (!empty($show_demo_login)): ?>

@@ -1,10 +1,10 @@
-# ReceiptGrid — Go to market
+# InvoicePay — Go to market
 
 Owner: **Robert Foster** · Product: invoice chase + payment reminders for solo trades / freelancers.
 
 ## Positioning
 
-> **ReceiptGrid — Get paid without the chase.**  
+> **InvoicePay — Get paid without the chase.**  
 > Paste unpaid invoices, auto-remind clients, and recover cash without awkward follow-ups.
 
 **Not competing with:** QuickBooks, FreshBooks, full CRMs.  
@@ -56,7 +56,7 @@ Offer a **14-day trial** (already seeded in the app). No card is required to sta
 ### Day 4 — Proof assets
 - [ ] 60-second Loom: overdue → send reminder → record payment
 - [ ] 3 screenshots (dashboard, reminder queue, invoice)
-- [ ] One-page PDF “How trades get paid faster with ReceiptGrid”
+- [ ] One-page PDF “How trades get paid faster with InvoicePay”
 
 ### Day 5–7 — Sell
 - [ ] $20–50/day Facebook/Nextdoor ads targeting “plumber / landscaper / photographer” + city
@@ -100,7 +100,7 @@ If you hit that, double ad spend and add QuickBooks import as the next feature.
 
 ## Brand kit
 
-- **Name:** **ReceiptGrid** (this product: **ReceiptGrid Invoicing**). The receipts app at receiptgrid.pro shares the brand.  
+- **Name:** **InvoicePay**. The receipts product at receiptgrid.pro is a separate app; do not use that name on invcpay.com.  
 - **Tagline:** Get paid without the chase  
 - **UI colors:** teal `#0d6b66`, slate sidebar `#101920` (aligned with Coalesce ERP)  
 - **Icon:** blue / teal / violet invoice + reminder mark on black (`static/img/inpmnt-icon.png`)  

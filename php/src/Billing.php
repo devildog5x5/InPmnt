@@ -32,6 +32,62 @@ final class Billing
         return strlen($v) >= $minLen;
     }
 
+    public const CUSTOMER_SETUP = 'Payments are being set up, please contact support@invcpay.com';
+
+    public const PAID_PLANS = ['monthly', 'yearly', 'starter', 'pro', 'annual'];
+
+    /** Keys checkout needs. Placeholders (sk_test_..., price_...) count as invalid. */
+    public static function configIssues(): array
+    {
+        $issues = [];
+        if (!self::configuredValue(trim(Env::get('STRIPE_SECRET_KEY')), 'sk_', 20)) {
+            $issues[] = 'STRIPE_SECRET_KEY';
+        }
+        foreach (self::PLANS as $meta) {
+            if (!self::configuredValue(trim(Env::get($meta['env_price'])), 'price_', 20)) {
+                $issues[] = $meta['env_price'];
+            }
+        }
+        return $issues;
+    }
+
+    public static function adminSetupMessage(): string
+    {
+        $issues = self::configIssues();
+        $list = $issues ? implode(', ', $issues) : 'STRIPE_SECRET_KEY, STRIPE_PRICE_MONTHLY, STRIPE_PRICE_YEARLY';
+        return 'Stripe checkout is off. These keys in public_html/.env are missing or invalid: ' . $list . '.';
+    }
+
+    /** Calendar days until trial_ends_on. Today through that date is the remaining count. */
+    public static function daysLeft(?string $date): int
+    {
+        $raw = substr(trim((string) $date), 0, 10);
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $raw)) {
+            return 0;
+        }
+        $end = DateTimeImmutable::createFromFormat('Y-m-d', $raw);
+        $today = new DateTimeImmutable('today');
+        if (!$end) {
+            return 0;
+        }
+        $days = (int) $today->diff($end)->format('%r%a');
+        return max(0, $days);
+    }
+
+    /**
+     * Public origin for Stripe success and cancel URLs.
+     * When BASE_URL is unset, use the host on this request so a live site
+     * does not send customers back to 127.0.0.1.
+     */
+    public static function baseUrl(): string
+    {
+        $configured = trim(Env::get('BASE_URL'));
+        if ($configured !== '') {
+            return rtrim($configured, '/');
+        }
+        return rtrim(Http::requestOrigin(), '/');
+    }
+
     public static function config(): array
     {
         $prices = [];
@@ -43,15 +99,12 @@ final class Billing
             $legacy[$key] = trim(Env::get($meta['env_price']));
         }
         $secret = trim(Env::get('STRIPE_SECRET_KEY'));
-        $enabled = self::configuredValue($secret, 'sk_', 20);
-        foreach ($prices as $pid) {
-            $enabled = $enabled && self::configuredValue($pid, 'price_', 20);
-        }
+        $enabled = self::configIssues() === [];
         return [
             'secret_key' => $secret,
             'publishable_key' => trim(Env::get('STRIPE_PUBLISHABLE_KEY')),
             'webhook_secret' => trim(Env::get('STRIPE_WEBHOOK_SECRET')),
-            'base_url' => rtrim(Env::get('BASE_URL', 'http://127.0.0.1:5055'), '/'),
+            'base_url' => self::baseUrl(),
             'prices' => $prices,
             'legacy_prices' => $legacy,
             'enabled' => $enabled,
@@ -76,6 +129,12 @@ final class Billing
 
     public static function api(string $method, string $path, array $params = []): array
     {
+        if (Env::get('STRIPE_STUB') === 'error') {
+            throw new RuntimeException('No such price: price_test_missing');
+        }
+        if (Env::get('STRIPE_STUB') === '1') {
+            return self::stubResponse($method, $path, $params);
+        }
         $cfg = self::config();
         if ($cfg['secret_key'] === '') {
             throw new RuntimeException('STRIPE_SECRET_KEY is not set');
@@ -127,13 +186,13 @@ final class Billing
             'mode' => 'subscription',
             'line_items' => [['price' => $price, 'quantity' => 1]],
             'success_url' => $cfg['base_url'] . '/billing/success?session_id={CHECKOUT_SESSION_ID}',
-            'cancel_url' => $cfg['base_url'] . '/#pricing',
+            'cancel_url' => $cfg['base_url'] . '/app#/billing',
             'client_reference_id' => (string) $args['client_reference_id'],
             'metadata' => $meta,
             'allow_promotion_codes' => 'true',
             'subscription_data' => [
                 'metadata' => $meta,
-                'description' => 'ReceiptGrid Invoicing',
+                'description' => 'InvoicePay',
             ],
         ];
         if (!empty($args['customer_id'])) {
@@ -149,7 +208,7 @@ final class Billing
         $cfg = self::config();
         return self::api('POST', '/v1/billing_portal/sessions', [
             'customer' => $customerId,
-            'return_url' => $cfg['base_url'] . '/app#/settings',
+            'return_url' => $cfg['base_url'] . '/app#/billing',
         ]);
     }
 
@@ -187,5 +246,31 @@ final class Billing
             throw new RuntimeException('Invalid Stripe event JSON');
         }
         return $event;
+    }
+
+    /** Local tests only. STRIPE_STUB=1 returns a checkout URL and does not mark anyone paid. */
+    private static function stubResponse(string $method, string $path, array $params): array
+    {
+        $cfg = self::config();
+        $plan = '';
+        if (isset($params['metadata']['plan'])) {
+            $plan = (string) $params['metadata']['plan'];
+        }
+        if (strtoupper($method) === 'POST' && str_contains($path, '/v1/checkout/sessions')) {
+            return [
+                'id' => 'cs_test_stub',
+                'url' => $cfg['base_url'] . '/billing/stub-checkout?plan=' . rawurlencode($plan),
+            ];
+        }
+        if (strtoupper($method) === 'POST' && str_contains($path, '/v1/billing_portal/sessions')) {
+            return [
+                'id' => 'bps_test_stub',
+                'url' => $cfg['base_url'] . '/billing/stub-checkout?portal=1',
+            ];
+        }
+        if (strtoupper($method) === 'GET' && str_contains($path, '/v1/checkout/sessions/')) {
+            return ['id' => 'cs_test_stub', 'metadata' => ['plan' => $plan], 'customer' => null, 'subscription' => null];
+        }
+        throw new RuntimeException('Stripe stub has no response for ' . $path);
     }
 }

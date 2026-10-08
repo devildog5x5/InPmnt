@@ -25,6 +25,7 @@ $navItems = $navLoggedIn
         ['href' => '/app#/clients', 'label' => 'Clients'],
         ['href' => '/app#/templates', 'label' => 'Templates'],
         ['href' => '/app#/settings', 'label' => 'Settings'],
+        ['href' => '/app#/billing', 'label' => 'Billing'],
     ], $navPublic)
     : array_merge($navPublic, [
         ['href' => '/login', 'label' => 'Log in', 'class' => 'btn secondary sm'],
@@ -43,12 +44,12 @@ $navHome = $navLoggedIn ? '/app' : '/';
     <div class="brand-logo img">
       <picture>
         <source srcset="/static/img/inpmnt-icon.webp" type="image/webp" />
-        <img src="/static/img/inpmnt-icon.png" width="42" height="42" alt="ReceiptGrid logo" />
+        <img src="/static/img/inpmnt-icon.png" width="42" height="42" alt="InvoicePay logo" />
       </picture>
     </div>
     <div class="brand-copy">
-      <div class="brand-mark">ReceiptGrid</div>
-      <div class="brand-sub">Invoicing</div>
+      <div class="brand-mark">InvoicePay</div>
+      <div class="brand-sub">Get paid</div>
     </div>
   </a>
   <div class="nav-actions">

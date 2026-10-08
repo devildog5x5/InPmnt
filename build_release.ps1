@@ -1,4 +1,4 @@
-# Build ReceiptGrid release zips into installers\
+# Build InvoicePay release zips into installers\
 $ErrorActionPreference = "Stop"
 $Root = $PSScriptRoot
 $Out = Join-Path $Root "installers"
@@ -23,7 +23,7 @@ $include = @(
     "README.md", "GO_TO_MARKET.md", ".env.example", ".gitignore", ".gitattributes"
 )
 
-$PortableDir = Join-Path $Stage "ReceiptGrid"
+$PortableDir = Join-Path $Stage "InvoicePay"
 New-Item -ItemType Directory -Force -Path $PortableDir | Out-Null
 foreach ($item in $include) {
     $src = Join-Path $Root $item
@@ -48,7 +48,7 @@ $portableZip = Join-Path $Out "ReceiptGrid-Portable.v$Version.zip"
 $sourceZip = Join-Path $Out "ReceiptGrid-Source.v$Version.zip"
 $iconZip = Join-Path $Out "ReceiptGrid-Icon.v$Version.zip"
 $phpZip = Join-Path $Out "invcpay-v$Version.zip"
-Get-ChildItem -Path $Out -Filter "ReceiptGrid-*.zip" -ErrorAction SilentlyContinue | Remove-Item -Force
+Get-ChildItem -Path $Out -Filter "InvoicePay-*.zip" -ErrorAction SilentlyContinue | Remove-Item -Force
 Get-ChildItem -Path $Out -Filter "invcpay-v*.zip" -ErrorAction SilentlyContinue | Remove-Item -Force
 Get-ChildItem -Path $Out -Filter "ReceiptGrid-PHP*.zip" -ErrorAction SilentlyContinue | Remove-Item -Force
 foreach ($z in @($portableZip, $sourceZip, $iconZip, $phpZip)) {
@@ -72,7 +72,7 @@ function Write-ZipWithPrefix {
         $zip.Dispose()
     }
 }
-Write-ZipWithPrefix -SourceDir (Join-Path $Stage "ReceiptGrid") -DestZip $portableZip -Prefix "ReceiptGrid"
+Write-ZipWithPrefix -SourceDir (Join-Path $Stage "InvoicePay") -DestZip $portableZip -Prefix "InvoicePay"
 
 # Source = same tree (documented as source distribution)
 Copy-Item $portableZip $sourceZip -Force

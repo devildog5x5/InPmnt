@@ -3,7 +3,7 @@ description: Release SOP — commit/push, build zips, README Downloads links, ch
 alwaysApply: true
 ---
 
-# Release, handoff, and README SOP (ReceiptGrid)
+# Release, handoff, and README SOP (InvoicePay)
 
 **Always ship without asking.** When you finish a connected set of changes that affects **runnable app behavior**, **billing**, **packaging**, or **README download docs** — or the user asks for a shipping build / release / hotfix — do the full pipeline below. Do **not** end with “want me to commit/release?”
 

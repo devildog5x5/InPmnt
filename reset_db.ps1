@@ -1,4 +1,4 @@
-# Factory-reset the ReceiptGrid SQLite database (users, passwords, invoices, clients).
+# Factory-reset the InvoicePay SQLite database (users, passwords, invoices, clients).
 # Stops a running instance, then re-seeds the default admin and demo accounts.
 #
 # Usage:
@@ -29,7 +29,7 @@ function Stop-InPmntProcesses {
     )
     $killPids = @($listenPids + $runPids | Where-Object { $_ -and $_ -gt 0 } | Select-Object -Unique)
     if ($killPids.Count -eq 0) { return }
-    Write-Host "Stopping ReceiptGrid PID(s): $($killPids -join ', ')" -ForegroundColor Yellow
+    Write-Host "Stopping InvoicePay PID(s): $($killPids -join ', ')" -ForegroundColor Yellow
     foreach ($procId in $killPids) {
         Stop-Process -Id $procId -Force -ErrorAction SilentlyContinue
     }

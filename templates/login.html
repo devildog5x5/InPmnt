@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  {% set meta_title = "Log in · ReceiptGrid" %}
-  {% set meta_description = "Sign in to ReceiptGrid to track unpaid invoices and send automatic payment reminders to clients." %}
+  {% set meta_title = "Log in · InvoicePay" %}
+  {% set meta_description = "Sign in to InvoicePay to track unpaid invoices and send automatic payment reminders to clients." %}
   {% include "_meta.html" %}
   <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/inpmnt-icon.png') }}" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -18,11 +18,11 @@
     <div class="auth-card">
       <div class="auth-brand">
         <div class="brand-logo img">
-          <img src="{{ url_for('static', filename='img/inpmnt-icon.png') }}" width="42" height="42" alt="ReceiptGrid logo" />
+          <img src="{{ url_for('static', filename='img/inpmnt-icon.png') }}" width="42" height="42" alt="InvoicePay logo" />
         </div>
         <div>
-          <div class="brand-mark" style="color:var(--ink);font-size:1.35rem">ReceiptGrid</div>
-          <div class="brand-sub" style="color:var(--muted)">Invoicing</div>
+          <div class="brand-mark" style="color:var(--ink);font-size:1.35rem">InvoicePay</div>
+          <div class="brand-sub" style="color:var(--muted)">Get paid</div>
         </div>
       </div>
       <h1>Welcome back</h1>
@@ -52,7 +52,7 @@
       </p>
     </div>
   </div>
-  <footer class="page-version" id="site-version">ReceiptGrid v{{ app_version }}</footer>
+  <footer class="page-version" id="site-version">InvoicePay v{{ app_version }}</footer>
 {% include "_help_chat.html" %}
 </body>
 </html>

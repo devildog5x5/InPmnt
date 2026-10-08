@@ -23,7 +23,7 @@ final class Mailer
         if ($mailFrom === '') {
             throw new RuntimeException('MAIL_FROM is not set');
         }
-        $display = trim($fromName ?: Env::get('MAIL_FROM_NAME', 'ReceiptGrid'));
+        $display = trim($fromName ?: Env::get('MAIL_FROM_NAME', 'InvoicePay'));
         $fromHeader = "{$display} <{$mailFrom}>";
 
         $resend = trim(Env::get('RESEND_API_KEY'));
@@ -142,11 +142,11 @@ final class Mailer
             return $read();
         };
         $read();
-        $cmd('EHLO receiptgrid');
+        $cmd('EHLO invoicepay');
         if (!$ssl && Env::get('SMTP_STARTTLS', '1') !== '0') {
             $cmd('STARTTLS');
             stream_socket_enable_crypto($fp, true, STREAM_CRYPTO_METHOD_TLS_CLIENT);
-            $cmd('EHLO receiptgrid');
+            $cmd('EHLO invoicepay');
         }
         if ($user !== '') {
             $cmd('AUTH LOGIN');

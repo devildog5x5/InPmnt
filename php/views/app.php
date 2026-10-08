@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="csrf-token" content="<?= Http::e(Http::csrfToken()) ?>" />
   <?php
-    $meta_title = 'ReceiptGrid workspace for open invoice reminders';
-    $meta_description = 'Your ReceiptGrid workspace for open invoices, reminder schedules, clients, and recorded payments.';
+    $meta_title = 'InvoicePay workspace for open invoice reminders';
+    $meta_description = 'Your InvoicePay workspace for open invoices, reminder schedules, clients, and recorded payments.';
     $meta_robots = 'noindex, nofollow';
     require __DIR__ . '/_meta.php';
   ?>
@@ -19,11 +19,11 @@
     <aside class="sidebar">
       <div class="brand">
         <div class="brand-logo img">
-          <img src="/static/img/inpmnt-icon.png" width="42" height="42" alt="ReceiptGrid logo" />
+          <img src="/static/img/inpmnt-icon.png" width="42" height="42" alt="InvoicePay logo" />
         </div>
         <div class="brand-copy">
-          <div class="brand-mark">ReceiptGrid</div>
-          <div class="brand-sub">Invoicing</div>
+          <div class="brand-mark">InvoicePay</div>
+          <div class="brand-sub">Get paid</div>
         </div>
       </div>
 
@@ -56,6 +56,10 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 4h9l3 3v13H8V4zm0 0H5v16h3M11 12h6M11 16h4"/></svg>
             Templates
           </a>
+          <a href="#/billing" data-route="/billing">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h18v10H3z"/><path d="M3 10h18"/><path d="M7 15h4"/></svg>
+            <span id="nav-billing-label">Billing</span>
+          </a>
           <a href="#/settings" data-route="/settings">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.04.04a2 2 0 1 1-2.83 2.83l-.04-.04A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.08V21a2 2 0 1 1-4 0v-.06A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.87.34l-.04.04a2 2 0 1 1-2.83-2.83l.04-.04A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1A1.7 1.7 0 0 0 2.92 13.6H3a2 2 0 1 1 0-4h.06A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.87l-.04-.04a2 2 0 1 1 2.83-2.83l.04.04A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6A1.7 1.7 0 0 0 10.4 2.9V3a2 2 0 1 1 4 0v.06a1.7 1.7 0 0 0 .4 1.08 1.7 1.7 0 0 0 1 .6 1.7 1.7 0 0 0 1.87-.34l.04-.04a2 2 0 1 1 2.83 2.83l-.04.04A1.7 1.7 0 0 0 19.4 9c.24.3.4.67.44 1.07H20a2 2 0 1 1 0 4h-.06c-.1.4-.26.77-.54 1.08z"/></svg>
             Settings
@@ -87,10 +91,13 @@
       </div>
     </aside>
 
-    <main class="main" id="app"></main>
+    <div class="app-column">
+      <div id="trial-banner" class="trial-banner-host" hidden></div>
+      <main class="main" id="app"></main>
+    </div>
   </div>
 
-  <footer class="page-version" id="site-version">ReceiptGrid v<?= Http::e(Http::VERSION) ?></footer>
+  <footer class="page-version" id="site-version">InvoicePay v<?= Http::e(Http::VERSION) ?></footer>
 
   <div id="toast-host" class="toast-host"></div>
   <div id="modal-root" class="modal-backdrop"></div>
@@ -99,8 +106,11 @@
     window.__INPMNT__ = {
       user: <?= json_encode($user ?? new stdClass(), JSON_UNESCAPED_SLASHES) ?>,
       logoutUrl: "/logout",
-      theme: <?= json_encode(Http::theme(), JSON_UNESCAPED_SLASHES) ?>
+      theme: <?= json_encode(Http::theme(), JSON_UNESCAPED_SLASHES) ?>,
+      billingNotice: <?= json_encode((string) ($_SESSION['billing_notice'] ?? ''), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>,
+      billingAdminNotice: <?= json_encode((string) ($_SESSION['billing_admin_notice'] ?? ''), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>
     };
+    <?php unset($_SESSION['billing_notice'], $_SESSION['billing_admin_notice']); ?>
   </script>
   <script type="module" src="/static/js/app.js?v=<?= rawurlencode(Http::VERSION) ?>"></script>
 <?php require __DIR__ . '/_help_chat.php'; ?>
