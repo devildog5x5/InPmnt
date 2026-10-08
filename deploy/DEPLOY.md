@@ -12,7 +12,7 @@ ReceiptGrid is a **Python (Flask)** app for Windows/VPS, and a **PHP** app for H
 | **Windows Server** | Waitress + Windows Service (NSSM) + IIS reverse proxy → [Windows](#windows-server) |
 
 Download zips: [latest release](https://github.com/devildog5x5/InPmnt/releases/latest)  
-(`ReceiptGrid-PHP.vX.Y.Z.zip` → Hostinger `public_html`; `ReceiptGrid-Portable.vX.Y.Z.zip` for native Windows; Docker uses the repo `Dockerfile`.)
+(`invcpay-vX.Y.Z.zip` → Hostinger `public_html`; `ReceiptGrid-Portable.vX.Y.Z.zip` for native Windows; Docker uses the repo `Dockerfile`.)
 
 ---
 
@@ -20,7 +20,7 @@ Download zips: [latest release](https://github.com/devildog5x5/InPmnt/releases/l
 
 No VPS. Uses the PHP rewrite in `php/`.
 
-1. Download **[ReceiptGrid-PHP.vX.Y.Z.zip](https://github.com/devildog5x5/InPmnt/releases/latest)**.
+1. Download **[invcpay-vX.Y.Z.zip](https://github.com/devildog5x5/InPmnt/releases/latest)**.
 2. hPanel → **Files → File Manager** (or FTP). Unzip **every file into `public_html`** (not a subfolder).
 3. Copy `.env.example` to `.env`. Set:
    - `APP_SECRET` — long random string

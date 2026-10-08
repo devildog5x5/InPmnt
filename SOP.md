@@ -1,6 +1,6 @@
 # ReceiptGrid owner SOP
 
-Rules for the live site (https://invcpay.com/, PHP on Hostinger shared hosting). Deploy by unzipping the PHP zip into `public_html` with File Manager. There is no SSH.
+Rules for the live site (https://invcpay.com/, PHP on Hostinger shared hosting). Deploy by unzipping `invcpay-vX.Y.Z.zip` into `public_html` with File Manager. There is no SSH. The zip has no `.env`, no `data/*.db`, and no GitHub or source links.
 
 ## Version
 

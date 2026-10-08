@@ -17,7 +17,7 @@ alwaysApply: true
 
 1. `powershell -File .\build_release.ps1 <version>`
 2. Produce **all four** zips under `installers\` with the version **at the end** of the filename:
-   - `ReceiptGrid-PHP.vX.Y.Z.zip` — Hostinger / `public_html` drop
+   - `invcpay-vX.Y.Z.zip` — Hostinger / `public_html` drop (site name, not ReceiptGrid-PHP)
    - `ReceiptGrid-Portable.vX.Y.Z.zip` — runnable Windows app (use `start.ps1`)
    - `ReceiptGrid-Source.vX.Y.Z.zip` — source distribution
    - `ReceiptGrid-Icon.vX.Y.Z.zip` — brand icon assets
@@ -29,7 +29,7 @@ alwaysApply: true
 
 | Line | Content |
 |------|---------|
-| **PHP** | Full URL to `ReceiptGrid-PHP.vX.Y.Z.zip` |
+| **PHP** | Full URL to `invcpay-vX.Y.Z.zip` |
 | **Portable** | Full URL to `ReceiptGrid-Portable.vX.Y.Z.zip` |
 | **Source** | Full URL to `ReceiptGrid-Source.vX.Y.Z.zip` |
 | **Icon** | Full URL to `ReceiptGrid-Icon.vX.Y.Z.zip` |
@@ -37,4 +37,4 @@ alwaysApply: true
 | **Local smoke** | `http://127.0.0.1:5055` after `.\start.ps1` |
 
 Never invent `releases/download/...` URLs — verify with `gh release view` after upload.
-Never ship unversioned zip names (`ReceiptGrid-PHP.zip`).
+Never ship unversioned zip names (`invcpay.zip` or `ReceiptGrid-PHP.zip`).

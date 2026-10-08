@@ -47,8 +47,10 @@ foreach ($rel in @("php\.env.example", "php\.htaccess", "php\.user.ini", "php\da
 $portableZip = Join-Path $Out "ReceiptGrid-Portable.v$Version.zip"
 $sourceZip = Join-Path $Out "ReceiptGrid-Source.v$Version.zip"
 $iconZip = Join-Path $Out "ReceiptGrid-Icon.v$Version.zip"
-$phpZip = Join-Path $Out "ReceiptGrid-PHP.v$Version.zip"
+$phpZip = Join-Path $Out "invcpay-v$Version.zip"
 Get-ChildItem -Path $Out -Filter "ReceiptGrid-*.zip" -ErrorAction SilentlyContinue | Remove-Item -Force
+Get-ChildItem -Path $Out -Filter "invcpay-v*.zip" -ErrorAction SilentlyContinue | Remove-Item -Force
+Get-ChildItem -Path $Out -Filter "ReceiptGrid-PHP*.zip" -ErrorAction SilentlyContinue | Remove-Item -Force
 foreach ($z in @($portableZip, $sourceZip, $iconZip, $phpZip)) {
     if (Test-Path $z) { Remove-Item $z -Force }
 }
@@ -104,12 +106,22 @@ foreach ($pair in @(
         Copy-Item -LiteralPath $src -Destination $dest -Force
     }
 }
-Get-ChildItem -Path (Join-Path $phpStage "data") -Filter "*.db" -ErrorAction SilentlyContinue | Remove-Item -Force
+# Never ship the live database, secrets, or docs into public_html.
+$dataDir = Join-Path $phpStage "data"
+if (Test-Path -LiteralPath $dataDir) {
+    Get-ChildItem -LiteralPath $dataDir -Force -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -like "*.db" -or $_.Name -like "*.db-wal" -or $_.Name -like "*.db-shm" } |
+        Remove-Item -Force
+}
+foreach ($secretName in @(".env", ".env.local")) {
+    $secret = Join-Path $phpStage $secretName
+    if (Test-Path -LiteralPath $secret) { Remove-Item -LiteralPath $secret -Force }
+}
 # Docs stay in the repo. Do not drop README, SOP, or this zip into public_html.
 Get-ChildItem -Path $phpStage -Recurse -Include *.md,*.zip,HOSTINGER.txt -ErrorAction SilentlyContinue | Remove-Item -Force
-# ZipFile keeps .htaccess, .user.ini, and .env.example at the public_html root.
+# Forward-slash entry names so Hostinger File Manager extracts the same tree on Windows or Linux.
 if (Test-Path $phpZip) { Remove-Item $phpZip -Force }
-[System.IO.Compression.ZipFile]::CreateFromDirectory($phpStage, $phpZip)
+Write-ZipWithPrefix -SourceDir $phpStage -DestZip $phpZip -Prefix ""
 
 Write-Host "Built v$Version"
 Write-Host "  $portableZip"
