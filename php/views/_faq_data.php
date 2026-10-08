@@ -24,4 +24,12 @@ return [
         'q' => 'Can I switch between monthly and yearly later?',
         'a' => 'Yes. Billing inside the app is where you move between $4.99 a month and $49.99 a year after the trial.',
     ],
+    [
+        'q' => 'How do the reminders actually go out?',
+        'a' => 'You write the message. InvoicePay queues it for the days you pick (the default is 3 days before due, on the due date, then 3, 7, and 14 days after). Email sends when you connect Resend or SMTP. SMS templates are included on the paid plan. A phone carrier is not connected in this version, so those texts are saved in your reminder log instead of delivered to a handset.',
+    ],
+    [
+        'q' => 'Is there a limit on open invoices?',
+        'a' => 'The 14-day trial allows 40 open invoices (sent, partial, or overdue). Monthly and yearly plans remove that cap. Recording a payment, including a partial payment, updates the balance, and queued reminders stop once the invoice is paid.',
+    ],
 ];
