@@ -82,8 +82,21 @@ $csrf = Admin::csrfToken();
       appearance: none; border: 1px solid var(--line); background: var(--card); color: var(--text);
       border-radius: 4px; padding: 7px 12px; cursor: pointer; text-decoration: none; font: inherit;
     }
-    button.primary, .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-    button.danger, .btn.danger { background: var(--danger); border-color: var(--danger); color: #fff; }
+    button.primary, .btn.primary,
+    button.primary:hover, .btn.primary:hover,
+    button.primary:focus, .btn.primary:focus,
+    button.primary:focus-visible, .btn.primary:focus-visible,
+    button.primary:active, .btn.primary:active {
+      background: #056a64; border-color: #056a64; color: #fff;
+    }
+    button.primary:hover, .btn.primary:hover,
+    button.primary:focus, .btn.primary:focus,
+    button.primary:focus-visible, .btn.primary:focus-visible,
+    button.primary:active, .btn.primary:active {
+      background: #034e49; border-color: #034e49; color: #fff;
+    }
+    button.danger, .btn.danger,
+    button.danger:hover, .btn.danger:hover { background: var(--danger); border-color: var(--danger); color: #fff; }
     input, textarea, select {
       width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 4px;
       background: var(--card); color: var(--text); font: inherit;
