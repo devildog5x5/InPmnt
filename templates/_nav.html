@@ -13,12 +13,19 @@
   <div class="nav-actions" id="site-menu">
     {% if nav_logged_in %}
     <a href="{{ url_for('main.app_home') }}#/">Dashboard</a>
-    <a href="{{ url_for('main.app_home') }}#/reminders">Reminders</a>
+    <a href="{{ url_for('main.app_home') }}#/reminders">Reminder queue</a>
     <a href="{{ url_for('main.app_home') }}#/invoices">Invoices</a>
     <a href="{{ url_for('main.app_home') }}#/clients">Clients</a>
     <a href="{{ url_for('main.app_home') }}#/templates">Templates</a>
     <a href="{{ url_for('main.app_home') }}#/settings">Settings</a>
     <a href="{{ url_for('main.app_home') }}#/billing">Billing</a>
+    {% endif %}
+    <a href="{{ url_for('main.landing') }}">Home</a>
+    <a href="/pricing">Pricing</a>
+    <a href="/invoice-reminders">Reminders</a>
+    <a href="/overdue-invoices">Overdue invoices</a>
+    <a href="/for-contractors">Contractors</a>
+    <a href="/faq">FAQ</a>
     <a href="{{ url_for('main.legal', slug='support') }}">Help</a>
     <a href="{{ url_for('main.legal', slug='contact') }}">Contact</a>
     <a href="{{ url_for('main.legal', slug='privacy') }}">Privacy</a>
@@ -26,17 +33,6 @@
     <a href="{{ url_for('main.legal', slug='security') }}">Security</a>
     <a href="{{ url_for('main.legal', slug='refunds') }}">Refunds</a>
     {% if nav_is_admin %}<a href="/admin">Admin</a>{% endif %}
-    {% else %}
-    <a href="{{ url_for('main.landing') }}">Home</a>
-    <a href="{{ url_for('main.landing') }}#how">How it works</a>
-    <a href="{{ url_for('main.landing') }}#pricing">Pricing</a>
-    <a href="{{ url_for('main.legal', slug='support') }}">Help</a>
-    <a href="{{ url_for('main.legal', slug='contact') }}">Contact</a>
-    <a href="{{ url_for('main.legal', slug='privacy') }}">Privacy</a>
-    <a href="{{ url_for('main.legal', slug='terms') }}">Terms</a>
-    <a href="{{ url_for('main.legal', slug='security') }}">Security</a>
-    <a href="{{ url_for('main.legal', slug='refunds') }}">Refunds</a>
-    {% endif %}
   </div>
   <div class="nav-cta">
     {% if nav_logged_in %}

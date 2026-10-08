@@ -864,7 +864,7 @@ async function renderSettings() {
       </div>
       <div class="field full">
         <p class="settings-note">
-          Reminder sends are logged in-app until SMTP/Twilio are connected (see GO_TO_MARKET.md).
+          Email reminders send when mail is connected. SMS templates stay in the reminder log until a phone carrier is connected. Text 801-319-1061 for customer support.
         </p>
       </div>
       <div class="field full actions">

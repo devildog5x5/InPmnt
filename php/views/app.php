@@ -104,7 +104,7 @@
 
   <script>
     window.__INPMNT__ = {
-      user: <?= json_encode($user ?? new stdClass(), JSON_UNESCAPED_SLASHES) ?>,
+      user: <?= json_encode(array_diff_key(is_array($user ?? null) ? $user : [], ['email' => true]), JSON_UNESCAPED_SLASHES) ?>,
       logoutUrl: "/logout",
       theme: <?= json_encode(Http::theme(), JSON_UNESCAPED_SLASHES) ?>,
       billingNotice: <?= json_encode((string) ($_SESSION['billing_notice'] ?? ''), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>,
