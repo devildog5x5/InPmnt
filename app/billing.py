@@ -66,7 +66,7 @@ class StripeConfig:
         )
 
 
-SUPPORT_NOTE = "Text 801-319-1061 for customer support"
+SUPPORT_NOTE = "Inquiries Text: 801.319.1061"
 CUSTOMER_SETUP = "Payments are being set up. " + SUPPORT_NOTE + "."
 PAID_PLANS = {"monthly", "yearly", "starter", "pro", "annual"}
 

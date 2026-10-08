@@ -293,13 +293,13 @@ final class App
             'title' => 'Contact',
             'slug' => 'contact',
             'meta_title' => 'Contact InvoicePay about billing or your account',
-            'description' => 'Text 801-319-1061 for customer support. Sales, billing, and account questions.',
+            'description' => 'Inquiries Text: 801.319.1061. Sales, billing, and account questions.',
         ],
         '/support' => [
             'title' => 'Support',
             'slug' => 'support',
             'meta_title' => 'InvoicePay help for reminders, billing, and sign-in',
-            'description' => 'Get InvoicePay help from the on-page button. Text 801-319-1061 for customer support. Include the name on the account and the plan name for billing questions.',
+            'description' => 'Get InvoicePay help from the on-page button. Inquiries Text: 801.319.1061. Include the name on the account and the plan name for billing questions.',
         ],
         '/security' => [
             'title' => 'Data Security',
@@ -1475,7 +1475,7 @@ final class App
             ]);
         } catch (Throwable $e) {
             error_log('[InvoicePay] Stripe checkout failed: ' . $e->getMessage());
-            $out = ['error' => 'We could not start checkout. Please try again. Text 801-319-1061 for customer support.'];
+            $out = ['error' => 'We could not start checkout. Please try again. Inquiries Text: 801.319.1061.'];
             if ($this->isAdminUser()) {
                 $out['admin_error'] = 'Stripe said: ' . $e->getMessage();
             }
@@ -1484,7 +1484,7 @@ final class App
         $url = (string) ($sess['url'] ?? '');
         if ($url === '') {
             error_log('[InvoicePay] Stripe checkout returned no URL');
-            return ['error' => 'We could not start checkout. Please try again. Text 801-319-1061 for customer support.'];
+            return ['error' => 'We could not start checkout. Please try again. Inquiries Text: 801.319.1061.'];
         }
         Db::log($this->db, 'billing', "Started Stripe checkout for {$plan}", 'settings', $wid, $wid);
         unset($_SESSION['signup_plan']);
@@ -1580,7 +1580,7 @@ final class App
             Http::json(['url' => $result['url']]);
         }
         $status = isset(Billing::PLANS[$plan]) && !Billing::config()['enabled'] ? 503 : 400;
-        $body = ['error' => $result['error'] ?? 'We could not start checkout. Please try again. Text 801-319-1061 for customer support.'];
+        $body = ['error' => $result['error'] ?? 'We could not start checkout. Please try again. Inquiries Text: 801.319.1061.'];
         if (!empty($result['admin_error'])) {
             $body['admin_error'] = $result['admin_error'];
         }
@@ -1608,7 +1608,7 @@ final class App
             $sess = Billing::createPortal($settings['stripe_customer_id']);
         } catch (Throwable $e) {
             error_log('[InvoicePay] Stripe portal failed: ' . $e->getMessage());
-            $body = ['error' => 'We could not open billing. Please try again. Text 801-319-1061 for customer support.'];
+            $body = ['error' => 'We could not open billing. Please try again. Inquiries Text: 801.319.1061.'];
             if ($this->isAdminUser()) {
                 $body['admin_error'] = 'Stripe said: ' . $e->getMessage();
             }

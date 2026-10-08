@@ -15,7 +15,7 @@ final class HelpChat
     private const RATE_MAX_SESSION = 16;
     private const RATE_MAX_IP = 40;
 
-    public const SUPPORT_NOTE = 'Text 801-319-1061 for customer support';
+    public const SUPPORT_NOTE = 'Inquiries Text: 801.319.1061';
 
     /** Mail config only. Never show this address on a page, in chat, or in an error. */
     public static function supportEmail(): string
@@ -196,9 +196,9 @@ Product facts:
 - Sign up at /signup. Sign in at /login. Forgot password at /forgot-password.
 - In the app, paste unpaid invoices and schedule polite reminder emails to clients.
 - Workspace admin console at /admin for admin-role users. Do not advertise that console as a customer feature.
-- For a person, say exactly: {$note}. The number is 801-319-1061.
+- For a person, say exactly: {$note}.
 
-Never give an email address, a mailto link, or any phone number other than 801-319-1061. If you do not know, say so and give that text number.
+Never give an email address, a mailto link, or any phone number other than 801.319.1061. If you do not know, say so and give that inquiries text.
 TXT;
     }
 

@@ -11,14 +11,14 @@
   var history = [];
   var ignoreToggleUntil = 0;
   var chatUrl = wrap.getAttribute("data-url") || "/support/chat";
-  var supportNote = "Text 801-319-1061 for customer support.";
+  var supportNote = "Inquiries Text: 801.319.1061";
 
   function linkify(text) {
     var div = document.createElement("div");
     div.textContent = text == null ? "" : String(text);
     var html = div.innerHTML;
     html = html.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1">$1</a>');
-    html = html.replace(/801-319-1061/g, '<a href="sms:+18013191061">801-319-1061</a>');
+    html = html.replace(/801[.\-]319[.\-]1061/g, '<a href="sms:+18013191061">801.319.1061</a>');
     return html;
   }
 
