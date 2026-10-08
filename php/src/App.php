@@ -53,8 +53,7 @@ final class App
         } elseif (str_starts_with($path, '/api/')) {
             $this->api($method, $path);
         } else {
-            http_response_code(404);
-            echo 'Not found';
+            $this->notFound();
         }
     }
 
@@ -217,6 +216,12 @@ final class App
     private function showDemoLogin(): bool
     {
         return Env::truthy('SHOW_DEMO_LOGIN');
+    }
+
+    private function notFound(): never
+    {
+        http_response_code(404);
+        $this->view('not_found', []);
     }
 
     private function view(string $name, array $vars = []): void
@@ -1520,9 +1525,7 @@ final class App
     private function billingStubCheckout(): never
     {
         if (Env::get('STRIPE_STUB') !== '1') {
-            http_response_code(404);
-            echo 'Not found';
-            exit;
+            $this->notFound();
         }
         $plan = Http::e((string) ($_GET['plan'] ?? ''));
         $portal = isset($_GET['portal']);

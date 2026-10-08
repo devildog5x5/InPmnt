@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  {% set meta_title = "Page not found · InvoicePay" %}
+  {% set meta_description = "That InvoicePay page is not here. Open pricing, help, or the workspace from the menu." %}
+  {% set meta_robots = "noindex, nofollow" %}
+  {% include "_meta.html" %}
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/inpmnt-icon.png') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v={{ app_version }}" />
+</head>
+<body class="landing">
+  {% include "_nav.html" %}
+  <article class="legal-page">
+    <h1>Page not found</h1>
+    <p>That address is not on InvoicePay. Use the menu to open pricing, reminders, or your workspace.</p>
+    <p>{% include "_support_note.html" %}.</p>
+    <p><a href="{{ url_for('main.landing') }}">Back to home</a></p>
+  </article>
+  <footer class="page-version" id="site-version">{% include "_version_line.html" %}</footer>
+  {% include "_help_chat.html" %}
+</body>
+</html>

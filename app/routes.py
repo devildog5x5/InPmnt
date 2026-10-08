@@ -11,6 +11,7 @@ from typing import Any
 from flask import (
     Blueprint,
     Response,
+    abort,
     current_app,
     g,
     jsonify,
@@ -87,13 +88,57 @@ def _public_base() -> str:
 
 _MARKETING_PAGES = (
     ("/", "weekly", "1.0"),
-    ("/signup", "monthly", "0.6"),
+    ("/pricing", "weekly", "0.9"),
+    ("/signup", "monthly", "0.8"),
+    ("/invoice-reminders", "monthly", "0.7"),
+    ("/overdue-invoices", "monthly", "0.7"),
+    ("/for-contractors", "monthly", "0.7"),
+    ("/faq", "monthly", "0.6"),
     ("/support", "monthly", "0.5"),
     ("/contact", "monthly", "0.5"),
     ("/privacy", "yearly", "0.3"),
     ("/terms", "yearly", "0.3"),
     ("/security", "yearly", "0.3"),
     ("/refunds", "yearly", "0.3"),
+)
+
+_GUIDES = {
+    "pricing": (
+        "Pricing",
+        "InvoicePay pricing: $4.99 a month or $49.99 a year",
+        "InvoicePay is $4.99 a month or $49.99 a year, after a 14-day trial. No credit card to start.",
+    ),
+    "invoice-reminders": (
+        "Invoice reminders",
+        "How InvoicePay schedules polite invoice reminders",
+        "How to remind clients about unpaid invoices without sounding rude, and how InvoicePay schedules those notes.",
+    ),
+    "overdue-invoices": (
+        "Overdue invoices",
+        "What to do when an InvoicePay invoice is overdue",
+        "What to do when an invoice is past due: check the bill, send a calm reminder, record partial payments, then one final notice.",
+    ),
+    "for-contractors": (
+        "Invoice reminders for contractors",
+        "Invoice reminders for contractors on InvoicePay",
+        "InvoicePay helps contractors, landscapers, consultants, and photographers collect unpaid invoices. 14-day trial, no credit card.",
+    ),
+    "faq": (
+        "FAQ",
+        "InvoicePay FAQ: trial, prices, and cancellation",
+        "Trial length, the $4.99 monthly price, the $49.99 yearly price, cancellation, and what InvoicePay stores.",
+    ),
+}
+
+_FAQ_ITEMS = (
+    {"q": "Do I need a credit card to start?", "a": "No. The 14-day trial opens with your name, email, and a password. A card is required only when you choose monthly or yearly billing."},
+    {"q": "What does InvoicePay cost after the trial?", "a": "InvoicePay is $4.99 a month or $49.99 a year. You pick either one. Both include unlimited open invoices plus email and SMS reminders. The yearly price is $9.89 less than twelve months at $4.99."},
+    {"q": "What happens if I cancel?", "a": "Cancel from Billing. The plan stays active through the end of the period you already paid. The trial itself has nothing to refund because it does not take a card."},
+    {"q": "Do you store my customers’ card numbers?", "a": "No. InvoicePay records the invoices and reminder messages you enter. When you subscribe, Stripe handles the checkout. InvoicePay does not store your customers’ card numbers."},
+    {"q": "Who is this for?", "a": "Service businesses that invoice after the work is done: contractors, landscapers, consultants, photographers, and similar shops. This site is InvoicePay, at invcpay.com."},
+    {"q": "Can I switch between monthly and yearly later?", "a": "Yes. Billing inside the app is where you move between $4.99 a month and $49.99 a year after the trial."},
+    {"q": "How do the reminders actually go out?", "a": "You write the message. InvoicePay queues it for the days you pick (the default is 3 days before due, on the due date, then 3, 7, and 14 days after). Email sends when you connect Resend or SMTP. SMS templates are included on the paid plan. A phone carrier is not connected in this version, so those texts are saved in your reminder log instead of delivered to a handset."},
+    {"q": "Is there a limit on open invoices?", "a": "The 14-day trial allows 40 open invoices (sent, partial, or overdue). Monthly and yearly plans remove that cap. Recording a payment, including a partial payment, updates the balance, and queued reminders stop once the invoice is paid."},
 )
 
 
@@ -120,13 +165,25 @@ def inject_ui() -> dict[str, Any]:
     }
 
 
+@bp.app_errorhandler(404)
+def page_not_found(_err):
+    if request.path.startswith("/api/"):
+        return jsonify({"error": "Not found"}), 404
+    return render_template("not_found.html"), 404
+
+
 @bp.get("/robots.txt")
 def robots_txt():
     base = _public_base()
     body = (
         "User-agent: *\n"
         "Allow: /\n"
+        "Allow: /pricing\n"
         "Allow: /signup\n"
+        "Allow: /invoice-reminders\n"
+        "Allow: /overdue-invoices\n"
+        "Allow: /for-contractors\n"
+        "Allow: /faq\n"
         "Allow: /login\n"
         "Allow: /forgot-password\n"
         "Allow: /support\n"
@@ -156,10 +213,16 @@ def sitemap_xml():
         '<?xml version="1.0" encoding="UTF-8"?>',
         '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
     ]
+    version_file = Path(__file__).resolve().parents[1] / "VERSION"
+    lastmod = (
+        datetime.utcfromtimestamp(version_file.stat().st_mtime).strftime("%Y-%m-%d")
+        if version_file.exists()
+        else date.today().isoformat()
+    )
     for path, freq, priority in _MARKETING_PAGES:
         loc = base + ("/" if path == "/" else path)
         lines.append(
-            f"  <url><loc>{loc}</loc><changefreq>{freq}</changefreq><priority>{priority}</priority></url>"
+            f"  <url><loc>{loc}</loc><lastmod>{lastmod}</lastmod><changefreq>{freq}</changefreq><priority>{priority}</priority></url>"
         )
     lines.append("</urlset>")
     return Response("\n".join(lines) + "\n", mimetype="application/xml; charset=utf-8")
@@ -227,6 +290,60 @@ def support_chat():
     return jsonify({"reply": reply})
 
 
+def _render_guide(slug: str):
+    title, meta_title, description = _GUIDES[slug]
+    cfg = load_stripe_config()
+    json_ld = None
+    if slug == "faq":
+        json_ld = {
+            "@context": "https://schema.org",
+            "@type": "FAQPage",
+            "mainEntity": [
+                {
+                    "@type": "Question",
+                    "name": item["q"],
+                    "acceptedAnswer": {"@type": "Answer", "text": item["a"]},
+                }
+                for item in _FAQ_ITEMS
+            ],
+        }
+    return render_template(
+        "guide.html",
+        title=title,
+        slug=slug,
+        meta_title=meta_title,
+        description=description,
+        stripe_enabled=cfg.enabled,
+        faq_items=_FAQ_ITEMS,
+        json_ld=json_ld,
+    )
+
+
+@bp.get("/pricing")
+def pricing_page():
+    return _render_guide("pricing")
+
+
+@bp.get("/invoice-reminders")
+def invoice_reminders_page():
+    return _render_guide("invoice-reminders")
+
+
+@bp.get("/overdue-invoices")
+def overdue_invoices_page():
+    return _render_guide("overdue-invoices")
+
+
+@bp.get("/for-contractors")
+def for_contractors_page():
+    return _render_guide("for-contractors")
+
+
+@bp.get("/faq")
+def faq_page():
+    return _render_guide("faq")
+
+
 _LEGAL = {
     "privacy": "Privacy Policy",
     "terms": "Terms of Service",
@@ -241,7 +358,7 @@ _LEGAL = {
 def legal(slug: str):
     title = _LEGAL.get(slug)
     if not title:
-        return ("Not found", 404)
+        abort(404)
     return render_template(
         "legal.html",
         title=title,
@@ -496,9 +613,11 @@ def logout():
 def app_home(_=None):
     notice = session.pop("billing_notice", "") or ""
     admin_notice = session.pop("billing_admin_notice", "") or ""
+    shell_user = dict(g.user or {})
+    shell_user.pop("email", None)
     return render_template(
         "app.html",
-        user=g.user,
+        user=shell_user,
         billing_notice=notice,
         billing_admin_notice=admin_notice,
     )

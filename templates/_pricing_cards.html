@@ -1,0 +1,45 @@
+{% if not stripe_enabled %}
+<p class="pay-setup" role="status">Payments are being set up. {% include "_support_note.html" %}.</p>
+{% endif %}
+<div class="pricing-grid">
+  <article class="price-card">
+    <h3>Monthly</h3>
+    <div class="price">$4.99<span>/mo</span></div>
+    <p class="plan-save">After the 14-day trial. Billed every month.</p>
+    <ul>
+      <li>Unlimited open invoices</li>
+      <li>Email and SMS reminders</li>
+      <li>Dashboard and aging</li>
+      <li>Custom templates</li>
+    </ul>
+    <div class="price-actions">
+      {% if nav_logged_in %}
+      <a class="btn" href="{{ url_for('main.app_home') }}#/billing">Subscribe monthly — $4.99</a>
+      {% else %}
+      <a class="btn" href="{{ url_for('main.signup') }}?plan=monthly">Subscribe monthly — $4.99</a>
+      {% endif %}
+      <a class="btn secondary" href="{{ url_for('main.signup') }}">Start free trial</a>
+    </div>
+  </article>
+  <article class="price-card featured">
+    <div class="popular">Save $9.89 a year</div>
+    <h3>Yearly</h3>
+    <div class="price">$49.99<span>/yr</span></div>
+    <p class="plan-save">Save $9.89 versus twelve months at $4.99.</p>
+    <ul>
+      <li>Same features as monthly</li>
+      <li>Unlimited open invoices</li>
+      <li>Email and SMS reminders</li>
+      <li>One payment for the year</li>
+    </ul>
+    <div class="price-actions">
+      {% if nav_logged_in %}
+      <a class="btn" href="{{ url_for('main.app_home') }}#/billing">Subscribe yearly — $49.99</a>
+      {% else %}
+      <a class="btn" href="{{ url_for('main.signup') }}?plan=yearly">Subscribe yearly — $49.99</a>
+      {% endif %}
+      <a class="btn secondary" href="{{ url_for('main.signup') }}">Start free trial</a>
+    </div>
+  </article>
+</div>
+<p class="sub pricing-note">No credit card to start the 14-day trial. Subscribe at $4.99 a month or $49.99 a year whenever you are ready. Stripe handles the charge. InvoicePay does not store your customers’ card numbers. Cancel anytime; access continues through the time already paid.</p>

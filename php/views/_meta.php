@@ -31,6 +31,27 @@ $msVerify = Env::get('MSVALIDATE_01');
 <?php endif; ?>
   <meta name="google-site-verification" content="<?= Http::e($googleVerify) ?>" />
   <meta name="msvalidate.01" content="<?= Http::e($msVerify) ?>" />
-<?php if (!empty($json_ld)): ?>
+<?php
+if (empty($json_ld)) {
+    $origin = rtrim(Http::canonicalBase(), '/');
+    $json_ld = [
+        '@context' => 'https://schema.org',
+        '@type' => 'WebPage',
+        'name' => $metaTitle,
+        'description' => $metaDesc,
+        'url' => $canonical,
+        'isPartOf' => [
+            '@type' => 'WebSite',
+            'name' => 'InvoicePay',
+            'url' => $origin . '/',
+        ],
+        'publisher' => [
+            '@type' => 'Organization',
+            'name' => 'InvoicePay',
+            'url' => $origin . '/',
+            'telephone' => '+1-801-319-1061',
+        ],
+    ];
+}
+?>
   <script type="application/ld+json"><?= json_encode($json_ld, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?></script>
-<?php endif; ?>
