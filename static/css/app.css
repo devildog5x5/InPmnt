@@ -1,8 +1,8 @@
 :root {
   --ink: #15202b;
   --ink-soft: #2a3a48;
-  --muted: #667888;
-  --muted-2: #8a99a8;
+  --muted: #546372;
+  --muted-2: #5c6b7a;
   --line: #e2e8ee;
   --line-strong: #cfd8e1;
   --surface: #ffffff;
@@ -42,8 +42,8 @@
 html[data-theme="dark"] {
   --ink: #e8eef3;
   --ink-soft: #c5d0da;
-  --muted: #8a99a8;
-  --muted-2: #6b7a88;
+  --muted: #a9b8c4;
+  --muted-2: #96a6b4;
   --line: #2a3844;
   --line-strong: #3a4a58;
   --surface: #151e26;
@@ -350,8 +350,15 @@ html[data-theme="dark"] .btn.ghost:focus-visible {
   background: #14353a;
   color: #fff;
 }
-.btn.danger { background: var(--danger); box-shadow: none; }
-.btn.danger:hover { background: #931c14; }
+.btn.danger,
+.btn.danger:focus,
+.btn.danger:focus-visible,
+.btn.danger:active {
+  background: #9f1d14;
+  color: #fff;
+  box-shadow: none;
+}
+.btn.danger:hover { background: #7f160f; color: #fff; }
 .btn.sm { padding: 7px 11px; font-size: 0.82rem; border-radius: 8px; }
 
 /* ---------- KPIs ---------- */
@@ -405,11 +412,19 @@ html[data-theme="dark"] .btn.ghost:focus-visible {
   color: var(--muted-2);
   font-size: 0.8rem;
 }
-.kpi.alert .kpi-value { color: var(--danger); }
+.kpi:hover { border-color: var(--line-strong); }
 .kpi.alert {
-  background: linear-gradient(180deg, #fff 0%, var(--danger-soft) 140%);
+  background: var(--surface);
   border-color: var(--danger-line);
 }
+.kpi.alert:hover,
+.kpi.alert:focus-within {
+  background: var(--surface);
+  border-color: var(--danger);
+}
+.kpi.alert .kpi-value { color: var(--danger); }
+.kpi.alert .kpi-label,
+.kpi.alert .kpi-meta { color: var(--ink-soft); }
 .kpi.alert::before { background: var(--danger); }
 
 /* ---------- Panels ---------- */
@@ -581,13 +596,17 @@ html[data-theme="dark"] .pw-toggle { color: #7fd4cf; }
 .reminder-card.critical {
   border-color: var(--danger-line);
   border-left-color: var(--danger);
-  background: linear-gradient(90deg, var(--danger-soft), #fff 42%);
+  background: linear-gradient(90deg, var(--danger-soft), var(--surface) 55%);
+  color: var(--ink);
 }
+.reminder-card.critical:hover { background: var(--surface); }
 .reminder-card.warning {
   border-color: var(--warn-line);
   border-left-color: var(--warn);
-  background: linear-gradient(90deg, var(--warn-soft), #fff 42%);
+  background: linear-gradient(90deg, var(--warn-soft), var(--surface) 55%);
+  color: var(--ink);
 }
+.reminder-card.warning:hover { background: var(--surface); }
 .reminder-meta {
   display: flex;
   justify-content: space-between;
@@ -660,7 +679,8 @@ html[data-theme="dark"] .pw-toggle { color: #7fd4cf; }
   width: min(760px, 100%);
   max-height: 90vh;
   overflow: auto;
-  background: white;
+  background: var(--surface);
+  color: var(--ink);
   border-radius: 18px;
   padding: 24px;
   box-shadow: var(--shadow-lg);
@@ -1039,9 +1059,17 @@ body.app-body .sidebar { height: auto; min-height: calc(100vh - 64px); }
   max-width: 42ch;
 }
 html[data-theme="dark"] .landing-hero .sub,
+html[data-theme="dark"] .landing-hero .audience,
+html[data-theme="dark"] .hero-note,
 html[data-theme="dark"] .feature p,
 html[data-theme="dark"] .step p,
-html[data-theme="dark"] .pricing-note { color: var(--muted); }
+html[data-theme="dark"] .plan-save,
+html[data-theme="dark"] .pricing-note,
+html[data-theme="dark"] .landing-footer,
+html[data-theme="dark"] .legal-page { color: var(--muted); }
+html[data-theme="dark"] .landing-footer a,
+html[data-theme="dark"] .footer-col h2,
+html[data-theme="dark"] .legal-page h1 { color: var(--ink); }
 .landing-hero .audience {
   margin: 0 0 22px;
   color: #425466;
@@ -1053,12 +1081,20 @@ html[data-theme="dark"] .pricing-note { color: var(--muted); }
 .hero-note { margin: 12px 0 0; color: #425466; font-size: 0.9rem; }
 .hero-visual { min-width: 0; }
 .browser-frame {
-  background: var(--surface);
+  background: #fff;
+  color: #243B53;
   border: 1px solid var(--line);
   border-radius: 16px;
   box-shadow: 0 18px 40px rgba(16, 42, 67, 0.12);
   overflow: hidden;
 }
+.browser-frame .hero-sample,
+.browser-frame .dash-kpis em,
+.browser-frame .dash-aging div,
+.browser-frame .browser-url { color: #425466; }
+.browser-frame .dash-top strong,
+.browser-frame .dash-kpis b { color: #102A43; }
+.browser-frame .dash-reminders li { color: #243B53; }
 .browser-chrome {
   display: flex;
   align-items: center;
