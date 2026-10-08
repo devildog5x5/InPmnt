@@ -2,35 +2,37 @@
   var amount = document.getElementById("roi-amount");
   var count = document.getElementById("roi-count");
   var out = document.getElementById("roi-result");
-  if (!amount || !count || !out) return;
-
-  var PRICE = 4.99;
+  var fig = document.getElementById("roi-figure");
+  if (!amount || !count || !out || !fig) return;
 
   function money(n) {
-    return n.toLocaleString("en-US", { style: "currency", currency: "USD" });
+    var digits = Math.round(n * 100) % 100 === 0 ? 0 : 2;
+    return n.toLocaleString("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits
+    });
   }
 
   function render() {
     var invoice = Math.max(0, Number(amount.value) || 0);
     var late = Math.max(0, Math.floor(Number(count.value) || 0));
-    var book = invoice * late;
     if (invoice <= 0) {
-      out.textContent = "Enter an average invoice amount to compare it with $4.99.";
+      fig.textContent = "—";
+      out.textContent = "Enter an average invoice amount.";
       return;
     }
-    var months = invoice / PRICE;
-    var monthLabel = months >= 10 ? String(Math.round(months)) : months.toFixed(1);
-    var bookLine;
+    var book = invoice * late;
     if (late <= 0) {
-      bookLine = "Add how many invoices usually run late in a month. ";
-    } else if (late === 1) {
-      bookLine = "If that " + money(invoice) + " invoice is paid a week sooner, " + money(book) + " is in the account a week earlier. ";
-    } else {
-      bookLine = "If those " + late + " late invoices (" + money(book) + ") are paid a week sooner, that cash is in the account a week earlier. ";
+      fig.textContent = money(invoice);
+      out.textContent = "Add how many invoices run late in a month.";
+      return;
     }
-    out.textContent = bookLine
-      + "InvoicePay is $4.99 for the month. One invoice of " + money(invoice) + " covers about " + monthLabel
-      + " months of the subscription. This is arithmetic, not a promise that every reminder gets paid.";
+    fig.textContent = money(book);
+    out.textContent = late === 1
+      ? "One invoice, in the account a week sooner. InvoicePay is $4.99 this month."
+      : late + " invoices, in the account a week sooner. InvoicePay is $4.99 this month.";
   }
 
   amount.addEventListener("input", render);

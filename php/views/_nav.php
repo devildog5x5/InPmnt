@@ -52,7 +52,11 @@ $navHome = $navLoggedIn ? '/app' : '/';
       <div class="brand-sub">Get paid</div>
     </div>
   </a>
-  <div class="nav-actions">
+  <button type="button" class="nav-toggle" aria-expanded="false" aria-controls="site-menu">
+    <span class="sr-only">Menu</span>
+    <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+  </button>
+  <div class="nav-actions" id="site-menu">
     <?php foreach ($navItems as $item): ?>
       <?php if (isset($item['class'])) { continue; } ?>
       <?php
