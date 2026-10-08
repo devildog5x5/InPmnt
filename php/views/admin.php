@@ -96,7 +96,14 @@ $csrf = Admin::csrfToken();
       background: #034e49; border-color: #034e49; color: #fff;
     }
     button.danger, .btn.danger,
-    button.danger:hover, .btn.danger:hover { background: var(--danger); border-color: var(--danger); color: #fff; }
+    button.danger:hover, .btn.danger:hover,
+    button.danger:focus, .btn.danger:focus {
+      background: #9f1d14; border-color: #9f1d14; color: #fff;
+    }
+    button.danger:hover, .btn.danger:hover,
+    button.danger:focus, .btn.danger:focus {
+      background: #7f160f; border-color: #7f160f; color: #fff;
+    }
     input, textarea, select {
       width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 4px;
       background: var(--card); color: var(--text); font: inherit;
