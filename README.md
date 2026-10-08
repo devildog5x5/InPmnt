@@ -8,14 +8,14 @@ InvoicePay helps plumbers, landscapers, photographers, and consultants stop losi
 
 ## Downloads
 
-Packages for **v1.6.5** are on the [v1.6.5 release](https://github.com/devildog5x5/InPmnt/releases/tag/v1.6.5). The GitHub repo name stays `InPmnt` until Robert renames it. Rebuild locally with `powershell -File .\build_release.ps1` → `installers\`.
+Packages for **v1.6.6** are on the [v1.6.6 release](https://github.com/devildog5x5/InPmnt/releases/tag/v1.6.6). The GitHub repo name stays `InPmnt` until Robert renames it. Rebuild locally with `powershell -File .\build_release.ps1` → `installers\`.
 
 | Package | What you get | Download |
 |---------|----------------|----------|
-| **PHP (Hostinger)** | Unzip into `public_html` — no VPS | [invcpay-v1.6.5.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.6.5/invcpay-v1.6.5.zip) |
-| **Portable** | Runnable Windows app — `install.ps1` or `start.ps1` | [ReceiptGrid-Portable.v1.6.5.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.6.5/ReceiptGrid-Portable.v1.6.5.zip) |
-| **Source** | Full source (Python + PHP + Docker) | [ReceiptGrid-Source.v1.6.5.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.6.5/ReceiptGrid-Source.v1.6.5.zip) |
-| **Icon** | Brand icon assets (blue / teal / violet) | [ReceiptGrid-Icon.v1.6.5.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.6.5/ReceiptGrid-Icon.v1.6.5.zip) |
+| **PHP (Hostinger)** | Unzip into `public_html` — no VPS | [invcpay-v1.6.6.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.6.6/invcpay-v1.6.6.zip) |
+| **Portable** | Runnable Windows app — `install.ps1` or `start.ps1` | [ReceiptGrid-Portable.v1.6.6.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.6.6/ReceiptGrid-Portable.v1.6.6.zip) |
+| **Source** | Full source (Python + PHP + Docker) | [ReceiptGrid-Source.v1.6.6.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.6.6/ReceiptGrid-Source.v1.6.6.zip) |
+| **Icon** | Brand icon assets (blue / teal / violet) | [ReceiptGrid-Icon.v1.6.6.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.6.6/ReceiptGrid-Icon.v1.6.6.zip) |
 - Sign up: `/signup` · Local demo (optional): set `SHOW_DEMO_LOGIN=1` then `demouser@inpmnt.app` / `Demo`
 - App URL (local): `https://127.0.0.1:5055` (self-signed cert; accept the browser warning)
 - Rebuild locally: `powershell -File .\build_release.ps1` → `installers\*.zip`
@@ -110,7 +110,7 @@ Production TLS (Let's Encrypt / IIS) is handled by nginx or IIS in front of the 
 
 InvoicePay now ships a **PHP** build you can drop on Hostinger Web/Cloud (no VPS).
 
-1. Download [invcpay-v1.6.5.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.6.5/invcpay-v1.6.5.zip).
+1. Download [invcpay-v1.6.6.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.6.6/invcpay-v1.6.6.zip).
 2. In hPanel → **Files → File Manager** (or FTP), unzip **all files into `public_html`**.
 3. Copy `.env.example` → `.env`. Set `APP_SECRET` (long random string) and `BASE_URL=https://yourdomain.com`.
 4. hPanel → **Advanced → PHP Configuration**: PHP **8.2+**, enable **pdo_sqlite**.

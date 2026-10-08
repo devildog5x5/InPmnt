@@ -51,29 +51,30 @@
 <body class="landing">
 <?php require __DIR__ . '/_nav.php'; ?>
 
+  <div class="hero-band">
   <header class="landing-hero">
     <div>
       <p class="kicker">Invoice reminders for service businesses</p>
       <h1>Get paid without chasing the invoice.</h1>
-      <p class="sub">InvoicePay keeps the unpaid invoices, the reminder dates, and the message in one place, then emails the note you wrote when mail is connected. Queued reminders stop when you mark the invoice paid.</p>
-      <p class="hero-price">14 days free, no credit card. Then <strong>$4.99 a month</strong> or <strong>$49.99 a year</strong>.</p>
+      <p class="sub">Open invoices, reminder dates, and the message stay in one place. Email sends when mail is connected. Mark it paid and the queue stops.</p>
+      <p class="hero-price">14 days free. Then <strong>$4.99 a month</strong> or <strong>$49.99 a year</strong>.</p>
       <div class="hero-cta">
         <a class="btn" href="/signup?plan=">Start 14-day free trial</a>
         <a class="btn secondary" href="/signup?plan=monthly">Subscribe — $4.99/mo</a>
       </div>
-      <p class="hero-note">No card for the trial. Cancel anytime after you subscribe. Stripe handles the payment. InvoicePay does not store your customers’ card numbers.</p>
+      <p class="hero-note">No card to start. Cancel anytime. Stripe handles the payment.</p>
     </div>
     <div class="hero-visual">
+      <p class="float-paid">Paid ✓ · $1,240</p>
       <div class="browser-frame">
         <div class="browser-chrome" aria-hidden="true">
           <span></span><span></span><span></span>
           <div class="browser-url">invcpay.com/app</div>
         </div>
-        <p class="hero-sample">Sample workspace. These names and amounts are an illustration, not live results.</p>
+        <p class="hero-sample">Sample workspace. Illustration, not live results.</p>
         <div class="dash-shot">
           <div class="dash-top">
             <strong>Outstanding</strong>
-            <span class="dash-toast">Paid · Harbor Studio · $1,240</span>
           </div>
           <div class="dash-kpis">
             <div>
@@ -108,140 +109,160 @@
       <li>Cancel anytime from Billing</li>
     </ul>
   </section>
+  </div>
 
   <section class="landing-section" id="problem">
-    <h2>Unpaid invoices cost time before they cost cash</h2>
-    <p class="sub">A small shop usually already knows who owes what. The drag is remembering to ask, wording it so it still sounds like you, and noticing when the money finally lands.</p>
-    <div class="problem-grid">
-      <ul class="problem-list">
-        <li>
-          <h3>The follow-up eats the evening</h3>
-          <p>Checking a notebook, rewriting the same email, and wondering whether you already asked this week is unpaid work on top of the unpaid invoice.</p>
-        </li>
-        <li>
-          <h3>The ask feels awkward</h3>
-          <p>InvoicePay starts from templates you can edit: a friendly nudge, a due-today note, an overdue follow-up, and a final notice. The words stay yours.</p>
-        </li>
-        <li>
-          <h3>Cash shows up late</h3>
-          <p>The dashboard lists the open balance and sorts it into current, 1–30, 31–60, and 60+ days, so you can see which invoices have been quiet the longest.</p>
-        </li>
-      </ul>
-      <aside class="math-callout">
-        <h3>A plain piece of arithmetic</h3>
-        <p>If one reminder gets one <strong>$200</strong> invoice paid a week sooner, that single invoice is more than three years of InvoicePay at $4.99 a month. $4.99 × 36 months is $179.64. This is not a survey. It is $200 compared with the subscription.</p>
-      </aside>
-    </div>
+    <h2>Late invoices cost the evening first</h2>
+    <p class="sub">You already know who owes you. The work is remembering to ask.</p>
+    <ul class="problem-list">
+      <li class="lift">
+        <div class="feat-icon teal" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v5l3 2"/></svg></div>
+        <h3>Evenings spent chasing</h3>
+        <p>The same follow-up, rewritten, while you try to remember if you already asked.</p>
+      </li>
+      <li class="lift">
+        <div class="feat-icon blue" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 5h14v14H5z"/><path d="M8 9h8M8 13h5"/></svg></div>
+        <h3>A note that sounds like you</h3>
+        <p>Start from a nudge, a due-today note, an overdue follow-up, or a final notice. Edit any of them.</p>
+      </li>
+      <li class="lift">
+        <div class="feat-icon violet" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 19V10M10 19V5M16 19v-7M22 19H2"/></svg></div>
+        <h3>See which invoices went quiet</h3>
+        <p>Open balance, sorted into current, 1–30, 31–60, and 60+ days.</p>
+      </li>
+    </ul>
   </section>
 
-  <section class="landing-section" id="how">
+  <section class="band band-alt" id="how">
+  <div class="landing-section">
     <h2>How it works</h2>
-    <p class="sub">Four steps from a client and an invoice to a recorded payment.</p>
+    <p class="sub">Four steps from a new invoice to a recorded payment.</p>
     <div class="steps">
-      <article class="step">
-        <div class="step-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="3"/><path d="M19 8v6M16 11h6"/></svg>
+      <article class="step-col">
+        <div class="step-num">1</div>
+        <div class="step lift">
+          <h3>Add the client and invoice</h3>
+          <p>Name, email, phone, amount, and due date.</p>
         </div>
-        <h3>1. Add the client and the invoice</h3>
-        <p>Save the name, email, and phone, then the invoice number, amount, and due date.</p>
       </article>
-      <article class="step">
-        <div class="step-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16"/></svg>
+      <article class="step-col">
+        <div class="step-num">2</div>
+        <div class="step lift">
+          <h3>Set the reminder days</h3>
+          <p>Starts at 3 days before due, the due date, then 3, 7, and 14 days after. Change the offsets anytime.</p>
         </div>
-        <h3>2. Pick the reminder days</h3>
-        <p>The starting schedule is 3 days before due, the due date, then 3, 7, and 14 days after. You can change those offsets.</p>
       </article>
-      <article class="step">
-        <div class="step-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><path d="M4 6h16v12H4z"/><path d="m4 7 8 6 8-6"/></svg>
+      <article class="step-col">
+        <div class="step-num">3</div>
+        <div class="step lift">
+          <h3>Send the reminder</h3>
+          <p>Email sends when Resend or SMTP is connected. Paid plans include SMS templates. Those texts stay in the reminder log until a carrier is connected.</p>
         </div>
-        <h3>3. Send the note you wrote</h3>
-        <p>Email goes out when Resend or SMTP is connected. SMS templates unlock on the paid plan. A phone carrier is not connected yet, so texts are kept in the reminder log.</p>
       </article>
-      <article class="step">
-        <div class="step-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><path d="M8.5 12.2 11 14.7 15.5 9.5"/></svg>
+      <article class="step-col">
+        <div class="step-num">4</div>
+        <div class="step lift">
+          <h3>Mark it paid</h3>
+          <p>Record a partial or full payment. Queued reminders stop when the balance is gone.</p>
         </div>
-        <h3>4. Mark it paid</h3>
-        <p>Record a partial or full payment. When the balance is gone, reminders that are still queued stop.</p>
       </article>
     </div>
+  </div>
   </section>
 
   <section class="landing-section" id="features">
-    <h2>What is actually in the app</h2>
-    <p class="sub">A short list of the screens you get. Nothing here is a customer count or a made-up result.</p>
+    <h2>Everything in the app</h2>
+    <p class="sub">The screens you use to get an invoice paid.</p>
     <div class="feature-grid">
       <article class="feature">
         <div class="feat-icon teal" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 19V10M10 19V5M16 19v-7M22 19H2"/></svg></div>
         <h3>Dashboard</h3>
-        <p>Open balance, how many invoices are overdue, and aging buckets: current, 1–30, 31–60, and 60+ days.</p>
+        <p>Open balance, overdue count, and aging: current, 1–30, 31–60, and 60+ days.</p>
       </article>
       <article class="feature">
         <div class="feat-icon blue" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 22a2.2 2.2 0 0 0 2.1-1.6H9.9A2.2 2.2 0 0 0 12 22zm7-6V11a7 7 0 1 0-14 0v5l-2 2h18l-2-2z"/></svg></div>
         <h3>Reminder queue</h3>
-        <p>Pending and due reminders in one list, with the invoice, the client, and whether the date has passed.</p>
+        <p>Due and pending reminders in one list, with the client and the invoice.</p>
       </article>
       <article class="feature">
         <div class="feat-icon violet" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 3h8l4 4v14H4V3h4zm0 0v4h8M8 13h8M8 17h5"/></svg></div>
         <h3>Invoices</h3>
-        <p>Draft, sent, partial, overdue, and paid. Record what came in and keep the remaining balance visible.</p>
+        <p>Draft, sent, partial, overdue, and paid. The balance stays visible.</p>
       </article>
       <article class="feature">
         <div class="feat-icon teal" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"/></svg></div>
         <h3>Clients</h3>
-        <p>Name, email, phone, and a note, next to the invoices that still have a balance.</p>
+        <p>Name, email, phone, and the invoices that still have a balance.</p>
       </article>
       <article class="feature">
         <div class="feat-icon blue" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 4h9l3 3v13H8V4zm0 0H5v16h3M11 12h6M11 16h4"/></svg></div>
         <h3>Templates</h3>
-        <p>Friendly nudge, due today, overdue follow-up, final notice, and a short SMS. Merge fields fill in the client, amount, and due date.</p>
+        <p>Friendly nudge, due today, overdue, final notice, and a short SMS. Merge fields fill the name, amount, and date.</p>
       </article>
       <article class="feature">
         <div class="feat-icon violet" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 6h16v12H4z"/><path d="m4 7 8 6 8-6"/></svg></div>
         <h3>Email reminders</h3>
-        <p>Included in the trial. They send when you add a Resend key or SMTP settings. Each send is logged.</p>
+        <p>Included in the trial. They send when Resend or SMTP is connected, and each send is logged.</p>
       </article>
       <article class="feature">
         <div class="feat-icon teal" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v5h5M9 13h6M9 17h4"/></svg></div>
         <h3>Final notice</h3>
-        <p>One action fills the final-notice template and emails it when mail is connected. The send is stored on the invoice.</p>
+        <p>One action fills the final-notice template and emails it when mail is connected.</p>
       </article>
       <article class="feature">
         <div class="feat-icon blue" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 16.5V7.5A3.5 3.5 0 0 1 8.5 4h7A3.5 3.5 0 0 1 19 7.5v5A3.5 3.5 0 0 1 15.5 16H9l-4 3.5z"/></svg></div>
         <h3>Help chat</h3>
-        <p>The help button answers from the product facts on this site. You can also email support@invcpay.com.</p>
+        <p>Answers from the facts on this site. You can also email support@invcpay.com.</p>
       </article>
       <article class="feature">
         <div class="feat-icon violet" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18"/></svg></div>
         <h3>Billing</h3>
-        <p>Subscribe monthly or yearly from the pricing cards or the Billing page. Stripe Checkout and the customer portal handle the card.</p>
+        <p>Subscribe monthly or yearly. Stripe Checkout and the customer portal handle the card.</p>
       </article>
     </div>
   </section>
 
-  <section class="landing-section" id="value">
-    <h2>Why $4.99 is a small price for this job</h2>
-    <p class="sub">$4.99 a month is about 16¢ a day ($4.99 × 12 ÷ 365). $49.99 a year is $9.89 less than paying $4.99 twelve times.</p>
-    <div class="value-layout">
-      <div class="value-grid">
-        <article class="value-card">
-          <h3>Against an hour of chasing</h3>
-          <p>If you already spend part of a week rewriting “just checking in” emails, the subscription is the smaller number. InvoicePay does not do the work for free. It keeps the schedule and the wording so you are not starting from a blank message.</p>
-        </article>
-        <article class="value-card">
-          <h3>Against a full field-service suite</h3>
-          <p>Larger field-service products often roll dispatch, inventory, and payroll into one bill and cost much more per month. InvoicePay is only the unpaid-invoice list, the reminders, and the record of what was paid.</p>
-        </article>
-        <article class="value-card">
-          <h3>Same features on both plans</h3>
-          <p>Monthly and yearly both lift the trial cap of 40 open invoices and unlock SMS templates. Email reminders are already in the trial. Yearly is one payment of $49.99.</p>
-        </article>
-      </div>
-      <form class="roi-card" id="roi-calc">
-        <h3>Compare a late invoice with $4.99</h3>
-        <p class="roi-note">This only multiplies the numbers you type. It does not estimate how many clients will pay.</p>
+  <section class="band band-alt" id="value">
+  <div class="landing-section">
+    <h2>Why $4.99 is a small price</h2>
+    <p class="sub">One invoice paid a week sooner covers the subscription for years.</p>
+    <div class="stat-row">
+      <article class="stat-block lead">
+        <strong>16¢</strong>
+        <span>a day</span>
+        <p>$4.99 a month is $4.99 × 12 ÷ 365.</p>
+      </article>
+      <article class="stat-block">
+        <strong>$9.89</strong>
+        <span>off the yearly plan</span>
+        <p>$49.99 instead of twelve payments of $4.99.</p>
+      </article>
+      <article class="stat-block">
+        <strong>3+ years</strong>
+        <span>from one $200 invoice</span>
+        <p>Paid a week sooner, that invoice covers $4.99 × 36 ($179.64).</p>
+      </article>
+    </div>
+    <div class="value-grid">
+      <article class="value-card lift">
+        <div class="feat-icon teal" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v5l3 2"/></svg></div>
+        <h3>Less time chasing</h3>
+        <p>The reminder is already written and dated. You send it instead of starting from a blank email.</p>
+      </article>
+      <article class="value-card lift">
+        <div class="feat-icon blue" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 8h16M4 16h16M8 4v16M16 4v16"/></svg></div>
+        <h3>Smaller than a full suite</h3>
+        <p>Field-service suites often bundle dispatch, inventory, and payroll and cost much more a month. InvoicePay is the open invoices and the reminders.</p>
+      </article>
+      <article class="value-card lift">
+        <div class="feat-icon violet" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M8.5 12.2 11 14.7 15.5 9.5"/></svg></div>
+        <h3>Same tools on both plans</h3>
+        <p>Monthly and yearly both remove the 40-invoice trial cap and include SMS templates. Yearly is one payment of $49.99.</p>
+      </article>
+    </div>
+    <form class="roi-panel" id="roi-calc">
+      <div>
+        <h3>Your late invoices, next to $4.99</h3>
         <div class="roi-fields">
           <label>Average invoice amount
             <input id="roi-amount" name="amount" type="number" min="0" step="1" value="200" inputmode="decimal" />
@@ -250,28 +271,36 @@
             <input id="roi-count" name="count" type="number" min="0" step="1" value="1" inputmode="numeric" />
           </label>
         </div>
-        <p class="roi-result" id="roi-result" aria-live="polite"></p>
-      </form>
-    </div>
+        <p class="roi-note">Arithmetic only. Not a promise that every reminder gets paid.</p>
+      </div>
+      <div class="roi-readout" aria-live="polite">
+        <p class="roi-kicker">Cash a week sooner</p>
+        <p class="roi-figure" id="roi-figure">$200</p>
+        <p class="roi-result" id="roi-result"></p>
+      </div>
+    </form>
+  </div>
   </section>
 
   <section class="landing-section" id="who">
     <h2>Who it is for</h2>
-    <p class="sub">Shops that invoice after the work is done and then wait. The app does not care which trade is on the invoice.</p>
+    <p class="sub">Any shop that invoices after the work and then waits.</p>
     <div class="audience-grid">
-      <article class="audience-card"><h3>Plumbers and electricians</h3><p>The job is finished. The invoice is still open.</p></article>
-      <article class="audience-card"><h3>Landscapers and cleaners</h3><p>Repeat clients, a few late ones, and a reminder that should sound like you.</p></article>
-      <article class="audience-card"><h3>Photographers and freelancers</h3><p>A handful of invoices, not a full accounting department.</p></article>
-      <article class="audience-card"><h3>Contractors</h3><p>There is a <a href="/for-contractors">contractors page</a> with the same trial and the same prices.</p></article>
-      <article class="audience-card"><h3>Consultants</h3><p>Track the balance, send the note, record the payment.</p></article>
-      <article class="audience-card"><h3>Anyone with open invoices</h3><p>If you can type the amount and the due date, you can run the queue.</p></article>
+      <article class="audience-card lift"><h3>Plumbers and electricians</h3><p>The job is done. The invoice is still open.</p></article>
+      <article class="audience-card lift"><h3>Landscapers and cleaners</h3><p>Repeat clients, and a reminder that sounds like you.</p></article>
+      <article class="audience-card lift"><h3>Photographers and freelancers</h3><p>A handful of invoices. No accounting department.</p></article>
+      <article class="audience-card lift"><h3>Contractors</h3><p>Same trial and prices on the <a href="/for-contractors">contractors page</a>.</p></article>
+      <article class="audience-card lift"><h3>Consultants</h3><p>Track the balance, send the note, record the payment.</p></article>
+      <article class="audience-card lift"><h3>Anyone with open invoices</h3><p>Type the amount and the due date. Run the queue.</p></article>
     </div>
   </section>
 
-  <section class="landing-section" id="pricing">
+  <section class="band band-alt" id="pricing">
+  <div class="landing-section">
     <h2>Pricing</h2>
-    <p class="sub">14 days free. No credit card. Subscribe when you want the paid plan. You can change plans later from Billing.</p>
+    <p class="sub">14 days free. No card. Then $4.99 a month or $49.99 a year.</p>
     <?php require __DIR__ . '/_pricing_cards.php'; ?>
+  </div>
   </section>
 
   <section class="landing-section" id="faq">
@@ -281,13 +310,15 @@
   </section>
 
   <section class="cta-band" aria-labelledby="closing-cta">
-    <div>
-      <h2 id="closing-cta">Start with the invoices you already have</h2>
-      <p>The trial is 14 days and does not ask for a card. After that, stay on $4.99 a month or $49.99 a year.</p>
-    </div>
-    <div class="cta-actions">
-      <a class="btn on-light" href="/signup?plan=">Start 14-day free trial</a>
-      <a class="btn secondary" href="/signup?plan=yearly">Subscribe yearly — $49.99</a>
+    <div class="cta-inner">
+      <div>
+        <h2 id="closing-cta">Start with the invoices you already have</h2>
+        <p>14 days free. No card. Then $4.99 a month or $49.99 a year.</p>
+      </div>
+      <div class="cta-actions">
+        <a class="btn on-light" href="/signup?plan=">Start 14-day free trial</a>
+        <a class="btn secondary" href="/signup?plan=yearly">Subscribe yearly — $49.99</a>
+      </div>
     </div>
   </section>
 
