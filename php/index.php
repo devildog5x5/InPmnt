@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 /**
- * ReceiptGrid v1.6.3
+ * InvoicePay v1.6.4
  *
  * Hostinger entry point. The version string above stays in lockstep with
  * Http::VERSION and the root VERSION file so a text search of index.php finds it.
@@ -32,6 +32,7 @@ if (str_starts_with($path, '/static/')) {
                 'svg' => 'image/svg+xml',
                 'ico' => 'image/x-icon',
                 'webp' => 'image/webp',
+                'webmanifest' => 'application/manifest+json; charset=utf-8',
             ];
             header('Content-Type: ' . ($types[$ext] ?? 'application/octet-stream'));
             header('Cache-Control: public, max-age=31536000, immutable');

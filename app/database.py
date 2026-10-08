@@ -498,7 +498,7 @@ def _ensure_system_accounts(conn: sqlite3.Connection) -> None:
             email=ADMIN_EMAIL,
             name=ADMIN_NAME,
             password_hash=generate_password_hash(ADMIN_PASSWORD),
-            business_name="ReceiptGrid Admin",
+            business_name="InvoicePay Admin",
             role="admin",
         )
 
@@ -570,7 +570,7 @@ def _seed(conn: sqlite3.Connection) -> None:
         email=ADMIN_EMAIL,
         name=ADMIN_NAME,
         password_hash=generate_password_hash(ADMIN_PASSWORD),
-        business_name="ReceiptGrid Admin",
+        business_name="InvoicePay Admin",
         role="admin",
     )
 

@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  {% set meta_title = "Sign up · ReceiptGrid" %}
-  {% set meta_description = "Create a ReceiptGrid Invoicing account so clients get automatic reminders about unpaid invoices until you are paid. Then $4.99 a month or $49.99 a year." %}
+  {% set meta_title = "Sign up · InvoicePay" %}
+  {% set meta_description = "Create an InvoicePay account so clients get automatic reminders about unpaid invoices until you are paid. Then $4.99 a month or $49.99 a year." %}
   {% include "_meta.html" %}
   <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/inpmnt-icon.png') }}" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -18,11 +18,11 @@
     <div class="auth-card">
       <div class="auth-brand">
         <div class="brand-logo img">
-          <img src="{{ url_for('static', filename='img/inpmnt-icon.png') }}" width="42" height="42" alt="ReceiptGrid logo" />
+          <img src="{{ url_for('static', filename='img/inpmnt-icon.png') }}" width="42" height="42" alt="InvoicePay logo" />
         </div>
         <div>
-          <div class="brand-mark" style="color:var(--ink);font-size:1.35rem">ReceiptGrid</div>
-          <div class="brand-sub" style="color:var(--muted)">Invoicing</div>
+          <div class="brand-mark" style="color:var(--ink);font-size:1.35rem">InvoicePay</div>
+          <div class="brand-sub" style="color:var(--muted)">Get paid</div>
         </div>
       </div>
       <h1>Start your free trial</h1>
@@ -30,7 +30,11 @@
       {% if error %}
       <div class="auth-error">{{ error }}</div>
       {% endif %}
+      {% if plan %}
+      <p class="pay-setup" role="status">After this account is created you go straight to checkout for {{ plan_label }}.</p>
+      {% endif %}
       <form method="post">
+        <input type="hidden" name="plan" value="{{ plan or '' }}" />
         <div class="field">
           <label for="name">Your name</label>
           <input id="name" name="name" type="text" required autocomplete="name" />
@@ -55,7 +59,7 @@
       </p>
     </div>
   </div>
-  <footer class="page-version" id="site-version">ReceiptGrid v{{ app_version }}</footer>
+  <footer class="page-version" id="site-version">InvoicePay v{{ app_version }}</footer>
 {% include "_help_chat.html" %}
 </body>
 </html>

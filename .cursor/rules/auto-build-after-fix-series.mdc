@@ -3,7 +3,7 @@ description: After build-related fix series, rebuild release zips and hand off d
 alwaysApply: true
 ---
 
-# Auto-build after fix series (ReceiptGrid)
+# Auto-build after fix series (InvoicePay)
 
 When you finish a **connected set of changes** that fix or materially affect **runtime, billing, packaging, or start scripts**, do **not** end the turn until you have:
 

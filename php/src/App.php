@@ -44,6 +44,10 @@ final class App
             $this->admin();
         } elseif ($method === 'GET' && $path === '/billing/success') {
             $this->billingSuccess();
+        } elseif ($method === 'POST' && $path === '/billing/checkout') {
+            $this->billingCheckoutForm();
+        } elseif ($method === 'GET' && $path === '/billing/stub-checkout') {
+            $this->billingStubCheckout();
         } elseif ($method === 'POST' && $path === '/api/billing/webhook') {
             $this->stripeWebhook();
         } elseif (str_starts_with($path, '/api/')) {
@@ -227,32 +231,32 @@ final class App
         '/pricing' => [
             'title' => 'Pricing',
             'slug' => 'pricing',
-            'meta_title' => 'ReceiptGrid pricing: $4.99 a month or $49.99 a year',
-            'description' => 'ReceiptGrid Invoicing is $4.99 a month or $49.99 a year, after a 14-day trial. No credit card to start.',
+            'meta_title' => 'InvoicePay pricing: $4.99 a month or $49.99 a year',
+            'description' => 'InvoicePay is $4.99 a month or $49.99 a year, after a 14-day trial. No credit card to start.',
         ],
         '/invoice-reminders' => [
             'title' => 'Invoice reminders',
             'slug' => 'invoice-reminders',
-            'meta_title' => 'How ReceiptGrid schedules polite invoice reminders',
-            'description' => 'How to remind clients about unpaid invoices without sounding rude, and how ReceiptGrid schedules those notes.',
+            'meta_title' => 'How InvoicePay schedules polite invoice reminders',
+            'description' => 'How to remind clients about unpaid invoices without sounding rude, and how InvoicePay schedules those notes.',
         ],
         '/overdue-invoices' => [
             'title' => 'Overdue invoices',
             'slug' => 'overdue-invoices',
-            'meta_title' => 'What to do when a ReceiptGrid invoice is overdue',
+            'meta_title' => 'What to do when an InvoicePay invoice is overdue',
             'description' => 'What to do when an invoice is past due: check the bill, send a calm reminder, record partial payments, then one final notice.',
         ],
         '/for-contractors' => [
             'title' => 'Invoice reminders for contractors',
             'slug' => 'for-contractors',
-            'meta_title' => 'Invoice reminders for contractors on ReceiptGrid',
-            'description' => 'ReceiptGrid helps contractors, landscapers, consultants, and photographers collect unpaid invoices. 14-day trial, no credit card.',
+            'meta_title' => 'Invoice reminders for contractors on InvoicePay',
+            'description' => 'InvoicePay helps contractors, landscapers, consultants, and photographers collect unpaid invoices. 14-day trial, no credit card.',
         ],
         '/faq' => [
             'title' => 'FAQ',
             'slug' => 'faq',
-            'meta_title' => 'ReceiptGrid FAQ: trial, prices, and cancellation',
-            'description' => 'Trial length, the $4.99 monthly price, the $49.99 yearly price, cancellation, and what ReceiptGrid stores.',
+            'meta_title' => 'InvoicePay FAQ: trial, prices, and cancellation',
+            'description' => 'Trial length, the $4.99 monthly price, the $49.99 yearly price, cancellation, and what InvoicePay stores.',
         ],
     ];
 
@@ -272,38 +276,38 @@ final class App
         '/privacy' => [
             'title' => 'Privacy Policy',
             'slug' => 'privacy',
-            'meta_title' => 'ReceiptGrid privacy policy for account and invoice data',
-            'description' => 'ReceiptGrid stores the account, client, and invoice details you enter so reminders can be sent. Card numbers stay with Stripe.',
+            'meta_title' => 'InvoicePay privacy policy for account and invoice data',
+            'description' => 'InvoicePay stores the account, client, and invoice details you enter so reminders can be sent. Card numbers stay with Stripe.',
         ],
         '/terms' => [
             'title' => 'Terms of Service',
             'slug' => 'terms',
-            'meta_title' => 'ReceiptGrid terms of service for reminder subscriptions',
-            'description' => 'The ReceiptGrid Invoicing trial is 14 days with no card. After that the price is $4.99 a month or $49.99 a year.',
+            'meta_title' => 'InvoicePay terms of service for reminder subscriptions',
+            'description' => 'The InvoicePay trial is 14 days with no card. After that the price is $4.99 a month or $49.99 a year.',
         ],
         '/contact' => [
             'title' => 'Contact',
             'slug' => 'contact',
-            'meta_title' => 'Contact ReceiptGrid about billing or your account',
-            'description' => 'Email support@invcpay.com for ReceiptGrid Invoicing sales, billing, or account questions.',
+            'meta_title' => 'Contact InvoicePay about billing or your account',
+            'description' => 'Email support@invcpay.com for InvoicePay sales, billing, or account questions.',
         ],
         '/support' => [
             'title' => 'Support',
             'slug' => 'support',
-            'meta_title' => 'ReceiptGrid help for reminders, billing, and sign-in',
-            'description' => 'Get ReceiptGrid help from the on-page button or support@invcpay.com. Include your account email and plan name for billing questions.',
+            'meta_title' => 'InvoicePay help for reminders, billing, and sign-in',
+            'description' => 'Get InvoicePay help from the on-page button or support@invcpay.com. Include your account email and plan name for billing questions.',
         ],
         '/security' => [
             'title' => 'Data Security',
             'slug' => 'security',
-            'meta_title' => 'How ReceiptGrid protects passwords and invoice data',
-            'description' => 'ReceiptGrid stores passwords as hashes and sends checkout through Stripe. Customer card numbers are not stored in ReceiptGrid.',
+            'meta_title' => 'How InvoicePay protects passwords and invoice data',
+            'description' => 'InvoicePay stores passwords as hashes and sends checkout through Stripe. Customer card numbers are not stored in InvoicePay.',
         ],
         '/refunds' => [
             'title' => 'Refund and cancellation policy',
             'slug' => 'refunds',
-            'meta_title' => 'ReceiptGrid refund and cancellation policy details',
-            'description' => 'The ReceiptGrid trial needs no card. After you subscribe you can cancel anytime, and access lasts through the period already paid.',
+            'meta_title' => 'InvoicePay refund and cancellation policy details',
+            'description' => 'The InvoicePay trial needs no card. After you subscribe you can cancel anytime, and access lasts through the period already paid.',
         ],
     ];
 
@@ -422,6 +426,11 @@ final class App
             if ($user && password_verify($password, $user['password_hash'])) {
                 $_SESSION['user_id'] = (int) $user['id'];
                 Http::setTheme('light');
+                $this->loadUser();
+                $plan = $this->rememberedPlan(false);
+                if ($plan) {
+                    $this->beginCheckout($plan);
+                }
                 Http::redirect($next ?: '/app');
             }
             $error = 'Invalid email or password.';
@@ -493,14 +502,14 @@ final class App
 
     private function deliverReset(string $email, string $url): void
     {
-        $body = "Reset your ReceiptGrid password\n\n"
+        $body = "Reset your InvoicePay password\n\n"
             . "We received a request to reset the password for this account.\n\n"
             . "Open this link within 1 hour:\n{$url}\n\n"
             . "If you didn't request this, you can ignore this message.\n";
         $sent = false;
         if (Mailer::configured()) {
             try {
-                Mailer::send($email, 'Reset your ReceiptGrid password', $body);
+                Mailer::send($email, 'Reset your InvoicePay password', $body);
                 $sent = true;
             } catch (Throwable $e) {
                 $sent = false;
@@ -513,7 +522,11 @@ final class App
 
     private function signup(): void
     {
+        $plan = $this->rememberedPlan(true);
         if (!empty($_SESSION['user_id'])) {
+            if ($plan) {
+                $this->beginCheckout($plan);
+            }
             Http::redirect('/app');
         }
         $error = null;
@@ -548,6 +561,11 @@ final class App
                         );
                         $this->db->commit();
                         $_SESSION['user_id'] = $uid;
+                        $this->loadUser();
+                        $chosen = $this->rememberedPlan(false);
+                        if ($chosen) {
+                            $this->beginCheckout($chosen);
+                        }
                         Http::redirect('/app');
                     }
                 } catch (Throwable $e) {
@@ -558,7 +576,12 @@ final class App
                 }
             }
         }
-        $this->view('signup', ['error' => $error]);
+        $this->view('signup', [
+            'error' => $error,
+            'plan' => $plan,
+            'plan_label' => $plan ? (Billing::PLANS[$plan]['name'] . ' — ' . Billing::PLANS[$plan]['amount_label']) : '',
+            'payments_ready' => Billing::config()['enabled'],
+        ]);
     }
 
     private function apiResetDatabase(): void
@@ -920,7 +943,7 @@ final class App
             'amount_due' => Db::money(Db::invoiceBalance($inv)),
             'due_date' => $inv['due_date'],
             'status' => $inv['status'],
-            'business_name' => $settings['business_name'] ?? 'ReceiptGrid',
+            'business_name' => $settings['business_name'] ?? 'InvoicePay',
         ];
         $created = 0;
         $ins = $this->db->prepare(
@@ -1218,7 +1241,7 @@ final class App
         $now = Db::now();
         if ($channel === 'sms') {
             if (!Workspace::allowsSms(Workspace::effectivePlan($settings))) {
-                Http::json(['error' => 'SMS reminders are included on the paid ReceiptGrid plan ($4.99/month or $49.99/year).'], 403);
+                Http::json(['error' => 'SMS reminders are included on the paid InvoicePay plan ($4.99/month or $49.99/year).'], 403);
             }
             Db::log($this->db, 'reminder', "SMS stub (not wired yet) for {$r['number']} to " . ($r['phone'] ?: $r['client_name']), 'reminder', $id, $wid);
             $this->db->prepare('UPDATE reminders SET status=?, sent_at=? WHERE id=?')->execute(['sent', $now, $id]);
@@ -1315,7 +1338,7 @@ final class App
             'amount_due' => Db::money(Db::invoiceBalance($inv)),
             'due_date' => $inv['due_date'],
             'status' => $inv['status'],
-            'business_name' => $settings['business_name'] ?? 'ReceiptGrid',
+            'business_name' => $settings['business_name'] ?? 'InvoicePay',
         ];
         $subject = Db::renderVars($tmpl['subject'] ?? 'Final notice', $ctx);
         $body = Db::renderVars($tmpl['body'] ?? 'Final notice', $ctx);
@@ -1399,39 +1422,46 @@ final class App
         $this->apiGetSettings($wid);
     }
 
-    private function apiBillingStatus(int $wid): void
+    private function rememberedPlan(bool $fromRequest): ?string
     {
-        $cfg = Billing::config();
-        $settings = Workspace::settings($this->db, $wid);
-        $plans = [];
-        foreach (Billing::PLANS as $key => $meta) {
-            $plans[$key] = ['name' => $meta['name'], 'amount_label' => $meta['amount_label']];
+        if ($fromRequest && (array_key_exists('plan', $_GET) || array_key_exists('plan', $_POST))) {
+            $raw = strtolower(trim((string) ($_POST['plan'] ?? $_GET['plan'] ?? '')));
+            if (isset(Billing::PLANS[$raw])) {
+                $_SESSION['signup_plan'] = $raw;
+            } else {
+                unset($_SESSION['signup_plan']);
+            }
         }
-        Http::json([
-            'enabled' => $cfg['enabled'],
-            'publishable_key' => $cfg['publishable_key'],
-            'plan' => $settings['plan'] ?? 'trial',
-            'trial_ends_on' => $settings['trial_ends_on'] ?? null,
-            'has_customer' => !empty($settings['stripe_customer_id']),
-            'plans' => $plans,
-        ]);
+        $plan = strtolower(trim((string) ($_SESSION['signup_plan'] ?? '')));
+        return isset(Billing::PLANS[$plan]) ? $plan : null;
     }
 
-    private function apiBillingCheckout(int $wid): void
+    private function isAdminUser(): bool
     {
-        $data = Http::bodyJson();
-        $plan = strtolower(trim((string) ($data['plan'] ?? '')));
+        return strtolower((string) ($GLOBALS['inpmnt_user']['role'] ?? '')) === 'admin';
+    }
+
+    /** @return array{url?:string,error?:string,admin_error?:string} */
+    private function checkoutResult(int $wid, string $plan): array
+    {
         if (!isset(Billing::PLANS[$plan])) {
-            Http::json(['error' => 'Unknown plan. Use monthly or yearly.'], 400);
+            return ['error' => 'Unknown plan. Use monthly or yearly.'];
         }
         $cfg = Billing::config();
         if (!$cfg['enabled']) {
-            Http::json(['error' => 'Stripe is not configured. Add keys and price IDs to .env (see .env.example).', 'demo' => true], 503);
+            $out = ['error' => Billing::CUSTOMER_SETUP];
+            if ($this->isAdminUser()) {
+                $out['admin_error'] = Billing::adminSetupMessage();
+            }
+            return $out;
         }
         $settings = Workspace::settings($this->db, $wid);
         $user = $this->db->prepare('SELECT * FROM users WHERE id = ?');
-        $user->execute([(int) $_SESSION['user_id']]);
+        $user->execute([(int) ($_SESSION['user_id'] ?? 0)]);
         $u = $user->fetch();
+        if (!$u) {
+            return ['error' => 'Sign in again, then choose a plan.'];
+        }
         try {
             $sess = Billing::createCheckout([
                 'plan' => $plan,
@@ -1441,17 +1471,133 @@ final class App
                 'workspace_id' => $wid,
             ]);
         } catch (Throwable $e) {
-            Http::json(['error' => $e->getMessage()], 400);
+            error_log('[InvoicePay] Stripe checkout failed: ' . $e->getMessage());
+            $out = ['error' => 'We could not start checkout. Please try again, or email support@invcpay.com.'];
+            if ($this->isAdminUser()) {
+                $out['admin_error'] = 'Stripe said: ' . $e->getMessage();
+            }
+            return $out;
+        }
+        $url = (string) ($sess['url'] ?? '');
+        if ($url === '') {
+            error_log('[InvoicePay] Stripe checkout returned no URL');
+            return ['error' => 'We could not start checkout. Please try again, or email support@invcpay.com.'];
         }
         Db::log($this->db, 'billing', "Started Stripe checkout for {$plan}", 'settings', $wid, $wid);
-        Http::json(['url' => $sess['url'] ?? null, 'id' => $sess['id'] ?? null]);
+        unset($_SESSION['signup_plan']);
+        return ['url' => $url];
+    }
+
+    private function beginCheckout(string $plan): never
+    {
+        $wid = (int) ($GLOBALS['inpmnt_user']['workspace_id'] ?? 0);
+        $result = $this->checkoutResult($wid, $plan);
+        if (!empty($result['url'])) {
+            Http::redirect($result['url']);
+        }
+        $_SESSION['billing_notice'] = (string) ($result['error'] ?? Billing::CUSTOMER_SETUP);
+        if (!empty($result['admin_error'])) {
+            $_SESSION['billing_admin_notice'] = (string) $result['admin_error'];
+        }
+        Http::redirect('/app#/billing');
+    }
+
+    private function billingCheckoutForm(): never
+    {
+        $this->requireLogin();
+        $token = (string) ($_POST['csrf'] ?? '');
+        $need = Http::csrfToken();
+        if ($token === '' || !hash_equals($need, $token)) {
+            $_SESSION['billing_notice'] = 'That page expired. Choose a plan again.';
+            Http::redirect('/pricing');
+        }
+        $plan = strtolower(trim((string) ($_POST['plan'] ?? '')));
+        if (!isset(Billing::PLANS[$plan])) {
+            $_SESSION['billing_notice'] = 'Unknown plan. Use monthly or yearly.';
+            Http::redirect('/app#/billing');
+        }
+        $this->beginCheckout($plan);
+    }
+
+    private function billingStubCheckout(): never
+    {
+        if (Env::get('STRIPE_STUB') !== '1') {
+            http_response_code(404);
+            echo 'Not found';
+            exit;
+        }
+        $plan = Http::e((string) ($_GET['plan'] ?? ''));
+        $portal = isset($_GET['portal']);
+        header('Content-Type: text/html; charset=utf-8');
+        echo '<!DOCTYPE html><title>Checkout</title><p>'
+            . ($portal ? 'Billing portal stub. No charge was made.' : 'Stripe Checkout stub for ' . $plan . '. No charge was made.')
+            . '</p>';
+        exit;
+    }
+
+    private function apiBillingStatus(int $wid): void
+    {
+        $cfg = Billing::config();
+        $settings = Workspace::settings($this->db, $wid) ?: [];
+        $plans = [];
+        foreach (Billing::PLANS as $key => $meta) {
+            $plans[$key] = [
+                'name' => $meta['name'],
+                'amount_label' => $meta['amount_label'],
+                'button' => $key === 'yearly' ? 'Subscribe yearly — $49.99' : 'Subscribe monthly — $4.99',
+            ];
+        }
+        $plan = (string) ($settings['plan'] ?? 'trial');
+        if ($plan === '') {
+            $plan = 'trial';
+        }
+        $subscribed = in_array($plan, Billing::PAID_PLANS, true);
+        $trialEnds = $settings['trial_ends_on'] ?? null;
+        $payload = [
+            'enabled' => $cfg['enabled'],
+            'publishable_key' => $cfg['publishable_key'],
+            'plan' => $plan,
+            'trial_ends_on' => $trialEnds,
+            'days_left' => Billing::daysLeft(is_string($trialEnds) ? $trialEnds : null),
+            'has_customer' => !empty($settings['stripe_customer_id']),
+            'subscribed' => $subscribed,
+            'plans' => $plans,
+            'customer_notice' => $cfg['enabled'] ? '' : Billing::CUSTOMER_SETUP,
+        ];
+        if ($this->isAdminUser() && !$cfg['enabled']) {
+            $payload['admin_notice'] = Billing::adminSetupMessage();
+        }
+        Http::json($payload);
+    }
+
+    private function apiBillingCheckout(int $wid): void
+    {
+        $data = Http::bodyJson();
+        $plan = strtolower(trim((string) ($data['plan'] ?? '')));
+        $result = $this->checkoutResult($wid, $plan);
+        if (!empty($result['url'])) {
+            Http::json(['url' => $result['url']]);
+        }
+        $status = isset(Billing::PLANS[$plan]) && !Billing::config()['enabled'] ? 503 : 400;
+        $body = ['error' => $result['error'] ?? 'We could not start checkout. Please try again, or email support@invcpay.com.'];
+        if (!empty($result['admin_error'])) {
+            $body['admin_error'] = $result['admin_error'];
+        }
+        if ($status === 503) {
+            $body['demo'] = true;
+        }
+        Http::json($body, $status);
     }
 
     private function apiBillingPortal(int $wid): void
     {
         $cfg = Billing::config();
         if (!$cfg['enabled']) {
-            Http::json(['error' => 'Stripe is not configured.'], 503);
+            $body = ['error' => Billing::CUSTOMER_SETUP];
+            if ($this->isAdminUser()) {
+                $body['admin_error'] = Billing::adminSetupMessage();
+            }
+            Http::json($body, 503);
         }
         $settings = Workspace::settings($this->db, $wid);
         if (!$settings || empty($settings['stripe_customer_id'])) {
@@ -1460,7 +1606,12 @@ final class App
         try {
             $sess = Billing::createPortal($settings['stripe_customer_id']);
         } catch (Throwable $e) {
-            Http::json(['error' => $e->getMessage()], 400);
+            error_log('[InvoicePay] Stripe portal failed: ' . $e->getMessage());
+            $body = ['error' => 'We could not open billing. Please try again, or email support@invcpay.com.'];
+            if ($this->isAdminUser()) {
+                $body['admin_error'] = 'Stripe said: ' . $e->getMessage();
+            }
+            Http::json($body, 400);
         }
         Http::json(['url' => $sess['url'] ?? null]);
     }
@@ -1477,7 +1628,7 @@ final class App
             } catch (Throwable) {
             }
         }
-        Http::redirect('/app#/settings');
+        Http::redirect('/app#/billing');
     }
 
     private function stripeWebhook(): void

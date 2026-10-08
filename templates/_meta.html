@@ -1,8 +1,11 @@
   <title>{{ meta_title }}</title>
+  <meta name="application-name" content="InvoicePay" />
+  <meta name="apple-mobile-web-app-title" content="InvoicePay" />
+  <link rel="manifest" href="{{ url_for('static', filename='manifest.webmanifest') }}" />
   <meta name="description" content="{{ meta_description }}" />
   <link rel="canonical" href="{{ canonical_url }}" />
   <meta property="og:type" content="website" />
-  <meta property="og:site_name" content="ReceiptGrid Invoicing" />
+  <meta property="og:site_name" content="InvoicePay" />
   <meta property="og:title" content="{{ meta_title }}" />
   <meta property="og:description" content="{{ meta_description }}" />
   <meta property="og:url" content="{{ canonical_url }}" />

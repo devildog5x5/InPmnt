@@ -1,21 +1,21 @@
-# ReceiptGrid
+# InvoicePay
 
 **Get paid without the chase.**
 
 Invoice chase + payment reminders for solo trades and freelancers. Built by **Robert Foster**.
 
-ReceiptGrid helps plumbers, landscapers, photographers, and consultants stop losing cash to late invoices: track open balances, auto-queue polite reminders, send final notices, and record payments — without a full accounting suite.
+InvoicePay helps plumbers, landscapers, photographers, and consultants stop losing cash to late invoices: track open balances, auto-queue polite reminders, send final notices, and record payments — without a full accounting suite.
 
 ## Downloads
 
-Packages for **v1.6.3** are on the [v1.6.3 release](https://github.com/devildog5x5/InPmnt/releases/tag/v1.6.3). The GitHub repo name stays `InPmnt` until Robert renames it. Rebuild locally with `powershell -File .\build_release.ps1` → `installers\`.
+Packages for **v1.6.4** are on the [v1.6.4 release](https://github.com/devildog5x5/InPmnt/releases/tag/v1.6.4). The GitHub repo name stays `InPmnt` until Robert renames it. Rebuild locally with `powershell -File .\build_release.ps1` → `installers\`.
 
 | Package | What you get | Download |
 |---------|----------------|----------|
-| **PHP (Hostinger)** | Unzip into `public_html` — no VPS | [invcpay-v1.6.3.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.6.3/invcpay-v1.6.3.zip) |
-| **Portable** | Runnable Windows app — `install.ps1` or `start.ps1` | [ReceiptGrid-Portable.v1.6.3.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.6.3/ReceiptGrid-Portable.v1.6.3.zip) |
-| **Source** | Full source (Python + PHP + Docker) | [ReceiptGrid-Source.v1.6.3.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.6.3/ReceiptGrid-Source.v1.6.3.zip) |
-| **Icon** | Brand icon assets (blue / teal / violet) | [ReceiptGrid-Icon.v1.6.3.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.6.3/ReceiptGrid-Icon.v1.6.3.zip) |
+| **PHP (Hostinger)** | Unzip into `public_html` — no VPS | [invcpay-v1.6.4.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.6.4/invcpay-v1.6.4.zip) |
+| **Portable** | Runnable Windows app — `install.ps1` or `start.ps1` | [ReceiptGrid-Portable.v1.6.4.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.6.4/ReceiptGrid-Portable.v1.6.4.zip) |
+| **Source** | Full source (Python + PHP + Docker) | [ReceiptGrid-Source.v1.6.4.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.6.4/ReceiptGrid-Source.v1.6.4.zip) |
+| **Icon** | Brand icon assets (blue / teal / violet) | [ReceiptGrid-Icon.v1.6.4.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.6.4/ReceiptGrid-Icon.v1.6.4.zip) |
 - Sign up: `/signup` · Local demo (optional): set `SHOW_DEMO_LOGIN=1` then `demouser@inpmnt.app` / `Demo`
 - App URL (local): `https://127.0.0.1:5055` (self-signed cert; accept the browser warning)
 - Rebuild locally: `powershell -File .\build_release.ps1` → `installers\*.zip`
@@ -108,9 +108,9 @@ Production TLS (Let's Encrypt / IIS) is handled by nginx or IIS in front of the 
 
 ## Hostinger (PHP — shared hosting)
 
-ReceiptGrid now ships a **PHP** build you can drop on Hostinger Web/Cloud (no VPS).
+InvoicePay now ships a **PHP** build you can drop on Hostinger Web/Cloud (no VPS).
 
-1. Download [invcpay-v1.6.3.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.6.3/invcpay-v1.6.3.zip).
+1. Download [invcpay-v1.6.4.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.6.4/invcpay-v1.6.4.zip).
 2. In hPanel → **Files → File Manager** (or FTP), unzip **all files into `public_html`**.
 3. Copy `.env.example` → `.env`. Set `APP_SECRET` (long random string) and `BASE_URL=https://yourdomain.com`.
 4. hPanel → **Advanced → PHP Configuration**: PHP **8.2+**, enable **pdo_sqlite**.
@@ -132,7 +132,7 @@ Use **invcpay-vX.Y.Z.zip** on Hostinger Web/Cloud (unzip into `public_html`). Th
 
 ## Docker (Linux container)
 
-Runs ReceiptGrid with **Gunicorn** on Linux inside Docker — good for a VPS/VM.
+Runs InvoicePay with **Gunicorn** on Linux inside Docker — good for a VPS/VM.
 
 ```bash
 # On a machine with Docker installed:
@@ -171,14 +171,14 @@ powershell -ExecutionPolicy Bypass -File .\deploy\setup-windows.ps1 -Domain your
 
 ## Stripe billing
 
-ReceiptGrid Invoicing uses **Stripe Checkout** and the Customer Portal. The customer picks **$4.99/month** or **$49.99/year** (same features; yearly saves $9.89 versus $4.99 × 12). The 14-day trial does not require a card. Email reminders are in the trial. SMS and unlimited open invoices are included after you subscribe.
+InvoicePay uses **Stripe Checkout** and the Customer Portal. The customer picks **$4.99/month** or **$49.99/year** (same features; yearly saves $9.89 versus $4.99 × 12). The 14-day trial does not require a card. Email reminders are in the trial. SMS and unlimited open invoices are included after you subscribe.
 
 Create one product in the [Stripe Dashboard](https://dashboard.stripe.com/products):
 
 | Field | Value |
 |---|---|
-| Product name | `ReceiptGrid Invoicing` |
-| Statement descriptor | `RECEIPTGRID` (5–22 characters; set on the product, not in this repo) |
+| Product name | `InvoicePay` |
+| Statement descriptor | `INVOICEPAY` (5–22 characters; set on the product, not in this repo) |
 
 Then create two **recurring** prices on that product and paste the price IDs into `.env` (Hostinger: `public_html/.env`):
 
@@ -191,9 +191,9 @@ Also set `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET` 
 
 Leave `STRIPE_PRICE_STARTER`, `STRIPE_PRICE_PRO`, and `STRIPE_PRICE_ANNUAL` only if existing subscribers are still billed on the old prices ($10/month, $20/month, $100/year). Those keys are not shown as purchase options. Do not point them at the new $4.99 or $49.99 prices.
 
-Set `MAIL_FROM_NAME=ReceiptGrid` so password-reset mail uses the new name. The env key name itself does not change.
+Set `MAIL_FROM_NAME=InvoicePay` so password-reset mail uses the new name. The env key name itself does not change.
 
-Without keys, the app still runs in demo/trial mode.
+Without those keys, Subscribe stays on the pricing cards and the Billing page and tells customers that payments are being set up (support@invcpay.com). Admins see which keys in `public_html/.env` are missing or still placeholders.
 
 ## Features
 
@@ -209,11 +209,11 @@ Without keys, the app still runs in demo/trial mode.
 
 ## Product
 
-**Official product name: ReceiptGrid Invoicing.** The shared brand is ReceiptGrid. Tagline: *Get paid without the chase.* The live site stays at invcpay.com.
+**Official product name: InvoicePay.** Tagline: *Get paid without the chase.* The live site stays at invcpay.com. receiptgrid.pro is a separate receipts product and is not named on this site.
 
 | | |
 |---|---|
-| Brand | **ReceiptGrid** |
+| Brand | **InvoicePay** |
 | Tagline | Get paid without the chase |
 | Author | Robert Foster |
 | Icon | `static/img/inpmnt-icon.png` |

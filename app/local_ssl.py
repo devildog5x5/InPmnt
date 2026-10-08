@@ -32,7 +32,7 @@ def ensure_local_certs(
     subject = issuer = x509.Name(
         [
             x509.NameAttribute(NameOID.COUNTRY_NAME, "US"),
-            x509.NameAttribute(NameOID.ORGANIZATION_NAME, "ReceiptGrid Local"),
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, "InvoicePay Local"),
             x509.NameAttribute(NameOID.COMMON_NAME, "localhost"),
         ]
     )
@@ -78,7 +78,7 @@ def ensure_local_certs(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Generate or replace the local ReceiptGrid HTTPS certificate."
+        description="Generate or replace the local InvoicePay HTTPS certificate."
     )
     parser.add_argument(
         "--force",

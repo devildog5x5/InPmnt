@@ -1,9 +1,9 @@
 <nav class="landing-nav site-nav" aria-label="Main">
   <a class="brand" href="{{ url_for('main.app_home') if nav_logged_in else url_for('main.landing') }}">
-    <div class="brand-logo img"><img src="{{ url_for('static', filename='img/inpmnt-icon.png') }}" width="42" height="42" alt="ReceiptGrid logo" /></div>
+    <div class="brand-logo img"><img src="{{ url_for('static', filename='img/inpmnt-icon.png') }}" width="42" height="42" alt="InvoicePay logo" /></div>
     <div class="brand-copy">
-      <div class="brand-mark">ReceiptGrid</div>
-      <div class="brand-sub">Invoicing</div>
+      <div class="brand-mark">InvoicePay</div>
+      <div class="brand-sub">Get paid</div>
     </div>
   </a>
   <div class="nav-actions">
@@ -14,6 +14,7 @@
     <a href="{{ url_for('main.app_home') }}#/clients">Clients</a>
     <a href="{{ url_for('main.app_home') }}#/templates">Templates</a>
     <a href="{{ url_for('main.app_home') }}#/settings">Settings</a>
+    <a href="{{ url_for('main.app_home') }}#/billing">Billing</a>
     <a href="{{ url_for('main.legal', slug='support') }}">Help</a>
     <a href="{{ url_for('main.legal', slug='contact') }}">Contact</a>
     <a href="{{ url_for('main.legal', slug='privacy') }}">Privacy</a>

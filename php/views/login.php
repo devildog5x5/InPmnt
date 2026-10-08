@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="csrf-token" content="<?= Http::e(Http::csrfToken()) ?>" />
   <?php
-    $meta_title = 'Log in to ReceiptGrid to manage invoice reminders';
-    $meta_description = 'Sign in to ReceiptGrid to track unpaid invoices and send payment reminders to clients.';
+    $meta_title = 'Log in to InvoicePay to manage invoice reminders';
+    $meta_description = 'Sign in to InvoicePay to track unpaid invoices and send payment reminders to clients.';
     $meta_robots = 'noindex, nofollow';
     require __DIR__ . '/_meta.php';
   ?>
@@ -19,11 +19,11 @@
     <div class="auth-card">
       <div class="auth-brand">
         <div class="brand-logo img">
-          <img src="/static/img/inpmnt-icon.png" width="42" height="42" alt="ReceiptGrid logo" />
+          <img src="/static/img/inpmnt-icon.png" width="42" height="42" alt="InvoicePay logo" />
         </div>
         <div>
-          <div class="brand-mark" style="color:var(--ink);font-size:1.35rem">ReceiptGrid</div>
-          <div class="brand-sub" style="color:var(--muted)">Invoicing</div>
+          <div class="brand-mark" style="color:var(--ink);font-size:1.35rem">InvoicePay</div>
+          <div class="brand-sub" style="color:var(--muted)">Get paid</div>
         </div>
       </div>
       <h1>Welcome back</h1>

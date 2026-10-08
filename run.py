@@ -1,4 +1,4 @@
-"""Run ReceiptGrid locally (HTTPS by default with a self-signed cert)."""
+"""Run InvoicePay locally (HTTPS by default with a self-signed cert)."""
 import os
 from pathlib import Path
 

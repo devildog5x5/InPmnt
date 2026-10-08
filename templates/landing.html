@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  {% set meta_title = "ReceiptGrid Invoicing — Get paid without the chase" %}
-  {% set meta_description = "ReceiptGrid Invoicing sends automated invoice reminders so small businesses collect overdue payments. 14-day trial, no credit card. Then $4.99 a month or $49.99 a year." %}
+  {% set meta_title = "InvoicePay — Get paid without the chase" %}
+  {% set meta_description = "InvoicePay sends automated invoice reminders so small businesses collect overdue payments. 14-day trial, no credit card. Then $4.99 a month or $49.99 a year." %}
   {% include "_meta.html" %}
   <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/inpmnt-icon.png') }}" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -65,7 +65,7 @@
   <section class="trust-strip" aria-label="Security and trial">
     <ul>
       <li>Secure checkout through Stripe</li>
-      <li>Your customers’ card details are not stored by ReceiptGrid</li>
+      <li>Your customers’ card details are not stored by InvoicePay</li>
       <li>Cancel anytime</li>
       <li>14-day trial</li>
     </ul>
@@ -164,7 +164,10 @@
           <li>Dashboard and aging</li>
           <li>Custom templates</li>
         </ul>
-        <a class="btn secondary" href="{{ url_for('main.signup') }}">Start free trial</a>
+        <div class="price-actions">
+          <a class="btn" href="{{ url_for('main.signup', plan='monthly') }}">Subscribe monthly — $4.99</a>
+          <a class="btn secondary" href="{{ url_for('main.signup', plan='') }}">Start free trial</a>
+        </div>
       </article>
       <article class="price-card featured">
         <div class="popular">Save $9.89 a year</div>
@@ -177,15 +180,17 @@
           <li>Email and SMS reminders</li>
           <li>One payment for the year</li>
         </ul>
-        <a class="btn" href="{{ url_for('main.signup') }}">Start free trial</a>
+        <div class="price-actions">
+          <a class="btn" href="{{ url_for('main.signup', plan='yearly') }}">Subscribe yearly — $49.99</a>
+          <a class="btn secondary" href="{{ url_for('main.signup', plan='') }}">Start free trial</a>
+        </div>
       </article>
     </div>
     <p class="sub pricing-note">
-      {% if stripe_enabled %}
-      Paid plans use secure checkout through Stripe. ReceiptGrid does not store your customers’ card details.
-      {% else %}
-      Stripe keys are not configured yet — the trial still opens without a card. Add keys from <code>.env.example</code> before charging cards.
+      {% if not stripe_enabled %}
+      Payments are being set up, please contact support@invcpay.com
       {% endif %}
+      Paid plans use secure checkout through Stripe. InvoicePay does not store your customers’ card details.
       Cancel anytime. Yearly is $49.99 (same features as monthly): save $9.89 versus $4.99 × 12.
     </p>
   </section>
@@ -194,11 +199,11 @@
     <div class="footer-brand">
       <div class="brand">
         <div class="brand-logo img">
-          <img src="{{ url_for('static', filename='img/inpmnt-icon.png') }}" width="42" height="42" alt="ReceiptGrid logo" />
+          <img src="{{ url_for('static', filename='img/inpmnt-icon.png') }}" width="42" height="42" alt="InvoicePay logo" />
         </div>
         <div class="brand-copy">
-          <div class="brand-mark">ReceiptGrid</div>
-          <div class="brand-sub">Invoicing</div>
+          <div class="brand-mark">InvoicePay</div>
+          <div class="brand-sub">Get paid</div>
         </div>
       </div>
       <p>Automated invoice reminders that help service businesses get paid without the chase.</p>
@@ -218,7 +223,7 @@
       <a href="{{ url_for('main.legal', slug='refunds') }}">Refund and cancellation</a>
     </div>
     <div class="footer-meta">
-      <p class="site-version" id="site-version">ReceiptGrid v{{ app_version }}</p>
+      <p class="site-version" id="site-version">InvoicePay v{{ app_version }}</p>
       <p>© 2026 Robert Foster</p>
       <p>Support: <a href="mailto:support@invcpay.com">support@invcpay.com</a></p>
       {% if show_demo_login %}

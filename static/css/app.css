@@ -125,6 +125,25 @@ button { font-family: var(--font-body); }
   grid-template-columns: 268px 1fr;
   min-height: 100vh;
 }
+.app-column { min-width: 0; display: flex; flex-direction: column; }
+.trial-banner-host { padding: 16px 36px 0; }
+.trial-banner-host a {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: var(--brand-fill, #056a64);
+  color: #fff;
+  font-weight: 700;
+  text-decoration: none;
+}
+.trial-banner-host a:hover,
+.trial-banner-host a:focus {
+  background: var(--brand-fill-hover, #034e49);
+  color: #fff;
+}
 
 /* ---------- Sidebar ---------- */
 .sidebar {
@@ -774,6 +793,7 @@ html[data-theme="dark"] .pw-toggle { color: #7fd4cf; }
     padding: 8px 10px;
   }
   .main { padding: 18px 14px 40px; }
+  .trial-banner-host { padding: 12px 14px 0; }
   .grid-kpi, .form-grid, .form-grid.three, .line-row { grid-template-columns: 1fr; }
   .topbar {
     flex-direction: column;
@@ -782,7 +802,7 @@ html[data-theme="dark"] .pw-toggle { color: #7fd4cf; }
   }
 }
 
-/* ---------- ReceiptGrid extras ---------- */
+/* ---------- InvoicePay extras ---------- */
 .brand-logo.img {
   padding: 0;
   overflow: hidden;
@@ -1225,6 +1245,34 @@ html[data-theme="dark"] .legal-page h1 { color: var(--ink); }
 .pricing-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .price-card { display: flex; flex-direction: column; position: relative; }
 .price-card .btn { width: 100%; text-align: center; margin-top: auto; text-decoration: none; }
+.price-actions { display: flex; flex-direction: column; gap: 8px; margin-top: auto; }
+.price-actions .btn,
+.price-actions form,
+.price-actions button { width: 100%; margin-top: 0; }
+.pay-setup {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #fff6e8;
+  color: #5c4308;
+  border: 1px solid #e6d3a4;
+  font-weight: 650;
+}
+.pay-setup.admin {
+  background: #fdecec;
+  color: #7a1f1a;
+  border-color: #f0c2bf;
+}
+html[data-theme="dark"] .pay-setup {
+  background: #3a2e14;
+  color: #ffe7b0;
+  border-color: #8a6a2a;
+}
+html[data-theme="dark"] .pay-setup.admin {
+  background: #3a1c1c;
+  color: #ffd0cb;
+  border-color: #8a3a34;
+}
 .plan-save { min-height: 2.6em; margin: 0 0 10px; color: #425466; font-size: 0.88rem; }
 .popular {
   position: absolute;

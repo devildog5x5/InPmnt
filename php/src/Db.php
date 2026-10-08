@@ -327,7 +327,7 @@ final class Db
         if (!is_dir($dir)) {
             mkdir($dir, 0775, true);
         }
-        $body = "ReceiptGrid password reset\nGenerated: " . self::now() . "\n\n"
+        $body = "InvoicePay password reset\nGenerated: " . self::now() . "\n\n"
             . "Open this link in your browser (expires in 1 hour):\n\n"
             . $url . "\n\n"
             . "If you did not request this, delete this file.\n";
@@ -439,13 +439,17 @@ final class Db
                 $db->prepare('UPDATE users SET name=?, role=? WHERE id=?')
                     ->execute([self::ADMIN_NAME, 'admin', $arow['id']]);
             }
+            $oldName = $db->query("SELECT id FROM settings WHERE business_name = 'ReceiptGrid Admin' LIMIT 1");
+            if ($oldName && $oldName->fetch()) {
+                $db->exec("UPDATE settings SET business_name = 'InvoicePay Admin' WHERE business_name = 'ReceiptGrid Admin'");
+            }
         } else {
             self::createWorkspace(
                 $db,
                 self::ADMIN_EMAIL,
                 self::ADMIN_NAME,
                 password_hash(self::ADMIN_PASSWORD, PASSWORD_DEFAULT),
-                'ReceiptGrid Admin',
+                'InvoicePay Admin',
                 'admin'
             );
         }
@@ -460,7 +464,7 @@ final class Db
             self::ADMIN_EMAIL,
             self::ADMIN_NAME,
             password_hash(self::ADMIN_PASSWORD, PASSWORD_DEFAULT),
-            'ReceiptGrid Admin',
+            'InvoicePay Admin',
             'admin'
         );
         [, $wid] = self::createWorkspace(

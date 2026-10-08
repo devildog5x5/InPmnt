@@ -83,13 +83,13 @@ final class HelpChat
         }
         $low = strtolower($msg);
         if (preg_match('/price|cost|plan|month|year|annual|19|39|99|billing|subscribe|stripe/', $low)) {
-            return 'ReceiptGrid Invoicing is $4.99/month or $49.99/year. You pick either one. The 14-day trial does not need a card. You can switch later from Billing. Email ' . $em . '.';
+            return 'InvoicePay is $4.99/month or $49.99/year. You pick either one. The 14-day trial does not need a card. You can switch later from Billing. Email ' . $em . '.';
         }
         if (preg_match('/login|password|sign in|forgot|reset/', $low)) {
             return 'Sign in at /login. Forgot password is at /forgot-password — it emails a reset link when mail is configured. For a person, email ' . $em . '.';
         }
         if (preg_match('/invoice|remind|chase|client|unpaid|schedule/', $low)) {
-            return 'In the app, add unpaid invoices and set polite reminder schedules. ReceiptGrid emails clients so you spend less time chasing late payers.';
+            return 'In the app, add unpaid invoices and set polite reminder schedules. InvoicePay emails clients so you spend less time chasing late payers.';
         }
         if (preg_match('/trial|free|signup|sign up/', $low)) {
             return 'Start a free trial at /signup. You can subscribe anytime from Billing or the landing page plans.';
@@ -97,7 +97,7 @@ final class HelpChat
         if (preg_match('/admin|owner/', $low)) {
             return 'Workspace admins can open /admin after signing in. That console is for owners only.';
         }
-        return 'ReceiptGrid helps you chase unpaid invoices with scheduled reminders. Ask about plans, login, or reminders — or email ' . $em . '.';
+        return 'InvoicePay helps you chase unpaid invoices with scheduled reminders. Ask about plans, login, or reminders — or email ' . $em . '.';
     }
 
     public static function logPath(): string
@@ -183,13 +183,13 @@ final class HelpChat
     {
         $em = self::supportEmail();
         return <<<TXT
-You are the Help assistant for ReceiptGrid, an invoice chase / payment reminder app.
+You are the Help assistant for InvoicePay, an invoice chase / payment reminder app.
 Speak in short, plain sentences. Do not invent features or prices.
 
 Product facts:
-- Brand: ReceiptGrid Invoicing. Price: \$4.99/month or \$49.99/year (same features; yearly saves \$9.89 versus \$4.99 × 12). Email reminders are in the trial. SMS and unlimited open invoices are included once you subscribe.
+- Brand: InvoicePay. Price: \$4.99/month or \$49.99/year (same features; yearly saves \$9.89 versus \$4.99 × 12). Email reminders are in the trial. SMS and unlimited open invoices are included once you subscribe.
 - 14-day trial, no credit card required to start. A card is required only when subscribing. Plans can be changed later from Billing. Cancel anytime.
-- Stripe processes checkout. ReceiptGrid does not store customers' card details.
+- Stripe processes checkout. InvoicePay does not store customers' card details.
 - Sign up at /signup. Sign in at /login. Forgot password at /forgot-password.
 - In the app, paste unpaid invoices and schedule polite reminder emails to clients.
 - Workspace admin console at /admin for admin-role users.

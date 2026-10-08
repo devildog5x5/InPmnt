@@ -28,7 +28,7 @@ def send_email(*, to: str, subject: str, body: str, from_name: str | None = None
     if not mail_from:
         raise RuntimeError("MAIL_FROM is not set")
 
-    display = (from_name or os.environ.get("MAIL_FROM_NAME") or "ReceiptGrid").strip()
+    display = (from_name or os.environ.get("MAIL_FROM_NAME") or "InvoicePay").strip()
     from_header = f"{display} <{mail_from}>"
 
     resend_key = (os.environ.get("RESEND_API_KEY") or "").strip()

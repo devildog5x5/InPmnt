@@ -1,0 +1,16 @@
+{
+  "name": "InvoicePay",
+  "short_name": "InvoicePay",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f161c",
+  "theme_color": "#056a64",
+  "icons": [
+    {
+      "src": "/static/img/inpmnt-icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

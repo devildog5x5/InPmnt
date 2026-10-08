@@ -1,8 +1,8 @@
-# Deploy ReceiptGrid
+# Deploy InvoicePay
 
 **Direct doc:** https://github.com/devildog5x5/InPmnt/blob/main/deploy/DEPLOY.md
 
-ReceiptGrid is a **Python (Flask)** app for Windows/VPS, and a **PHP** app for Hostinger shared hosting (FTP into `public_html`).
+InvoicePay is a **Python (Flask)** app for Windows/VPS, and a **PHP** app for Hostinger shared hosting (FTP into `public_html`).
 
 | Platform | Recommended stack |
 |----------|-------------------|
@@ -38,7 +38,7 @@ Leave `SHOW_DEMO_LOGIN=0` on a public site. Point the domain at this Web hosting
 
 ## Docker (Linux VM)
 
-Easiest way to keep ReceiptGrid “just running” on a VM.
+Easiest way to keep InvoicePay “just running” on a VM.
 
 ### Hostinger (recommended)
 
@@ -105,7 +105,7 @@ This is the closest thing to “upload files via FTP” for **Python**. Hostinge
 ### Do not
 
 - FTP into `public_html` / `www` / `htdocs` like a PHP site. Apache will not execute this app.
-- Expect a zip drop alone to start ReceiptGrid. Python packages must be installed in the host’s virtualenv.
+- Expect a zip drop alone to start InvoicePay. Python packages must be installed in the host’s virtualenv.
 
 ### Steps
 
@@ -275,7 +275,7 @@ FLASK_SECRET_KEY=long-random-string
 BASE_URL=https://yourdomain.com
 STRIPE_SECRET_KEY=sk_live_...
 STRIPE_PUBLISHABLE_KEY=pk_live_...
-# $4.99 USD monthly and $49.99 USD yearly on product "ReceiptGrid Invoicing"
+# $4.99 USD monthly and $49.99 USD yearly on product "InvoicePay"
 STRIPE_PRICE_MONTHLY=price_...
 STRIPE_PRICE_YEARLY=price_...
 # Optional. Keep only for subscribers still on the old $10 / $20 / $100 prices.

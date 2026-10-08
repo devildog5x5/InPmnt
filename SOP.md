@@ -1,18 +1,18 @@
-# ReceiptGrid owner SOP
+# InvoicePay owner SOP
 
 Rules for the live site (https://invcpay.com/, PHP on Hostinger shared hosting). Deploy by unzipping `invcpay-vX.Y.Z.zip` into `public_html` with File Manager. There is no SSH. The zip has no `.env`, no `data/*.db`, and no GitHub or source links.
 
 ## Version
 
-- Show the software version as plain text in the **footer only**: `ReceiptGrid vX.Y.Z`.
+- Show the software version as plain text in the **footer only**: `InvoicePay vX.Y.Z`.
 - Do not put the version in the page `<title>` or in any heading (`h1`–`h6`). Search results should read as the page name, not a build number.
 - Keep `VERSION`, `php/VERSION`, `Http::VERSION`, and the comment at the top of `php/index.php` in lockstep. That comment is for a source text search, not a page heading.
 
 ## Brand
 
-- **ReceiptGrid** is the customer-facing name. Use **ReceiptGrid Invoicing** when a page needs to distinguish this product from the receipts app.
+- **InvoicePay** is the customer-facing name. receiptgrid.pro is a separate receipts product and must not be named on this site.
 - The public origin stays `https://invcpay.com`. Do not change canonical URLs to another domain.
-- The footer version stays `ReceiptGrid vX.Y.Z`.
+- The footer version stays `InvoicePay vX.Y.Z`.
 
 ## Canonical URL
 
@@ -24,7 +24,7 @@ Rules for the live site (https://invcpay.com/, PHP on Hostinger shared hosting).
 
 - Every page, including login, signup, forgot-password, reset-password, settings, and deep app sub-pages, shows the same main menu.
 - The menu links to the site’s activities so a visitor is never stuck: Home, Pricing, Reminders, Overdue invoices, Contractors, FAQ, Help, Contact, Privacy, Terms, Security, Refunds, Log in, and Start free trial.
-- Logged-in pages may use one logged-in variant (Dashboard, Reminders, Invoices, Clients, Templates, Settings, Help, Contact, the legal pages, Admin when the role is admin, Log out). That variant is the same on every logged-in page, including `/app` (settings and invoice sub-pages) and `/admin`.
+- Logged-in pages may use one logged-in variant (Dashboard, Reminder queue, Invoices, Clients, Templates, Settings, Billing, Help, Contact, the legal pages, Admin when the role is admin, Log out). That variant is the same on every logged-in page, including `/app` (settings, billing, and invoice sub-pages) and `/admin`. Billing is where a customer subscribes or opens the Stripe customer portal.
 
 ## Search files
 

@@ -29,8 +29,22 @@ async function api(path, options = {}) {
     throw new Error("Unauthorized");
   }
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || "Request failed");
+  if (!res.ok) {
+    const customer = data.error || "Request failed";
+    const admin = data.admin_error ? ` ${data.admin_error}` : "";
+    throw new Error(customer + admin);
+  }
   return data;
+}
+
+function esc(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (ch) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  }[ch]));
 }
 
 function setActiveNav(route) {
@@ -683,6 +697,116 @@ async function setTheme(mode) {
   await api("/api/theme", { method: "POST", body: JSON.stringify({ theme: mode }) });
 }
 
+function subscribeButtons(billing) {
+  const plans = billing.plans || {
+    monthly: { name: "Monthly", amount_label: "$4.99/mo", button: "Subscribe monthly — $4.99" },
+    yearly: { name: "Yearly", amount_label: "$49.99/yr", button: "Subscribe yearly — $49.99" },
+  };
+  return Object.entries(plans).map(([key, meta]) => {
+    const label = meta.button || `Subscribe ${meta.name.toLowerCase()} — ${meta.amount_label}`;
+    return `<button class="btn" type="button" data-plan="${esc(key)}">${esc(label)}</button>`;
+  }).join("");
+}
+
+function billingNotices(billing) {
+  const bits = [];
+  if (billing.customer_notice) {
+    bits.push(`<p class="pay-setup" role="status">${esc(billing.customer_notice)}</p>`);
+  }
+  if (billing.admin_notice) {
+    bits.push(`<p class="pay-setup admin" role="status">${esc(billing.admin_notice)}</p>`);
+  }
+  const boot = window.__INPMNT__?.billingNotice || "";
+  const bootAdmin = window.__INPMNT__?.billingAdminNotice || "";
+  if (boot && boot !== billing.customer_notice) bits.push(`<p class="pay-setup" role="status">${esc(boot)}</p>`);
+  if (bootAdmin && bootAdmin !== billing.admin_notice) bits.push(`<p class="pay-setup admin" role="status">${esc(bootAdmin)}</p>`);
+  if (window.__INPMNT__) {
+    window.__INPMNT__.billingNotice = "";
+    window.__INPMNT__.billingAdminNotice = "";
+  }
+  return bits.join("");
+}
+
+function wireCheckout(root) {
+  root.querySelectorAll("[data-plan]").forEach((btn) => {
+    btn.onclick = async () => {
+      btn.disabled = true;
+      try {
+        const res = await api("/api/billing/checkout", {
+          method: "POST",
+          body: JSON.stringify({ plan: btn.dataset.plan }),
+        });
+        if (res.url) location.href = res.url;
+        else toast("We could not start checkout. Please try again, or email support@invcpay.com.");
+      } catch (err) {
+        toast(err.message || "We could not start checkout. Please try again, or email support@invcpay.com.");
+      } finally {
+        btn.disabled = false;
+      }
+    };
+  });
+  root.querySelector("#btn-portal")?.addEventListener("click", async () => {
+    try {
+      const res = await api("/api/billing/portal", { method: "POST", body: "{}" });
+      if (res.url) location.href = res.url;
+      else toast("We could not open billing. Please try again, or email support@invcpay.com.");
+    } catch (err) {
+      toast(err.message || "We could not open billing. Please try again, or email support@invcpay.com.");
+    }
+  });
+}
+
+async function refreshTrialBanner() {
+  const host = document.getElementById("trial-banner");
+  if (!host) return;
+  try {
+    const billing = await api("/api/billing/status");
+    const label = document.getElementById("nav-billing-label");
+    if (label) label.textContent = billing.subscribed ? "Billing" : "Upgrade";
+    if (billing.subscribed) {
+      host.hidden = true;
+      host.innerHTML = "";
+      return;
+    }
+    const days = Number(billing.days_left ?? 0);
+    host.hidden = false;
+    host.innerHTML = `<a href="#/billing">${esc(days)} days left — Choose a plan</a>`;
+  } catch {
+    host.hidden = true;
+  }
+}
+
+async function renderBilling() {
+  const billing = await api("/api/billing/status");
+  const planName = billing.plan === "trial" ? "Trial" : billing.plan;
+  const days = Number(billing.days_left ?? 0);
+  const subscribed = !!billing.subscribed;
+  appEl.innerHTML = `
+    ${topbar({
+      eyebrow: "Account",
+      title: subscribed ? "Billing" : "Upgrade",
+      subtitle: subscribed
+        ? "Your plan is active. Manage the card and invoices in the billing portal."
+        : "Pick monthly or yearly. The trial keeps working until it ends.",
+    })}
+    ${billingNotices(billing)}
+    <div class="panel">
+      <div class="panel-header"><h2>Current plan</h2></div>
+      <p class="settings-note">
+        Plan: <strong>${esc(planName)}</strong>
+        ${billing.trial_ends_on ? ` · trial ends ${esc(fmtDate(billing.trial_ends_on))}` : ""}.
+        ${subscribed ? "" : `${esc(days)} days left.`}
+      </p>
+      <div class="price-actions" style="margin-top:14px;max-width:360px">
+        ${subscribed && billing.has_customer
+          ? `<button class="btn" type="button" id="btn-portal">Manage billing</button>`
+          : subscribeButtons(billing)}
+      </div>
+    </div>
+  `;
+  wireCheckout(appEl);
+}
+
 /* ---------- Settings ---------- */
 async function renderSettings() {
   const [s, billing, me] = await Promise.all([
@@ -713,13 +837,13 @@ async function renderSettings() {
     <div class="panel" style="margin-bottom:14px">
       <div class="panel-header"><h2>Billing</h2></div>
       <p class="settings-note" style="margin-bottom:14px">
-        Plan: <strong>${billing.plan}</strong>
-        ${billing.trial_ends_on ? ` · trial ends ${fmtDate(billing.trial_ends_on)}` : ""}.
-        ${billing.enabled ? "Stripe Checkout is configured." : "Stripe keys missing — add them to .env (see .env.example)."}
+        Plan: <strong>${esc(billing.plan)}</strong>
+        ${billing.trial_ends_on ? ` · trial ends ${esc(fmtDate(billing.trial_ends_on))}` : ""}.
+        ${billing.subscribed ? "" : `${esc(billing.days_left ?? 0)} days left.`}
       </p>
+      ${billingNotices(billing)}
       <div class="actions">
-        ${Object.entries(billing.plans || { monthly: { name: "Monthly", amount_label: "$4.99/mo" }, yearly: { name: "Yearly", amount_label: "$49.99/yr" } }).map(([key, meta], i, all) => `<button class="${i === all.length - 1 ? "btn sm" : "btn secondary sm"}" data-plan="${key}">${meta.name} ${meta.amount_label}</button>`).join("")}
-        ${billing.has_customer ? `<button class="btn ghost sm" id="btn-portal">Manage billing</button>` : ""}
+        <a class="btn sm" href="#/billing">${billing.subscribed ? "Manage billing" : "Upgrade"}</a>
       </div>
     </div>
     <form id="settings-form" class="panel form-grid">
@@ -779,27 +903,6 @@ async function renderSettings() {
     toast("Settings saved");
     renderSettings();
   };
-  appEl.querySelectorAll("[data-plan]").forEach((btn) => {
-    btn.onclick = async () => {
-      try {
-        const res = await api("/api/billing/checkout", {
-          method: "POST",
-          body: JSON.stringify({ plan: btn.dataset.plan }),
-        });
-        if (res.url) location.href = res.url;
-      } catch (err) {
-        toast(err.message || "Checkout unavailable — configure Stripe in .env");
-      }
-    };
-  });
-  appEl.querySelector("#btn-portal")?.addEventListener("click", async () => {
-    try {
-      const res = await api("/api/billing/portal", { method: "POST", body: "{}" });
-      if (res.url) location.href = res.url;
-    } catch (err) {
-      toast(err.message || "Portal unavailable");
-    }
-  });
   appEl.querySelector("#btn-reset-db")?.addEventListener("click", () => {
     openModal({
       title: "Clear the database",
@@ -865,7 +968,9 @@ async function route() {
     else if (path === "/reminders") await renderReminders();
     else if (path === "/templates") await renderTemplates();
     else if (path === "/settings") await renderSettings();
+    else if (path === "/billing") await renderBilling();
     else await renderDashboard();
+    await refreshTrialBanner();
   } catch (err) {
     console.error(err);
     toast(err.message || "Something went wrong");
