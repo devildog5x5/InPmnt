@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 final class Http
 {
-    public const VERSION = '1.6.6';
+    public const VERSION = '1.6.7';
 
     public static function theme(): string
     {

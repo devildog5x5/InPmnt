@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 /**
- * InvoicePay v1.6.6
+ * InvoicePay v1.6.7
  *
  * Hostinger entry point. The version string above stays in lockstep with
  * Http::VERSION and the root VERSION file so a text search of index.php finds it.

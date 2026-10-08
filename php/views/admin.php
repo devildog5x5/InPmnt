@@ -11,7 +11,6 @@ $flash = $flash ?? null;
 $error = $error ?? null;
 $mode = $mode ?? 'home';
 $base = '/admin';
-$ver = Http::VERSION;
 $csrf = Admin::csrfToken();
 ?>
 <!doctype html>
@@ -278,10 +277,7 @@ $csrf = Admin::csrfToken();
         <?php endif; ?>
       </main>
     </div>
-    <footer class="foot">
-      <span id="site-version">InvoicePay v<?= Http::e($ver) ?></span>
-      <span>© 2026 Robert Foster</span>
-    </footer>
+    <?php require __DIR__ . '/_version.php'; ?>
   </div>
   <script>
   (function () {

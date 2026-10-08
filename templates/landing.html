@@ -262,11 +262,9 @@
       <a href="{{ url_for('main.legal', slug='refunds') }}">Refund and cancellation</a>
     </div>
     <div class="footer-meta">
-      <p class="site-version" id="site-version">InvoicePay v{{ app_version }}</p>
-      <p>© 2026 Robert Foster</p>
-      <p>Support: <a href="mailto:support@invcpay.com">support@invcpay.com</a></p>
+      <p class="page-version" id="site-version">{% include "_version_line.html" %}</p>
       {% if show_demo_login %}
-      <p>Local demo: demouser@inpmnt.app / Demo (SHOW_DEMO_LOGIN=1)</p>
+      <p class="page-version">Local demo: demouser@inpmnt.app / Demo</p>
       {% endif %}
     </div>
   </footer>

@@ -37,7 +37,7 @@
     {% endif %}
     <p><a href="{{ url_for('main.landing') }}">Back to home</a></p>
   </article>
-  <footer class="page-version" id="site-version">InvoicePay v{{ app_version }}</footer>
+  <footer class="page-version" id="site-version">{% include "_version_line.html" %}</footer>
   {% include "_help_chat.html" %}
 </body>
 </html>
