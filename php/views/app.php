@@ -97,7 +97,7 @@
     </div>
   </div>
 
-  <footer class="page-version" id="site-version">InvoicePay v<?= Http::e(Http::VERSION) ?></footer>
+  <?php require __DIR__ . '/_version.php'; ?>
 
   <div id="toast-host" class="toast-host"></div>
   <div id="modal-root" class="modal-backdrop"></div>

@@ -356,11 +356,9 @@
       <a href="/refunds">Refund and cancellation</a>
     </div>
     <div class="footer-meta">
-      <p class="site-version" id="site-version">InvoicePay v<?= Http::e(Http::VERSION) ?></p>
-      <p>© 2026 Robert Foster</p>
-      <p>Support: <a href="mailto:support@invcpay.com">support@invcpay.com</a></p>
+      <p class="page-version" id="site-version"><?php require __DIR__ . '/_version_line.php'; ?></p>
       <?php if (!empty($show_demo_login)): ?>
-      <p>Local demo: demouser@inpmnt.app / Demo (SHOW_DEMO_LOGIN=1)</p>
+      <p class="page-version">Local demo: demouser@inpmnt.app / Demo</p>
       <?php endif; ?>
     </div>
   </footer>

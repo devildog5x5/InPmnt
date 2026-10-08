@@ -1411,20 +1411,18 @@ html[data-theme="dark"] .pay-setup.admin {
 html[data-theme="dark"] .landing-footer a:hover { color: #7fd4cf; }
 .footer-col { display: flex; flex-direction: column; gap: 8px; }
 .footer-col h2 { margin: 0 0 4px; font-size: 0.78rem; letter-spacing: 0.06em; text-transform: uppercase; color: #102A43; }
-.footer-meta { grid-column: 1 / -1; border-top: 1px solid var(--line); padding-top: 14px; }
+.footer-meta { grid-column: 1 / -1; border-top: 1px solid var(--line); padding: 2px 0 0; text-align: center; }
 .footer-brand p { margin: 8px 0 0; max-width: 36ch; }
 .legal-page { max-width: 720px; margin: 0 auto; padding: 12px 24px 72px; color: #425466; }
 .legal-page h1 { color: #102A43; font-family: var(--font-display); font-size: 2rem; margin: 0 0 16px; }
 .legal-page p { line-height: 1.6; }
 .legal-page a { color: #056a64; font-weight: 650; }
 html[data-theme="dark"] .legal-page a { color: #7fd4cf; }
-.landing-footer .site-version {
-  margin: 0 0 6px;
-  font-family: var(--font-mono);
-  font-size: 0.95rem;
-  font-weight: 500;
-  color: var(--ink-soft);
-  letter-spacing: 0.02em;
+.landing-footer .footer-meta .page-version,
+.landing-footer .footer-meta .page-version a {
+  font-size: 12.5px;
+  font-weight: 400;
+  color: #425466;
 }
 .kicker {
   margin: 0 0 10px;
@@ -1580,14 +1578,35 @@ html[data-theme="dark"] body.landing .footer-col h2 { color: var(--ink); }
 .page-version {
   display: block;
   width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 8px 16px 10px;
   text-align: center;
-  padding: 12px 16px 20px;
-  font-family: var(--font-mono);
-  font-size: 0.9rem;
-  font-weight: 500;
-  color: var(--ink-soft);
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  font-weight: 400;
+  line-height: 1.45;
+  letter-spacing: 0;
+  color: #425466;
   border-top: 1px solid var(--line);
 }
+.footer-meta .page-version { border-top: 0; padding: 8px 12px 2px; }
+.page-version a {
+  color: inherit;
+  font-weight: 400;
+  font-size: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.page-version a:hover { color: #056a64; }
+html[data-theme="dark"] .page-version,
+html[data-theme="dark"] .page-version a,
+html[data-theme="dark"] .landing-footer .footer-meta .page-version,
+html[data-theme="dark"] .landing-footer .footer-meta .page-version a {
+  color: #c5d0da;
+}
+html[data-theme="dark"] .page-version a:hover,
+html[data-theme="dark"] .landing-footer .footer-meta .page-version a:hover { color: #7fd4cf; }
 
 .sr-only {
   position: absolute;
