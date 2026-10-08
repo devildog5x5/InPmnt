@@ -1740,6 +1740,12 @@ html[data-theme="dark"] .inp-chat-msg.assistant a { color: #7fd4cf; }
   font-size: 0.82rem;
   color: var(--muted);
 }
+.inp-chat-mail a {
+  color: inherit;
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
 
 .hero-band {
   position: relative;

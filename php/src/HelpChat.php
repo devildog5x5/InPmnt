@@ -15,10 +15,12 @@ final class HelpChat
     private const RATE_MAX_SESSION = 16;
     private const RATE_MAX_IP = 40;
 
+    public const SUPPORT_NOTE = 'Text 801-319-1061 for customer support';
+
+    /** Mail config only. Never show this address on a page, in chat, or in an error. */
     public static function supportEmail(): string
     {
-        $em = trim(Env::get('SUPPORT_EMAIL'));
-        return $em !== '' ? $em : 'support@invcpay.com';
+        return trim(Env::get('SUPPORT_EMAIL'));
     }
 
     public static function configured(): bool
@@ -54,7 +56,7 @@ final class HelpChat
             return self::fallback('');
         }
         if (!self::allow()) {
-            return 'Please wait a minute, then try Help again — or email ' . self::supportEmail() . '.';
+            return 'Please wait a minute, then try Help again. ' . self::SUPPORT_NOTE . '.';
         }
         if (!self::configured()) {
             return self::fallback($msg);
@@ -65,6 +67,7 @@ final class HelpChat
             if ($text === '') {
                 return self::fallback($msg);
             }
+            $text = self::hideAddresses($text);
             if (strlen($text) > self::MAX_REPLY) {
                 $text = rtrim(substr($text, 0, self::MAX_REPLY)) . '…';
             }
@@ -77,16 +80,16 @@ final class HelpChat
 
     public static function fallback(string $msg): string
     {
-        $em = self::supportEmail();
+        $note = self::SUPPORT_NOTE;
         if ($msg === '') {
-            return 'Ask me about plans, invoices, reminders, or login. For a person, email ' . $em . '.';
+            return 'Ask me about plans, invoices, reminders, or login. ' . $note . '.';
         }
         $low = strtolower($msg);
         if (preg_match('/price|cost|plan|month|year|annual|19|39|99|billing|subscribe|stripe/', $low)) {
-            return 'InvoicePay is $4.99/month or $49.99/year. You pick either one. The 14-day trial does not need a card. You can switch later from Billing. Email ' . $em . '.';
+            return 'InvoicePay is $4.99/month or $49.99/year. You pick either one. The 14-day trial does not need a card. You can switch later from Billing. ' . $note . '.';
         }
         if (preg_match('/login|password|sign in|forgot|reset/', $low)) {
-            return 'Sign in at /login. Forgot password is at /forgot-password — it emails a reset link when mail is configured. For a person, email ' . $em . '.';
+            return 'Sign in at /login. Forgot password is at /forgot-password — it emails a reset link when mail is configured. ' . $note . '.';
         }
         if (preg_match('/invoice|remind|chase|client|unpaid|schedule/', $low)) {
             return 'In the app, add unpaid invoices and set polite reminder schedules. InvoicePay emails clients so you spend less time chasing late payers.';
@@ -97,7 +100,7 @@ final class HelpChat
         if (preg_match('/admin|owner/', $low)) {
             return 'Workspace admins can open /admin after signing in. That console is for owners only.';
         }
-        return 'InvoicePay helps you chase unpaid invoices with scheduled reminders. Ask about plans, login, or reminders — or email ' . $em . '.';
+        return 'InvoicePay helps you chase unpaid invoices with scheduled reminders. Ask about plans, login, or reminders. ' . $note . '.';
     }
 
     public static function logPath(): string
@@ -181,22 +184,35 @@ final class HelpChat
 
     private static function systemPrompt(): string
     {
-        $em = self::supportEmail();
+        $note = self::SUPPORT_NOTE;
         return <<<TXT
 You are the Help assistant for InvoicePay, an invoice chase / payment reminder app.
 Speak in short, plain sentences. Do not invent features or prices.
 
 Product facts:
-- Brand: InvoicePay. Price: \$4.99/month or \$49.99/year (same features; yearly saves \$9.89 versus \$4.99 × 12). Email reminders are in the trial. SMS and unlimited open invoices are included once you subscribe.
+- Brand: InvoicePay. Price: \$4.99/month or \$49.99/year (same features; yearly saves \$9.89 versus \$4.99 × 12). Email reminders are in the trial. SMS reminder templates are on the paid plan; a phone carrier is not connected, so those texts stay in the reminder log.
 - 14-day trial, no credit card required to start. A card is required only when subscribing. Plans can be changed later from Billing. Cancel anytime.
 - Stripe processes checkout. InvoicePay does not store customers' card details.
 - Sign up at /signup. Sign in at /login. Forgot password at /forgot-password.
 - In the app, paste unpaid invoices and schedule polite reminder emails to clients.
-- Workspace admin console at /admin for admin-role users.
-- For a person, email {$em}.
+- Workspace admin console at /admin for admin-role users. Do not advertise that console as a customer feature.
+- For a person, say exactly: {$note}. The number is 801-319-1061.
 
-If you do not know, say so and give the email. Do not invent phone numbers.
+Never give an email address, a mailto link, or any phone number other than 801-319-1061. If you do not know, say so and give that text number.
 TXT;
+    }
+
+    private static function hideAddresses(string $text): string
+    {
+        $clean = preg_replace(
+            '/\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b/',
+            self::SUPPORT_NOTE,
+            $text
+        );
+        if (!is_string($clean)) {
+            return $text;
+        }
+        return str_ireplace('mail' . 'to:', '', $clean);
     }
 
     private static function allow(): bool

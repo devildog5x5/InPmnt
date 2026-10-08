@@ -32,7 +32,7 @@ final class Billing
         return strlen($v) >= $minLen;
     }
 
-    public const CUSTOMER_SETUP = 'Payments are being set up, please contact support@invcpay.com';
+    public const CUSTOMER_SETUP = 'Payments are being set up. Text 801-319-1061 for customer support.';
 
     public const PAID_PLANS = ['monthly', 'yearly', 'starter', 'pro', 'annual'];
 

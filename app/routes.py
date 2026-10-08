@@ -32,6 +32,7 @@ from .auth import (
 )
 from .billing import (
     CUSTOMER_SETUP,
+    SUPPORT_NOTE,
     PAID_PLANS,
     PLANS,
     admin_setup_message,
@@ -215,15 +216,14 @@ def load_user() -> None:
 def support_chat():
     data = request.get_json(silent=True) or {}
     msg = (data.get("message") or "").strip().lower()
-    email = "support@invcpay.com"
     if any(w in msg for w in ("price", "plan", "annual", "billing", "cost")):
         reply = (
             "InvoicePay is $4.99/month or $49.99/year. You pick either one. "
             "The 14-day trial does not need a card. "
-            f"You can change plans later from Billing. Email {email}."
+            f"You can change plans later from Billing. {SUPPORT_NOTE}."
         )
     else:
-        reply = f"Ask about plans, invoices, reminders, or login. For a person, email {email}."
+        reply = f"Ask about plans, invoices, reminders, or login. {SUPPORT_NOTE}."
     return jsonify({"reply": reply})
 
 
@@ -246,7 +246,6 @@ def legal(slug: str):
         "legal.html",
         title=title,
         slug=slug,
-        support_email="support@invcpay.com",
     )
 
 
@@ -420,7 +419,7 @@ def _redirect_checkout(plan: str, email: str, user_id: int, workspace_id: int, c
     except Exception as exc:  # noqa: BLE001
         current_app.logger.error("Stripe checkout failed: %s", exc)
         session["billing_notice"] = (
-            "We could not start checkout. Please try again, or email support@invcpay.com."
+            f"We could not start checkout. Please try again. {SUPPORT_NOTE}."
         )
         return redirect(url_for("main.app_home") + "#/billing")
     session.pop("signup_plan", None)
@@ -1664,7 +1663,7 @@ def api_billing_checkout():
         except Exception as exc:  # noqa: BLE001
             current_app.logger.error("Stripe checkout failed: %s", exc)
             body = {
-                "error": "We could not start checkout. Please try again, or email support@invcpay.com."
+                "error": f"We could not start checkout. Please try again. {SUPPORT_NOTE}."
             }
             if admin:
                 body["admin_error"] = f"Stripe said: {exc}"
@@ -1693,7 +1692,7 @@ def api_billing_portal():
             sess = create_portal_session(settings["stripe_customer_id"])
         except Exception as exc:  # noqa: BLE001
             current_app.logger.error("Stripe portal failed: %s", exc)
-            body = {"error": "We could not open billing. Please try again, or email support@invcpay.com."}
+            body = {"error": f"We could not open billing. Please try again. {SUPPORT_NOTE}."}
             if ((g.user or {}).get("role") or "").strip().lower() == "admin":
                 body["admin_error"] = f"Stripe said: {exc}"
             return jsonify(body), 400

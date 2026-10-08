@@ -37,7 +37,7 @@
         <?php endif; ?>
         <div class="field">
           <label for="email">Email</label>
-          <input id="email" name="email" type="email" required value="<?= !empty($show_demo_login) ? 'demouser@inpmnt.app' : '' ?>" autocomplete="username" />
+          <input id="email" name="email" type="email" required autocomplete="username" />
         </div>
         <div class="field">
           <label for="password">Password</label>
@@ -49,7 +49,6 @@
         <a href="/forgot-password">Forgot password?</a><br />
         New here? <a href="/signup">Start free trial</a><br />
         <a href="/">← Back to home</a>
-        <?php if (!empty($show_demo_login)): ?><br />Demo: demouser@inpmnt.app / Demo<?php endif; ?>
       </p>
     </div>
   </div>

@@ -10,7 +10,7 @@ $payPlans = [
 ];
 ?>
 <?php if (!$payCfg['enabled']): ?>
-<p class="pay-setup" role="status"><?= Http::e(Billing::CUSTOMER_SETUP) ?></p>
+<p class="pay-setup" role="status">Payments are being set up. <?php require __DIR__ . '/_support_note.php'; ?>.</p>
 <?php if ($payAdmin): ?>
 <p class="pay-setup admin" role="status"><?= Http::e(Billing::adminSetupMessage()) ?></p>
 <?php endif; ?>
