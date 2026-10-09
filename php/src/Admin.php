@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 /**
- * Copyright (c) 2026 Robert Foster
+ * Copyright (c) 2026 REKKY Consulting LLC
  *
  * Admin-only SQLite console for /admin.
  */

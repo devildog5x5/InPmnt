@@ -45,9 +45,13 @@ if (empty($json_ld)) {
             'name' => 'InvoicePay',
             'url' => $origin . '/',
         ],
+        'copyrightHolder' => [
+            '@type' => 'Organization',
+            'name' => 'REKKY Consulting LLC',
+        ],
         'publisher' => [
             '@type' => 'Organization',
-            'name' => 'InvoicePay',
+            'name' => 'REKKY Consulting LLC',
             'url' => $origin . '/',
             'telephone' => '+1-801-319-1061',
         ],

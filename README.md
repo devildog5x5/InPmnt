@@ -2,7 +2,7 @@
 
 **Get paid without the chase.**
 
-Invoice chase + payment reminders for solo trades and freelancers. Built by **Robert Foster**.
+Invoice chase + payment reminders for solo trades and freelancers. Built by **REKKY Consulting LLC**.
 
 InvoicePay helps plumbers, landscapers, photographers, and consultants stop losing cash to late invoices: track open balances, auto-queue polite reminders, send final notices, and record payments — without a full accounting suite.
 
@@ -10,7 +10,9 @@ InvoicePay helps plumbers, landscapers, photographers, and consultants stop losi
 
 Packages for **v1.6.10** are on the [v1.6.10 release](https://github.com/devildog5x5/InPmnt/releases/tag/v1.6.10). The GitHub repo name stays `InPmnt` until Robert renames it. Rebuild locally with `powershell -File .\build_release.ps1` → `installers\`.
 
-v1.6.10: the support note is exactly "Inquiries Text: 801.319.1061".
+v1.6.11: every page footer is one centered line, InvoicePay v1.6.11 · © 2026 REKKY Consulting LLC · Inquiries Text First Then Call: 801.319.1061. Legal pages, structured data, and the manifest name REKKY Consulting LLC. No customer-facing email address.
+
+v1.6.10: customer support on the site is a text to 801.319.1061.
 
 v1.6.9: every page uses the same menu and one-line footer, including pages that were missing. Structured data is on every page.
 
@@ -199,7 +201,7 @@ Leave `STRIPE_PRICE_STARTER`, `STRIPE_PRICE_PRO`, and `STRIPE_PRICE_ANNUAL` only
 
 Set `MAIL_FROM_NAME=InvoicePay` so password-reset mail uses the new name. The env key name itself does not change.
 
-Without those keys, Subscribe stays on the pricing cards and the Billing page and tells customers that payments are being set up. Inquiries Text: 801.319.1061. Admins see which keys in `public_html/.env` are missing or still placeholders.
+Without those keys, Subscribe stays on the pricing cards and the Billing page and tells customers that payments are being set up. Inquiries Text First Then Call: 801.319.1061. Admins see which keys in `public_html/.env` are missing or still placeholders.
 
 ## Features
 
@@ -221,7 +223,7 @@ Without those keys, Subscribe stays on the pricing cards and the Billing page an
 |---|---|
 | Brand | **InvoicePay** |
 | Tagline | Get paid without the chase |
-| Author | Robert Foster |
+| Author | REKKY Consulting LLC |
 | Icon | `static/img/inpmnt-icon.png` |
 | UI | Teal + slate system aligned with Coalesce ERP |
 | Repo / releases | https://github.com/devildog5x5/InPmnt |

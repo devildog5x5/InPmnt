@@ -298,6 +298,12 @@ def _render_guide(slug: str):
         json_ld = {
             "@context": "https://schema.org",
             "@type": "FAQPage",
+            "copyrightHolder": {"@type": "Organization", "name": "REKKY Consulting LLC"},
+            "publisher": {
+                "@type": "Organization",
+                "name": "REKKY Consulting LLC",
+                "telephone": "+1-801-319-1061",
+            },
             "mainEntity": [
                 {
                     "@type": "Question",

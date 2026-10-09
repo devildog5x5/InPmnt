@@ -23,7 +23,7 @@
     <?php elseif ($slug === 'terms'): ?>
     <p>InvoicePay sends the invoice reminders you configure. You are responsible for the accuracy of invoice amounts, the permission to email or text your clients, and the content of those messages.</p>
     <p>The 14-day trial does not require a credit card. After that, the price is $4.99 per month or $49.99 per year. You can switch between those two from Billing. Cancel anytime; access continues through the period already paid.</p>
-    <p>The service is provided by Robert Foster. <?php require __DIR__ . '/_support_note.php'; ?>.</p>
+    <p>The service is provided by REKKY Consulting LLC. <?php require __DIR__ . '/_support_note.php'; ?>.</p>
     <?php elseif ($slug === 'contact'): ?>
     <p><?php require __DIR__ . '/_support_note.php'; ?> for sales, billing, or account questions.</p>
     <p>InvoicePay is the product. This site stays at invcpay.com.</p>

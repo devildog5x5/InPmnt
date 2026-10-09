@@ -1,5 +1,5 @@
 <?php
-/** Copyright (c) 2026 Robert Foster */
+/** Copyright (c) 2026 REKKY Consulting LLC */
 ?>
 <div class="inp-chat" id="inp-chat" data-url="/support/chat">
   <button type="button" class="inp-chat-tab" id="inp-chat-toggle" aria-expanded="false" aria-controls="inp-chat-panel" aria-label="Need help?">

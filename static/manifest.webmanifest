@@ -1,6 +1,8 @@
 {
   "name": "InvoicePay",
   "short_name": "InvoicePay",
+  "description": "Invoice reminders. © 2026 REKKY Consulting LLC.",
+  "author": "REKKY Consulting LLC",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0f161c",

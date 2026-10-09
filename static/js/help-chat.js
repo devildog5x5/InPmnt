@@ -11,7 +11,7 @@
   var history = [];
   var ignoreToggleUntil = 0;
   var chatUrl = wrap.getAttribute("data-url") || "/support/chat";
-  var supportNote = "Inquiries Text: 801.319.1061";
+  var supportNote = "Inquiries Text First Then Call: 801.319.1061";
 
   function linkify(text) {
     var div = document.createElement("div");

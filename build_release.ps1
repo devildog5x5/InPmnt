@@ -92,9 +92,7 @@ Copy-Item -Path (Join-Path $Root "static") -Destination (Join-Path $phpStage "st
 foreach ($pair in @(
     @{ Src = "php\.env.example"; Dest = ".env.example" },
     @{ Src = "php\.htaccess"; Dest = ".htaccess" },
-    @{ Src = "php\.user.ini"; Dest = ".user.ini" },
-    @{ Src = "php\data\.htaccess"; Dest = "data\.htaccess" },
-    @{ Src = "php\data\.gitkeep"; Dest = "data\.gitkeep" }
+    @{ Src = "php\.user.ini"; Dest = ".user.ini" }
 )) {
     $src = Join-Path $Root $pair.Src
     $dest = Join-Path $phpStage $pair.Dest
@@ -106,12 +104,10 @@ foreach ($pair in @(
         Copy-Item -LiteralPath $src -Destination $dest -Force
     }
 }
-# Never ship the live database, secrets, or docs into public_html.
+# Keep the live .env and data/ on the server. The public_html zip must not ship either.
 $dataDir = Join-Path $phpStage "data"
 if (Test-Path -LiteralPath $dataDir) {
-    Get-ChildItem -LiteralPath $dataDir -Force -File -ErrorAction SilentlyContinue |
-        Where-Object { $_.Name -like "*.db" -or $_.Name -like "*.db-wal" -or $_.Name -like "*.db-shm" } |
-        Remove-Item -Force
+    Remove-Item -LiteralPath $dataDir -Recurse -Force
 }
 foreach ($secretName in @(".env", ".env.local")) {
     $secret = Join-Path $phpStage $secretName

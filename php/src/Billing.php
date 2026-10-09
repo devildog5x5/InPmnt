@@ -32,7 +32,7 @@ final class Billing
         return strlen($v) >= $minLen;
     }
 
-    public const CUSTOMER_SETUP = 'Payments are being set up. Inquiries Text: 801.319.1061.';
+    public const CUSTOMER_SETUP = 'Payments are being set up. Inquiries Text First Then Call: 801.319.1061.';
 
     public const PAID_PLANS = ['monthly', 'yearly', 'starter', 'pro', 'annual'];
 
