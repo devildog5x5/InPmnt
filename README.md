@@ -8,7 +8,7 @@ InvoicePay helps plumbers, landscapers, photographers, and consultants stop losi
 
 ## Downloads
 
-Packages for **v1.6.10** are on the [v1.6.10 release](https://github.com/devildog5x5/InPmnt/releases/tag/v1.6.10). The GitHub repo name stays `InPmnt` until Robert renames it. Rebuild locally with `powershell -File .\build_release.ps1` → `installers\`.
+Packages for **v1.6.11** are on the [v1.6.11 release](https://github.com/devildog5x5/InPmnt/releases/tag/v1.6.11). The GitHub repo name stays `InPmnt` until Robert renames it. Rebuild locally with `powershell -File .\build_release.ps1` → `installers\`.
 
 v1.6.11: every page footer is one centered line, InvoicePay v1.6.11 · © 2026 REKKY Consulting LLC · Inquiries Text First Then Call: 801.319.1061. Legal pages, structured data, and the manifest name REKKY Consulting LLC. No customer-facing email address.
 
@@ -20,10 +20,10 @@ v1.6.8: customer support on the site is a text message. No support email is show
 
 | Package | What you get | Download |
 |---------|----------------|----------|
-| **PHP (Hostinger)** | Unzip into `public_html` — no VPS | [invcpay-v1.6.10.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.6.10/invcpay-v1.6.10.zip) |
-| **Portable** | Runnable Windows app — `install.ps1` or `start.ps1` | [ReceiptGrid-Portable.v1.6.10.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.6.10/ReceiptGrid-Portable.v1.6.10.zip) |
-| **Source** | Full source (Python + PHP + Docker) | [ReceiptGrid-Source.v1.6.10.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.6.10/ReceiptGrid-Source.v1.6.10.zip) |
-| **Icon** | Brand icon assets (blue / teal / violet) | [ReceiptGrid-Icon.v1.6.10.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.6.10/ReceiptGrid-Icon.v1.6.10.zip) |
+| **PHP (Hostinger)** | Unzip into `public_html` — no VPS | [invcpay-v1.6.11.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.6.11/invcpay-v1.6.11.zip) |
+| **Portable** | Runnable Windows app — `install.ps1` or `start.ps1` | [ReceiptGrid-Portable.v1.6.11.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.6.11/ReceiptGrid-Portable.v1.6.11.zip) |
+| **Source** | Full source (Python + PHP + Docker) | [ReceiptGrid-Source.v1.6.11.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.6.11/ReceiptGrid-Source.v1.6.11.zip) |
+| **Icon** | Brand icon assets (blue / teal / violet) | [ReceiptGrid-Icon.v1.6.11.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.6.11/ReceiptGrid-Icon.v1.6.11.zip) |
 - Sign up: `/signup` · Local demo (optional): set `SHOW_DEMO_LOGIN=1` then `demouser@inpmnt.app` / `Demo`
 - App URL (local): `https://127.0.0.1:5055` (self-signed cert; accept the browser warning)
 - Rebuild locally: `powershell -File .\build_release.ps1` → `installers\*.zip`
@@ -118,7 +118,7 @@ Production TLS (Let's Encrypt / IIS) is handled by nginx or IIS in front of the 
 
 InvoicePay now ships a **PHP** build you can drop on Hostinger Web/Cloud (no VPS).
 
-1. Download [invcpay-v1.6.10.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.6.10/invcpay-v1.6.10.zip).
+1. Download [invcpay-v1.6.11.zip](https://github.com/devildog5x5/InPmnt/releases/download/v1.6.11/invcpay-v1.6.11.zip).
 2. In hPanel → **Files → File Manager** (or FTP), unzip **all files into `public_html`**.
 3. Copy `.env.example` → `.env`. Set `APP_SECRET` (long random string) and `BASE_URL=https://yourdomain.com`.
 4. hPanel → **Advanced → PHP Configuration**: PHP **8.2+**, enable **pdo_sqlite**.
