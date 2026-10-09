@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 /**
- * Copyright (c) 2026 Robert Foster
+ * Copyright (c) 2026 REKKY Consulting LLC
  *
  * Help tab: simple keyword answers always; Grok when XAI_API_KEY / GROK_API_KEY is set.
  */
@@ -15,7 +15,7 @@ final class HelpChat
     private const RATE_MAX_SESSION = 16;
     private const RATE_MAX_IP = 40;
 
-    public const SUPPORT_NOTE = 'Inquiries Text: 801.319.1061';
+    public const SUPPORT_NOTE = 'Inquiries Text First Then Call: 801.319.1061';
 
     /** Mail config only. Never show this address on a page, in chat, or in an error. */
     public static function supportEmail(): string

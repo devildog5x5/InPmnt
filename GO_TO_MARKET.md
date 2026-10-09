@@ -1,6 +1,6 @@
 # InvoicePay — Go to market
 
-Owner: **Robert Foster** · Product: invoice chase + payment reminders for solo trades / freelancers.
+Owner: **REKKY Consulting LLC** · Product: invoice chase + payment reminders for solo trades / freelancers.
 
 ## Positioning
 

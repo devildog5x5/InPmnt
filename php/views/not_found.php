@@ -1,5 +1,5 @@
 <?php
-/** Copyright (c) 2026 Robert Foster */
+/** Copyright (c) 2026 REKKY Consulting LLC */
 ?>
 <!DOCTYPE html>
 <html lang="en">

@@ -1,10 +1,10 @@
 # InvoicePay owner SOP
 
-Rules for the live site (https://invcpay.com/, PHP on Hostinger shared hosting). Deploy by unzipping `invcpay-vX.Y.Z.zip` into `public_html` with File Manager. There is no SSH. The zip has no `.env`, no `data/*.db`, and no GitHub or source links.
+Rules for the live site (https://invcpay.com/, PHP on Hostinger shared hosting). Deploy by unzipping `invcpay-vX.Y.Z.zip` into `public_html` with File Manager. There is no SSH. The zip has no `.env`, no `data/`, and no GitHub or source links. Keep the server `.env` and `data/` when you unzip.
 
 ## Version
 
-- Show the software version as plain text in the **footer only**: `InvoicePay vX.Y.Z`.
+- Show the software version as plain text in the **footer only**. Every page uses one centered line: `InvoicePay vX.Y.Z · © 2026 REKKY Consulting LLC · Inquiries Text First Then Call: 801.319.1061`. The number is a link to `sms:+18013191061`.
 - Do not put the version in the page `<title>` or in any heading (`h1`–`h6`). Search results should read as the page name, not a build number.
 - Keep `VERSION`, `php/VERSION`, `Http::VERSION`, and the comment at the top of `php/index.php` in lockstep. That comment is for a source text search, not a page heading.
 
@@ -12,7 +12,7 @@ Rules for the live site (https://invcpay.com/, PHP on Hostinger shared hosting).
 
 - **InvoicePay** is the customer-facing name. receiptgrid.pro is a separate receipts product and must not be named on this site.
 - The public origin stays `https://invcpay.com`. Do not change canonical URLs to another domain.
-- The footer version stays `InvoicePay vX.Y.Z`.
+- The footer stays the one centered line that starts with `InvoicePay vX.Y.Z`.
 
 ## Canonical URL
 

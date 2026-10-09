@@ -737,9 +737,9 @@ function wireCheckout(root) {
           body: JSON.stringify({ plan: btn.dataset.plan }),
         });
         if (res.url) location.href = res.url;
-        else toast("We could not start checkout. Please try again. Inquiries Text: 801.319.1061.");
+        else toast("We could not start checkout. Please try again. Inquiries Text First Then Call: 801.319.1061.");
       } catch (err) {
-        toast(err.message || "We could not start checkout. Please try again. Inquiries Text: 801.319.1061.");
+        toast(err.message || "We could not start checkout. Please try again. Inquiries Text First Then Call: 801.319.1061.");
       } finally {
         btn.disabled = false;
       }
@@ -749,9 +749,9 @@ function wireCheckout(root) {
     try {
       const res = await api("/api/billing/portal", { method: "POST", body: "{}" });
       if (res.url) location.href = res.url;
-      else toast("We could not open billing. Please try again. Inquiries Text: 801.319.1061.");
+      else toast("We could not open billing. Please try again. Inquiries Text First Then Call: 801.319.1061.");
     } catch (err) {
-      toast(err.message || "We could not open billing. Please try again. Inquiries Text: 801.319.1061.");
+      toast(err.message || "We could not open billing. Please try again. Inquiries Text First Then Call: 801.319.1061.");
     }
   });
 }
@@ -864,7 +864,7 @@ async function renderSettings() {
       </div>
       <div class="field full">
         <p class="settings-note">
-          Email reminders send when mail is connected. SMS templates stay in the reminder log until a phone carrier is connected. Inquiries Text: 801.319.1061.
+          Email reminders send when mail is connected. SMS templates stay in the reminder log until a phone carrier is connected. Inquiries Text First Then Call: 801.319.1061.
         </p>
       </div>
       <div class="field full actions">

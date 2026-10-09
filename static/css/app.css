@@ -1599,14 +1599,14 @@ html[data-theme="dark"] body.landing .footer-col h2 { color: var(--ink); }
   text-underline-offset: 2px;
 }
 .page-version a:hover { color: #056a64; }
-html[data-theme="dark"] .page-version,
-html[data-theme="dark"] .page-version a,
-html[data-theme="dark"] .landing-footer .footer-meta .page-version,
-html[data-theme="dark"] .landing-footer .footer-meta .page-version a {
-  color: #c5d0da;
+html[data-theme="dark"] body .page-version,
+html[data-theme="dark"] body .page-version a,
+html[data-theme="dark"] body .page-version a:hover,
+html[data-theme="dark"] body.landing .page-version,
+html[data-theme="dark"] body.landing .page-version a,
+html[data-theme="dark"] body.landing .page-version a:hover {
+  color: #fff;
 }
-html[data-theme="dark"] .page-version a:hover,
-html[data-theme="dark"] .landing-footer .footer-meta .page-version a:hover { color: #7fd4cf; }
 
 .sr-only {
   position: absolute;

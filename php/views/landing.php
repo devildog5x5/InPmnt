@@ -14,7 +14,7 @@
         '@graph' => [
             [
                 '@type' => 'Organization',
-                'name' => 'InvoicePay',
+                'name' => 'REKKY Consulting LLC',
                 'url' => $base . '/',
                 'telephone' => '+1-801-319-1061',
                 'logo' => $base . '/static/img/inpmnt-icon.png',
@@ -25,6 +25,15 @@
                 'applicationCategory' => 'BusinessApplication',
                 'operatingSystem' => 'Web',
                 'url' => $base . '/',
+                'copyrightHolder' => [
+                    '@type' => 'Organization',
+                    'name' => 'REKKY Consulting LLC',
+                ],
+                'publisher' => [
+                    '@type' => 'Organization',
+                    'name' => 'REKKY Consulting LLC',
+                    'telephone' => '+1-801-319-1061',
+                ],
                 'description' => 'Invoice reminders, an overdue dashboard, and a reminder queue for small service businesses. 14-day trial, then $4.99 a month or $49.99 a year.',
                 'offers' => [
                     ['@type' => 'Offer', 'name' => 'Monthly', 'price' => '4.99', 'priceCurrency' => 'USD', 'description' => 'Per month after a 14-day trial. Unlimited open invoices and email reminders. SMS templates included; carrier delivery is not connected yet.'],
@@ -322,43 +331,7 @@
     </div>
   </section>
 
-  <footer class="landing-footer">
-    <div class="footer-brand">
-      <div class="brand">
-        <div class="brand-logo img">
-          <picture>
-            <source srcset="/static/img/inpmnt-icon.webp" type="image/webp" />
-            <img src="/static/img/inpmnt-icon.png" width="42" height="42" alt="InvoicePay logo" loading="lazy" decoding="async" />
-          </picture>
-        </div>
-        <div class="brand-copy">
-          <div class="brand-mark">InvoicePay</div>
-          <div class="brand-sub">Get paid</div>
-        </div>
-      </div>
-      <p>InvoicePay for service businesses. This site stays at invcpay.com.</p>
-    </div>
-    <div class="footer-col">
-      <h2>Product</h2>
-      <a href="/pricing">Pricing</a>
-      <a href="#how">How it works</a>
-      <a href="#features">Features</a>
-      <a href="/for-contractors">Contractors</a>
-      <a href="/faq">FAQ</a>
-      <a href="/support">Help</a>
-      <a href="/contact">Contact</a>
-    </div>
-    <div class="footer-col">
-      <h2>Legal</h2>
-      <a href="/privacy">Privacy</a>
-      <a href="/terms">Terms</a>
-      <a href="/security">Security</a>
-      <a href="/refunds">Refund and cancellation</a>
-    </div>
-    <div class="footer-meta">
-      <p class="page-version" id="site-version"><?php require __DIR__ . '/_version_line.php'; ?></p>
-    </div>
-  </footer>
+<?php require __DIR__ . '/_version.php'; ?>
   <script src="/static/js/landing.js?v=<?= rawurlencode(Http::VERSION) ?>" defer></script>
 <?php require __DIR__ . '/_help_chat.php'; ?>
 </body>
